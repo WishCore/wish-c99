@@ -1,0 +1,65 @@
+
+3-rd party licenses used in this software
+
+Before any release this should be reviewed to ensure that this file is up to date.
+
+## BSON library extracted from EJDB, which is released Joyent.
+
+License: Apache 2
+Location in code: deps/bson
+
+
+## uthash https://github.com/troydhanson/uthash
+
+License: BSD
+Location in code: deps/uthash
+
+## mbedtls 
+
+License: Apache License Version 2.0
+Location in code: mbedtls-2.1.2/
+
+## esp8266 SDK and C library (Newlib)
+
+Licenses:
+1) Espressif MIT license, which as of 2016-08-11 covers everything from the 
+NON-OS SDK (also driver_lib)
+
+2) As we are using the GCC-based toolchain [1], there are some extra
+includes and libs that we use from the Xtensa SDK:
+    -newlib-xtensa (libc.a), available at [2]
+        which is covered by multiple licenses:
+        -- newlib: a long list of (apparently MIT-compatible?) licenses [3]
+        -- libgloss: a long list of (apparently MIT-compatible?) licenses [4]
+        -- newlib has some m4 script files which are under (L)GPL. However,
+        my understanding is that these do not taint the newlib library
+        with GPL.
+    -lx106-hal (libhal.a) available at [5], from Tensilica 
+        covered by the MIT license
+    -include files in include.tgz
+        There are some GPL licensed headers, (which seem to be C++
+        related), but they have this special restriction:
+
+        /* As a special exception, if you link this library with other
+         * files,some of which are compiled with GCC, to produce an
+         * executable, this library does not by itself cause the resulting
+         * executable to be covered by the GNU General Public License.
+         * This exception does not however invalidate any other reasons why
+         * the executable file might be covered by the GNU General Public 
+         * License.  */
+
+        See ./xcc/c++/xtensa-elf/bits/gthr-single.h in include.tgz for an example
+
+
+References:
+
+[1] https://github.com/esp8266/esp8266-wiki/wiki/Toolchain
+[2] https://github.com/jcmvbkbc/newlib-xtensa
+[3] https://github.com/jcmvbkbc/newlib-xtensa/blob/master/COPYING.NEWLIB
+[4] https://github.com/jcmvbkbc/newlib-xtensa/blob/master/COPYING.LIBGLOSS
+[5] https://github.com/tommie/lx106-hal
+
+
+Android
+
+Material icons https://material.io/icons/, published by Google, Apache 2.0

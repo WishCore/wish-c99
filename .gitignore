@@ -1,0 +1,17 @@
+/firmware
+/build
+/nbproject
+/mist_c99
+/mist-api
+/wish_id_db.bson
+/wish_hostid.raw
+/mappings.bin
+*.o
+*.d
+*.a
+
+# XCode project details
+/WishMist
+
+# the binary output from Makefile.app
+/wish_app_standalone_c99

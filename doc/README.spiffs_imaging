@@ -1,0 +1,38 @@
+SPIFFS image download, unpacking, creating and uploading on ESP8266
+
+First of all we must know where the spiffs filesystem starts, and the
+parameters page size (256), block size (4096) and filesystem size
+(32768), and also the start address of the filesystem on the ESP8266
+(0x1F2000)
+
+NB: mkspiffs uses MAGIC by default, whereas we don't have that on our
+ESP. (We could have). MAGIC must be disabled in spiffs_config.h in
+mkspiffs
+
+1) Download image from ESP8266 to file /tmp/image
+
+esptool.py --port /dev/ttyUSB0 read_flash 0x1f2000 32768 /tmp/image
+
+2) List the filesystem
+
+./mkspiffs -l /tmp/image
+
+3) Unpack the files on the filesystem
+
+./mkspiffs -u /tmp/unpacked_image /tmp/image
+
+NB: There was a bug in mkspiffs at this point, which we had to correct.
+
+4) Create new filesystem with some files
+
+./mkspiffs  -c mytest/ -p 256 -b 4096 -s 32768 /tmp/new_image
+
+
+NB: There is a bug in mkspiffs, it adds a '/' character in front of the
+file name!
+
+5) Upload the file back to ESP8266:
+
+esptool.py --port /dev/ttyUSB0 write_flash --flash_size 16m --flash_mode qio 0x1F2000 /tmp/new_image
+
+The new file(s) can now be seen on the ESP8266 too!
