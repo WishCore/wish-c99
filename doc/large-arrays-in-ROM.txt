@@ -1,0 +1,91 @@
+Freeing up RAM by moving large pre-computed arrays to ROM (Flash memory)
+
+This text applies to the ESP8266 platform using GCC, but is certainly 
+applicable on any other platform and compiler.
+
+The Wish project uses among others the AES code from the mbedtls
+library. AES uses some large tables which hold pre-computed data.
+Obviously we would like to store this kind of stuff in the ROM. How to
+do that?
+
+The initial situation was that the AES tables were pre-calculated at
+ssytem startup, in RAM memory-based arrays. Storage for these arrays
+were saved in the .bss segment. The bss segment is for statically
+allocated tables, which are initialised to zero, such as your typical
+globally defined arrays which are uninitialised.
+
+You can see what symbols (globals, like variables, arrays, functions) 
+exits and where they are allocated with objdump:
+
+xtensa-lx106-elf-objdump -x build/app.out
+
+(there's a lot of them so pipe to output to 'less' or 'grep')
+
+You can also use: (from [1])
+xtensa-lx106-elf-readelf -s ./out/build/app_0.out > /tmp/app-symbols.csv 
+
+and sort the results in a spreadsheet - however I don't know how to get
+the sections printed out with readelf so maybe objdump -x is better in
+that sense. But readelf produces output which is more easy to use in a
+spreadsheet!
+
+Anyway:
+First, we need to declare on mbdedtls config.h the AES_ROM_TABLES config
+option. This disables the run-time generation of the tables, and enables
+pre-calculated tables from one of the header files. It seems that GCC
+correctly identifies these arrays as "read-only", and allocates
+automatically them to .rodata segment. (obviously they do not end up in
+.bss, since they now have pre-defined data)
+This reduces the bss segment size, but does not actually decrease RAM 
+usage at all! Why, you ask?  Well, because the .rodata segment is allocated 
+by the linker script to RAM memory. So clearly we must do some more tricks 
+to move the arrays to flash ROM.
+
+Looking at the linker script (ld/eagle.app.v6.ld), we see that the flash
+memory is called 'irom0'. Further, we note that the segment .irom0.text
+is something that seems to stored to "irom0" memory.
+
+We can tell GCC (or ld linker, actually) to allocate something to ROM by
+using section attributes. For example, this would define a large array
+to be saved in irom0.text segment:
+
+int32_t __attribute__ ((section(".irom0.text"))) my_array[100] = { 
+    /* initialisation here */ };
+
+Obviosly, an array like this cannot be written to just like that, as it
+is saved in flash ROM. Maybe you could use the flash r/w routines to
+change the contents, but you would need to calculate somehow the actual
+flash sector address first, based on the address of 'my_array' and the
+mapping of flash memory to the address space. Doing this is outside the
+scope of this text.
+
+Arrays and objects saved in flash have an important restriction
+regarding how they can be accessed on the ESP8266 platform. Flash can
+only be read at addresses that are evenly divisible by 4 (in other words
+they must be 4 byte aligned). This means in practice that you cannot use
+a direct array reference (like: my_array[37]) unless the array element
+is an (u)int32_t, or some other type whose size is n*4, n being a
+natural number. If you must store odd-sized elements, you could use a 
+special getter method that gets for example a byte from flash by reading
+the whole 4-byte word containing the said byte, and filter out the byte
+data. This is actually done by the ESP8266 spiffs flash r/w driver.
+
+You should probably also set the aligned attribute to any object stored
+in flash, by appending this string to the section attribute string:
+
+__attribute__ ((aligned(4)))
+
+Note that for this reason it probably is not a good idea to try to move
+.rodata segment to flash (irom0), because the library routines assume
+that string litterals can be accessed byte-by-byte.
+
+Your other options:
+
+You could save your array data to a file, and save that file to 
+spiffs file system which you would flash to the system at the same time
+as the the firmware is flashed. See README.spiffs_imaging for
+information how to generate a spiffs filesystem image.
+
+
+References
+[1] https://blog.attachix.com/get-extra-free-ram-in-esp8266/
