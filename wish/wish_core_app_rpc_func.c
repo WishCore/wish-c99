@@ -1593,6 +1593,7 @@ void wish_report_identity_to_local_services(wish_identity_t* identity, bool onli
                         bson_init_buffer(&bs, buffer, buffer_len);
 
                         bson_append_string(&bs, "type", "peer");
+                        
                         bson_append_start_object(&bs, "peer");
                         bson_append_binary(&bs, "luid", (uint8_t*) identity->uid, WISH_ID_LEN);
                         bson_append_binary(&bs, "ruid", (uint8_t*) identity->uid, WISH_ID_LEN);
@@ -1610,6 +1611,8 @@ void wish_report_identity_to_local_services(wish_identity_t* identity, bool onli
                             WISHDEBUG(LOG_CRITICAL, "BSON error when creating peer message: %i %s len %i", bs.err, bs.errstr, bs.dataSize);
                         }
                         else {
+                            WISHDEBUG(LOG_CRITICAL, "Sending peer message to app %s:", service_registry[i].service_name);
+                            bson_visit(buffer, elem_visitor);
                             send_core_to_app(service_registry[i].wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
                         }
                     }

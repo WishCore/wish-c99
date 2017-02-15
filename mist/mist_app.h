@@ -35,8 +35,8 @@ typedef struct mist_app_t {
     wish_protocol_handler_t ucp_handler;
     struct mist_model model;
     wish_rpc_server_t device_rpc_server;
-    void (*online)(void* app, wish_protocol_peer_t* peer);
-    void (*offline)(void* app, wish_protocol_peer_t* peer);
+    void (*online)(struct mist_app_t* app, wish_protocol_peer_t* peer);
+    void (*offline)(struct mist_app_t* app, wish_protocol_peer_t* peer);
 } mist_app_t;
 
 typedef struct {

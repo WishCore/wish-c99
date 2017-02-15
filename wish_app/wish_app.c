@@ -598,7 +598,7 @@ void wish_app_determine_handler(wish_app_t *app, uint8_t *data, size_t len) {
             }
         }
         else {
-            WISHDEBUG(LOG_CRITICAL, "No ack or err in reponse!");
+            WISHDEBUG(LOG_CRITICAL, "No ack or err in reponse!! %i", len);
             bson_visit(data, elem_visitor);
         }
 

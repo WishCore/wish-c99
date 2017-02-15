@@ -87,12 +87,24 @@ static void mist_ready(wish_rpc_ctx *req, uint8_t *args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-static void online(void* ctx, wish_protocol_peer_t* peer) {
+static void online(mist_app_t* ctx, wish_protocol_peer_t* peer) {
     WISHDEBUG(LOG_CRITICAL, "online(%p): %p", ctx, peer);
     
     mist_api_t* mist_api = NULL; // find from existing mist apis based on context
+    mist_api_t* elt;
     
-    return;
+    DL_FOREACH(mist_apis, elt) {
+        if(ctx == elt->mist_app) {
+            // found it!
+            mist_api = elt;
+            break;
+        }
+    }
+    
+    if (mist_api == NULL) {
+        WISHDEBUG(LOG_CRITICAL, "online failed to determine mist_api instance, bailing!");
+        return;
+    }    
     
     int buf_len = 300;
     char buf[buf_len];
@@ -131,12 +143,24 @@ static void online(void* ctx, wish_protocol_peer_t* peer) {
     }
 }
 
-static void offline(void* ctx, wish_protocol_peer_t* peer) {
-    //WISHDEBUG(LOG_CRITICAL, "offline(%p): %p", ctx, peer);
+static void offline(mist_app_t* ctx, wish_protocol_peer_t* peer) {
+    WISHDEBUG(LOG_CRITICAL, "offline(%p): %p", ctx, peer);
+    
     mist_api_t* mist_api = NULL; // find from existing mist apis based on context
+    mist_api_t* elt;
     
-    return;
+    DL_FOREACH(mist_apis, elt) {
+        if(ctx == elt->mist_app) {
+            // found it!
+            mist_api = elt;
+            break;
+        }
+    }
     
+    if (mist_api == NULL) {
+        WISHDEBUG(LOG_CRITICAL, "offline failed to determine mist_api instance, bailing!");
+        return;
+    }    
     
     int buf_len = 300;
     char buf[buf_len];
@@ -1605,7 +1629,7 @@ static void update_identity_export_db(mist_api_t* mist_api) {
 }
 
 void identity_list_cb(rpc_client_req* req, void *ctx, uint8_t *payload, size_t payload_len) {
-    WISHDEBUG(LOG_CRITICAL, "API ready! context is %p", ctx);
+    //WISHDEBUG(LOG_CRITICAL, "API ready! context is %p", ctx);
     //bson_visit(payload, elem_visitor);
     
     bson_iterator it;

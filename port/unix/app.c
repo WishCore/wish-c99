@@ -447,6 +447,7 @@ void setup_wish_server(void) {
     if (bind(serverfd, (struct sockaddr *) &server_addr, 
             sizeof(server_addr)) < 0) {
         perror("ERROR on binding wish server socket");
+        printf("setup_wish_server: Trying to bind port %d failed.\n", server_addr.sin_port);
         exit(1);
     }
     int connection_backlog = 1;
@@ -503,6 +504,7 @@ int main(int argc, char** argv) {
 
     /* Process command line options */
     if (argc >= 2) {
+        printf("Parsing command line options.\n");
         process_cmdline_opts(argc, argv);
     } else {
         printf("Using default parameters. Start with -h for options.\n");
