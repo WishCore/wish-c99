@@ -54,6 +54,17 @@ static void methods(wish_rpc_ctx* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
+static void version(wish_rpc_ctx* req, uint8_t* args) {
+    
+    bson bs; 
+    bson_init(&bs);
+    bson_append_string(&bs, "data", MIST_API_VERSION_STRING);
+    bson_finish(&bs);
+    
+    wish_rpc_server_send(req, bs.data, bson_size(&bs));
+    bson_destroy(&bs);
+}
+
 static void model_cb(rpc_client_req* req, void *ctx, uint8_t *payload, size_t payload_len) {
     WISHDEBUG(LOG_CRITICAL, "model response:");
     bson_visit(payload, elem_visitor);
@@ -1481,6 +1492,7 @@ static struct wish_rpc_server_handler manage_user_ensure_handler =           { .
 
 // RPC enumeration
 static struct wish_rpc_server_handler methods_handler =                      { .op_str = "methods",                         .handler = methods };
+static struct wish_rpc_server_handler version_handler =                      { .op_str = "version",                         .handler = version };
 
 // MistAPI commands
 static struct wish_rpc_server_handler mist_signals_handler =                 { .op_str = "signals",                         .handler = mist_signals };
@@ -1729,6 +1741,7 @@ static void mist_api_init_rpc(mist_api_t* mist_api) {
     }
     
     wish_rpc_server_register(&mist_api->server, &methods_handler);
+    wish_rpc_server_register(&mist_api->server, &version_handler);
     
     wish_rpc_server_register(&mist_api->server, &mist_list_services_handler);
     wish_rpc_server_register(&mist_api->server, &mist_signals_handler);

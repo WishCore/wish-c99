@@ -11,7 +11,10 @@ EXTRA_INCDIR    = wish_app_deps wish_rpc deps/libuv/include deps/mbedtls-2.1.2/i
 LIBS		= 
 
 # Mist Modbus changes by AK 2016-09-20
-CFLAGS		= -Wall -fPIC -ffunction-sections -fvisibility=hidden -fdata-sections -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-variable -pthread -MD -DSTDC_HEADERS -DHAVE_STDLIB_H -DENABLE_PTHREAD
+#CFLAGS		= -O2 -DRELEASE_BUILD -Wall -fPIC -ffunction-sections -fvisibility=hidden -fdata-sections -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-variable -pthread -MD -DSTDC_HEADERS -DHAVE_STDLIB_H -DENABLE_PTHREAD
+CFLAGS		= -g -O0 -Wall -fPIC -ffunction-sections -fvisibility=hidden -fdata-sections -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-variable -pthread -MD -DSTDC_HEADERS -DHAVE_STDLIB_H -DENABLE_PTHREAD
+
+CFLAGS         += -DMIST_API_VERSION_STRING=\"$(shell git describe --abbrev=4 --dirty --always --tags)\"
 
 # ASM flags
 ASFLAGS     = -MD 
