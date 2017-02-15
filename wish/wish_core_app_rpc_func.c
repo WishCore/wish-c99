@@ -720,6 +720,7 @@ static void identity_create_handler(wish_rpc_ctx* req, uint8_t* args) {
 
     WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
     wish_ldiscover_advertize(new_id.uid);
+    wish_report_identity_to_local_services(&new_id, true);
 }
 /*
  * identity.remove
@@ -746,6 +747,11 @@ static void identity_remove_handler(wish_rpc_ctx* req, uint8_t* args) {
         uint8_t *luid = 0;
         luid = (uint8_t *)bson_iterator_bin_data(&it);
 
+        wish_identity_t id_to_remove;
+        if (wish_load_identity(luid, &id_to_remove) > 0) {
+            wish_report_identity_to_local_services(&id_to_remove, false);
+        }
+        
         int res = wish_identity_remove(luid);
 
         bson bs;
@@ -1552,6 +1558,62 @@ void wish_send_peer_update_locals(uint8_t *dst_wsid, struct wish_service_entry *
             }
             else {
                 send_core_to_app(dst_wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
+            }
+        }
+    }
+}
+
+/** Report the existence of the new identity to local services:
+ *
+ * Let the new identity to be i.
+ * Let the local host identity to be h.
+ * For every service "s" present in the local service registry, do;
+ *    For every service "r" present in the local service registry, do:
+ *      Construct "type: peer", "online: true", message with: <luid=i, ruid=i, rsid=r, rhid=h> and send it to s. If r == s, skip to avoid sending online message to service itself.
+ *    done
+ * done.      
+ * 
+ * @param identity the identity to send updates for
+ * @param online true, if the identity is online (e.g. true when identity is created, false when identity is deleted)
+ */
+void wish_report_identity_to_local_services(wish_identity_t* identity, bool online) {
+    uint8_t local_hostid[WISH_WHID_LEN];
+    wish_core_get_local_hostid(local_hostid);
+    struct wish_service_entry *service_registry = wish_service_get_registry();
+    int i = 0;
+    for (i = 0; i < WISH_MAX_SERVICES; i++) {
+        if (wish_service_entry_is_valid(&(service_registry[i]))) {
+            int j = 0;
+            for (j = 0; j < WISH_MAX_SERVICES; j++) {
+                if (wish_service_entry_is_valid(&(service_registry[j]))) {
+                    if (memcmp(service_registry[i].wsid, service_registry[j].wsid, WISH_WSID_LEN) != 0) {
+                        bson bs;
+                        int buffer_len = 2 * WISH_ID_LEN + WISH_WSID_LEN + WISH_WHID_LEN + WISH_PROTOCOL_NAME_MAX_LEN + 200;
+                        uint8_t buffer[buffer_len];
+                        bson_init_buffer(&bs, buffer, buffer_len);
+
+                        bson_append_string(&bs, "type", "peer");
+                        bson_append_start_object(&bs, "peer");
+                        bson_append_binary(&bs, "luid", (uint8_t*) identity->uid, WISH_ID_LEN);
+                        bson_append_binary(&bs, "ruid", (uint8_t*) identity->uid, WISH_ID_LEN);
+                        bson_append_binary(&bs, "rsid", (uint8_t*) service_registry[j].wsid, WISH_WSID_LEN);
+                        bson_append_binary(&bs, "rhid", (uint8_t*) local_hostid, WISH_ID_LEN);
+                        /* FIXME support more protocols than just one */
+                        bson_append_string(&bs, "protocol", &(service_registry[j].protocols[0][0]));
+                        
+                        bson_append_string(&bs, "type", "N");   /* FIXME will be type:"D" someday when deleting identity? */
+                        bson_append_bool(&bs, "online", online);
+                        bson_append_finish_object(&bs);
+
+                        bson_finish(&bs);
+                        if (bs.err) {
+                            WISHDEBUG(LOG_CRITICAL, "BSON error when creating peer message: %i %s len %i", bs.err, bs.errstr, bs.dataSize);
+                        }
+                        else {
+                            send_core_to_app(service_registry[i].wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
+                        }
+                    }
+                }
             }
         }
     }
