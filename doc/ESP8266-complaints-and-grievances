@@ -1,7 +1,0 @@
-- How to disable "automatic" reboot by watchdog? For example, we want to disable watchdog when os_malloc has failed for debugging purposes. (check system_soft_wdt_stop)
-
-- How to enable "back pressure" for TCP connections. It seems that the user application cannot control how much data is fed to it through receive callback.
-
-- What is the largest buffer that can be supplied to user app via espconn_recv_callback? 
-
-
