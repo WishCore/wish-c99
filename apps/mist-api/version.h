@@ -17,7 +17,8 @@ extern "C" {
 
 #ifndef MIST_API_VERSION_STRING
 #define MIST_API_VERSION_STRING "rogue-build"
-
+#endif
+    
 #ifdef __cplusplus
 }
 #endif

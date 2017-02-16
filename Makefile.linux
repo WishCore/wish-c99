@@ -20,10 +20,11 @@ LIBS		=
 # Remove -Werror for now, as our port of mbedTLS produces som many
 # warnings
 
-# Mist Modbus changes by AK 2016-09-20
-#CFLAGS		=  -g -Wall
-CFLAGS		=  -Os -Wall -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread -MD -DSTDC_HEADERS -DHAVE_STDLIB_H -DENABLE_PTHREAD -DMBM_RTU_ENABLED=1 -DMBM_ASCII_ENABLED=0 -DMBM_SERIAL_RTU_MAX_INSTANCES=2 -DMBM_TCP_ENABLED=0
-#-MD -D_XOPEN_SOURCE=500 -DSTDC_HEADERS -DHAVE_STDLIB_H -DMBM_SERIAL_ASCII_MAX_INSTANCES=2 -DMBM_TCP_ENABLED=0
+# Debug and release builds (debug starts with -g, release containts -DRELEASE_BUILD)
+CFLAGS		=  -g -O0 -Wall -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread
+#CFLAGS		=  -Os -Wall -DRELEASE_BUILD -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread
+
+CFLAGS         += -DWISH_CORE_VERSION_STRING=\"$(shell git describe --abbrev=4 --dirty --always --tags)\"
 
 # ASM flags
 ASFLAGS     = -MD 
