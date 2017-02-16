@@ -34,8 +34,6 @@
 #if 0
 #include "wish_app_mist_modbus.h"
 #endif
-//#include "wish_app_mist_example.h"
-#include "wish_app_chat.h"
 
 #include "fs_port.h"
 #include "wish_relay_client.h"

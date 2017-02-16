@@ -24,6 +24,7 @@
 
 /** If this is defined, include support for the App TCP server */
 #define WITH_APP_TCP_SERVER
+//#define WITH_APP_INTERNAL
 
 /** If this is defined, any friend request is accepted automatically if
  * id database contains just one entry */

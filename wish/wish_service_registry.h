@@ -15,8 +15,7 @@ struct wish_service_entry {
     uint8_t wsid[WISH_WSID_LEN];
     char service_name[WISH_APP_NAME_MAX_LEN];
     uint8_t protocols[WISH_PROTOCOL_NAME_MAX_LEN][WISH_APP_MAX_PROTOCOLS]; 
-    uint8_t 
-        permissions[WISH_PERMISSION_NAME_MAX_LEN][WISH_APP_MAX_PERMISSIONS];
+    //uint8_t permissions[WISH_PERMISSION_NAME_MAX_LEN][WISH_APP_MAX_PERMISSIONS];
 };
 
 

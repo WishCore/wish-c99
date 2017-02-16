@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include "wish_app.h"
-#include "app_service_ipc.h"
+//#include "app_service_ipc.h"
 #include "core_service_ipc.h"
 #include "cbson.h"
 #include "bson_visitor.h"
@@ -60,7 +60,7 @@ void receive_app_to_core(uint8_t wsid[WISH_ID_LEN], uint8_t *data, size_t len) {
     wish_core_handle_app_to_core(wsid, data, len);
 }
 
-
+#if 0
 void receive_core_to_app(wish_app_t *app, uint8_t *data, size_t len) {
     /* Parse the message:
      * -peer
@@ -71,7 +71,7 @@ void receive_core_to_app(wish_app_t *app, uint8_t *data, size_t len) {
      */
     wish_app_determine_handler(app, data, len);
 }
-
+#endif
 
 void send_core_to_app(uint8_t wsid[WISH_ID_LEN], uint8_t *data, size_t len) {
 #ifdef WITH_APP_TCP_SERVER
@@ -86,6 +86,7 @@ void send_core_to_app(uint8_t wsid[WISH_ID_LEN], uint8_t *data, size_t len) {
      * server, and should be handled locally */
 
 #endif
+#ifdef WITH_APP_INTERNAL    
     /* Find from the list of wish apps the one with the said wsid */
     wish_app_t *dst_app = wish_app_find_by_wsid(wsid);
     if (dst_app == NULL) {
@@ -95,6 +96,7 @@ void send_core_to_app(uint8_t wsid[WISH_ID_LEN], uint8_t *data, size_t len) {
     else {
         receive_core_to_app(dst_app, data, len);
     }
+#endif
 }
 
 

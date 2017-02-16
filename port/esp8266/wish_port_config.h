@@ -31,5 +31,7 @@
      You should make sure that in the worst case any message will fit into WISH_PORT_RPC_BUFFFER_SZ */
 #define WISH_PORT_MAX_UIDS ( 4 ) /* identity.list: 128 uid entries should fit into 16k RPC buffer */
 
+/** When the Wish core is embedded into the main application WITH_APP_INTERNAL needs to be set */
+#define WITH_APP_INTERNAL
 
 #endif

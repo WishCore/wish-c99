@@ -5,7 +5,7 @@
 
 #include "wish_service_registry.h"
 #include "wish_protocol.h"
-#include "wish_acl.h"
+//#include "wish_acl.h"
 #include "cbson.h"
 #include "wish_debug.h"
 #include "wish_core_rpc_func.h"
