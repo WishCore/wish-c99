@@ -5,13 +5,13 @@ TARGET         = mist
 VERSION_STRING = $(shell git describe --abbrev=4 --dirty --always --tags)
 
 # which modules (subdirectories) of the project to include in compiling
-MODULES		= wish deps/mbedtls-2.1.2/library deps/cBSON deps/ed25519/src port port/unix ed25519/src deps/wish_rpc deps/bson
+MODULES		= wish deps/mbedtls-2.1.2/library deps/cBSON deps/ed25519/src port port/unix deps/wish-rpc-c99/src deps/bson
 
 # Disabled Mist Apps in linux build
 # MODULES:       mist apps/mist-modbus apps/mist-example apps/mist-modbus/mbmaster apps/mist-modbus/mbmaster/rtu apps/mist-modbus/mbmaster/functions apps/mist-modbus/mbmaster/common apps/mist-modbus/mbmaster_port
 # EXTRA_INCDIR:  apps/mist-modbus/mbmaster/include apps/mist-modbus/mbmaster_port
 
-EXTRA_INCDIR    = deps/libuv/include deps/mbedtls-2.1.2/include deps/cBSON deps/wish_rpc deps/bson deps/ed25519/src deps/uthash/include
+EXTRA_INCDIR    = deps/libuv/include deps/mbedtls-2.1.2/include deps/cBSON deps/wish-rpc-c99/src deps/bson deps/ed25519/src deps/uthash/include
 
 # libraries used in this project, mainly provided by the SDK
 LIBS		= 
