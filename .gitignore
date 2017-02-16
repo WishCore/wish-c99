@@ -1,7 +1,7 @@
 /firmware
 /build
 /nbproject
-/mist_c99
+/wish-core-*
 /mist-api
 /wish_id_db.bson
 /wish_hostid.raw

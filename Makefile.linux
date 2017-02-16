@@ -1,7 +1,8 @@
 BUILD_BASE	= build
 
 # name for the target project
-TARGET		= mist
+TARGET         = mist
+VERSION_STRING = $(shell git describe --abbrev=4 --dirty --always --tags)
 
 # which modules (subdirectories) of the project to include in compiling
 MODULES		= wish deps/mbedtls-2.1.2/library deps/cBSON deps/ed25519/src port port/unix ed25519/src deps/wish_rpc deps/bson
@@ -24,7 +25,7 @@ LIBS		=
 CFLAGS		=  -g -O0 -Wall -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread
 #CFLAGS		=  -Os -Wall -DRELEASE_BUILD -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread
 
-CFLAGS         += -DWISH_CORE_VERSION_STRING=\"$(shell git describe --abbrev=4 --dirty --always --tags)\"
+CFLAGS         += -DWISH_CORE_VERSION_STRING=\"$(VERSION_STRING)\"
 
 # ASM flags
 ASFLAGS     = -MD 
@@ -78,7 +79,7 @@ all: clean checkdirs $(TARGET)
 noclean:  checkdirs $(TARGET) 
 
 $(TARGET): $(OBJ)
-	gcc $(OBJ) $(LDFLAGS) $(LDLIBS) -o mist_c99
+	gcc $(OBJ) $(LDFLAGS) $(LDLIBS) -o wish-core-$(VERSION_STRING)-x64-linux
 
 checkdirs: $(BUILD_DIR) 
 
