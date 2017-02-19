@@ -1,0 +1,263 @@
+/* This is the implementation for the Mist C99 simple "App" TCP
+ * interface (ie. the one without any kind of encryption in app
+ * connections)
+ */
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h> 
+#include <time.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#include "wish_io.h"
+#include "wish_event.h"
+#include "wish_platform.h"
+#include "wish_debug.h"
+//#include "wish_service_registry.h"
+
+#include "bson.h"
+#include "bson_visitor.h"
+
+#include "wish_local_discovery.h"
+#include "wish_connection_mgr.h"
+#include "wish_core_rpc_func.h"
+#include "wish_app.h"
+#include "wish_identity.h"
+#include "wish_time.h"
+//#include "app_service_ipc.h"
+#include "core_service_ipc.h"
+
+
+#include "fs_port.h"
+#include "wish_relay_client.h"
+
+
+#include "app_server.h"
+
+
+/* Prototypes */
+void socket_set_nonblocking(int sockfd);
+
+int app_serverfd = 0;
+
+/* This array holds the fds for app connections */
+int app_fds[NUM_APP_CONNECTIONS];
+enum app_state app_states[NUM_APP_CONNECTIONS];
+ring_buffer_t app_rx_ring_bufs[NUM_APP_CONNECTIONS];
+
+uint16_t app_transport_expect_bytes[NUM_APP_CONNECTIONS];
+enum app_transport_state app_transport_states[NUM_APP_CONNECTIONS];
+
+struct app_entry {
+    uint8_t wsid[WISH_WSID_LEN];
+};
+static struct app_entry apps[NUM_APP_CONNECTIONS];
+
+bool app_login_complete[NUM_APP_CONNECTIONS];
+
+
+/** This function sets up the app server listening socket so that App
+ * clients can be accepted when select detects incoming connection
+ * (indicated by fd turning to readable)
+ *
+ * @param app_port the TCP port where the app server should bind to
+ */
+void setup_app_server(wish_core_t* core, uint16_t app_port) {
+    //printf("App server starting\n");
+    app_serverfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (app_serverfd < 0) {
+        perror("App server socket creation");
+        exit(1);
+    }
+    int option = 1;
+    setsockopt(app_serverfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+    socket_set_nonblocking(app_serverfd);
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof (server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(app_port);
+    if (bind(app_serverfd, (struct sockaddr *) &server_addr, 
+            sizeof(server_addr)) < 0) {
+        perror("ERROR on binding");
+        exit(1);
+    }
+    int connection_backlog = 1;
+    if (listen(app_serverfd, connection_backlog) < 0) {
+        perror("listen()");
+    }
+
+    /* Setup app connection ring buffers */
+    int i = 0;
+    for (i = 0; i < NUM_APP_CONNECTIONS; i++) {
+        uint8_t *backing = (uint8_t *) malloc(APP_RX_RB_SZ);
+        if (backing == NULL) {
+            printf("Could not allocate app connection rb backing\n");
+            exit(1);
+        }
+        ring_buffer_init(&app_rx_ring_bufs[i], backing, APP_RX_RB_SZ);
+        app_transport_states[i] = APP_TRANSPORT_INITIAL;
+    }
+}
+
+bool is_app_via_tcp(wish_core_t* core, uint8_t wsid[WISH_WSID_LEN]) {
+    bool retval = false;
+    int i = 0;
+    for (i = 0; i < NUM_APP_CONNECTIONS; i++) {
+        if (memcmp(apps[i].wsid, wsid, WISH_WSID_LEN) == 0) {
+            /* Found the app! */
+            retval = true;
+            break;
+        }
+    }
+
+    return retval;
+}
+
+void send_core_to_app_via_tcp(wish_core_t* core, uint8_t wsid[WISH_ID_LEN], uint8_t *data, size_t len) {
+    /* Find app index */
+    int i = 0;
+    for (i = 0; i < NUM_APP_CONNECTIONS; i++) {
+        if (memcmp(apps[i].wsid, wsid, WISH_ID_LEN) == 0) {
+            /* Found our app connection */
+
+            uint16_t frame_len =  ((len & 0xff) << 8) | (len >> 8);
+            ssize_t write_ret = write(app_fds[i], (uint8_t *) &frame_len, 2);
+            if (write_ret != 2) {
+                printf("App connection: Write error!");
+            }
+            write_ret = write(app_fds[i], data, len);
+            if (write_ret != len) {
+                printf("App connection: Write error!");
+            }
+        }
+
+    }
+}
+
+
+void app_connection_feed(wish_core_t* core, int i, uint8_t *buffer, size_t buffer_len) {
+    //printf("Feeding %i bytes from app %i\n", (int) buffer_len, i);
+    ring_buffer_write(&app_rx_ring_bufs[i], buffer, buffer_len);
+
+again:
+    switch (app_transport_states[i]) {
+    case APP_TRANSPORT_INITIAL:
+        /* We expect to get the preabmle bytes first */
+        if (ring_buffer_length(&app_rx_ring_bufs[i]) < 3) {
+            /* Not enough data to read yet */
+            break;
+        }
+        else {
+            /* There enough data to read so we can see if we got the
+             * preamble! */
+            uint8_t preamble[3];
+            ring_buffer_read(&app_rx_ring_bufs[i], preamble, 3);
+            if (preamble[0] == 'W' 
+                    && preamble[1] == '.' 
+                    && preamble[2] == 0x18) {
+                printf("Error: App server secure handshake not implemented.\n");
+                app_transport_states[i] = APP_TRANSPORT_CLOSING;
+                break;
+            }
+            else if (preamble[0] == 'W' 
+                    && preamble[1] == '.' 
+                    && preamble[2] == 0x19) {
+                //printf("App server handshake OK\n");
+                /* Handshake OK, FALLTHROUGH to next case */
+                app_transport_states[i] = APP_TRANSPORT_WAIT_FRAME_LEN;
+            }
+            else {
+                printf("App server handshake error, version %d, type %d\n", preamble[2]>>4, preamble[2] & 0x0F);
+                break;
+            }
+        }
+        /* FALLTHROUGH */
+    case APP_TRANSPORT_WAIT_FRAME_LEN:
+        if (ring_buffer_length(&app_rx_ring_bufs[i]) >= 2) {
+            uint8_t len_bytes[2];
+            ring_buffer_read(&app_rx_ring_bufs[i], len_bytes, 2);
+            uint16_t expect_len = len_bytes[0] << 8 | len_bytes[1];
+            app_transport_expect_bytes[i] = expect_len;
+            app_transport_states[i] = APP_TRANSPORT_WAIT_PAYLOAD;
+            //printf("Now Waiting payload %i\n", expect_len);
+            if (ring_buffer_length(&app_rx_ring_bufs[i]) >= 
+                    app_transport_expect_bytes[i]) {
+                goto again;
+            }
+        }
+        break;
+    case APP_TRANSPORT_WAIT_PAYLOAD:
+        ;
+        uint16_t expect_len = app_transport_expect_bytes[i];
+        if (ring_buffer_length(&app_rx_ring_bufs[i]) >= expect_len) {
+            uint8_t payload[expect_len];
+            ring_buffer_read(&app_rx_ring_bufs[i], payload, expect_len);
+            app_transport_states[i] = APP_TRANSPORT_WAIT_FRAME_LEN;
+            //printf("Received whole frame! len = %i\n", expect_len);
+            if (app_login_complete[i] == false) {
+                /* Snatch WSID */
+                uint8_t *wsid;
+                int32_t wsid_len;
+                if (bson_get_binary(payload, "wsid", &wsid, &wsid_len)
+                        == BSON_SUCCESS) {
+                    if (wsid_len == WISH_WSID_LEN) {
+                        //printf("Found wsid from login message!");
+                        memcpy(apps[i].wsid, wsid, WISH_WSID_LEN);
+                        app_login_complete[i] = true;
+                    }
+                    else {
+                        printf("Wsid len mismatch in login message!");
+                    }
+                }
+                else {
+                    printf("Bad login message!\n");
+                    bson_visit(payload, elem_visitor);
+                }
+
+            }
+            /* Uncomment the following if you would like to see
+             * everything coming from the TCP app */
+            receive_app_to_core(core, apps[i].wsid, payload, expect_len);
+            if (ring_buffer_length(&app_rx_ring_bufs[i]) >= 2) {
+                goto again;
+            }
+        }
+
+        break;
+    case APP_TRANSPORT_CLOSING:
+        WISHDEBUG(LOG_CRITICAL, "This transport is in CLOSING state, server is disregarding.");
+        /* FIXME unhandled! */
+        break;
+    }
+}
+
+
+void app_connection_cleanup(wish_core_t* core, int i) {
+    if (app_states[i] != APP_CONNECTION_CONNECTED) {
+        WISHDEBUG(LOG_CRITICAL, "Illegal app state when app_connection_cleanup was called!");
+        return;
+    }
+    
+    /* We should now notify the Wish core that the service has gone way. The core will then send 'peers' updates ("offline-messages") to other cores which are subscribed to 'peers' */
+    wish_service_register_remove(core, apps[i].wsid);
+    /* Low-level clean-up: */
+    app_states[i] = APP_CONNECTION_INITIAL;
+    app_transport_states[i] = APP_TRANSPORT_INITIAL;
+    app_login_complete[i] = false;
+    memset(apps[i].wsid, 0, WISH_ID_LEN);
+
+    /* Empty the ring buffer so that no trashes are left */
+    uint16_t len = ring_buffer_length(&app_rx_ring_bufs[i]);
+    ring_buffer_skip(&app_rx_ring_bufs[i], len);
+}
