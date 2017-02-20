@@ -6,6 +6,7 @@
 #include "wish_rpc.h"
 #include "wish_version.h"
 #include "wish_identity.h"
+#include "wish_core_signals.h"
 #include "wish_io.h"
 #include "wish_core_app_rpc_func.h"
 #include "wish_core.h"
@@ -1415,6 +1416,7 @@ void write_bson_error(wish_rpc_ctx* req, int errno, char *errmsg) {
 }
 
 struct wish_rpc_server_handler methods_handler =                { .op_str = "methods",                .handler = methods };
+struct wish_rpc_server_handler signals_handler =                { .op_str = "signals",                .handler = wish_core_signals };
 struct wish_rpc_server_handler version_handler =                { .op_str = "version",                .handler = version };
 struct wish_rpc_server_handler services_send_handler =          { .op_str = "services.send",          .handler = services_send };
 struct wish_rpc_server_handler identity_sign_handler =          { .op_str = "identity.sign",          .handler = identity_sign };
@@ -1430,6 +1432,7 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     core->core_app_rpc_server->context = core;
     
     wish_rpc_server_register(core->core_app_rpc_server, &methods_handler);
+    wish_rpc_server_register(core->core_app_rpc_server, &signals_handler);
     wish_rpc_server_register(core->core_app_rpc_server, &version_handler);
     
     wish_rpc_server_register(core->core_app_rpc_server, &services_send_handler);
