@@ -10,9 +10,6 @@
 #include "cbson.h"
 
 
-/* FIXME getter function? */
-extern wish_context_t wish_context_pool[WISH_CONTEXT_POOL_SZ];
-
 #define PING_INTERVAL 10    /* seconds */
 #define PING_TIMEOUT (PING_INTERVAL + 30) /* seconds, must be larger than PING_INTERVAL */
 
@@ -23,7 +20,7 @@ extern wish_context_t wish_context_pool[WISH_CONTEXT_POOL_SZ];
 static void check_connection_liveliness(wish_core_t* core) {
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        wish_context_t* w = &(wish_context_pool[i]);
+        wish_context_t* w = &(core->wish_context_pool[i]);
         switch (w->context_state) {
         case WISH_CONTEXT_CONNECTED:
             /* We have found a connected context we must examine */

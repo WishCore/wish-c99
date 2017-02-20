@@ -4,7 +4,6 @@
 
 #include "rb.h"
 #include "wish_port_config.h"
-#include "wish_identity.h"
 
 #define WISH_CORE_DECRYPT_FAIL 1
 
@@ -23,8 +22,6 @@ normal wish connections */
 for relay control connection opened by relay client */
 #define WISH_WIRE_TYPE_RELAY_SESSION 0x7    /* low nibble: Protocol type
 for a Wish connection relayed via a relay server session */
-
-typedef int wish_connection_id_t;
 
 enum transport_state {
     TRANSPORT_STATE_INITIAL,
@@ -97,6 +94,8 @@ enum wish_context_state {
 };
 
 #define RX_RINGBUF_LEN (WISH_PORT_RX_RB_SZ)
+
+#include "wish_identity.h"
 
 typedef struct wish_context {
     /* An unique connection id which is unique to a wish core

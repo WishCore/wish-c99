@@ -593,7 +593,7 @@ int main(int argc, char** argv) {
 
         int i = -1;
         for (i = 0; i < WISH_PORT_CONTEXT_POOL_SZ; i++) {
-            wish_context_t* ctx = &(wish_context_pool[i]);
+            wish_context_t* ctx = &(core->wish_context_pool[i]);
             if (ctx->context_state == WISH_CONTEXT_FREE) {
                 continue;
             }
@@ -735,7 +735,7 @@ int main(int argc, char** argv) {
 
             /* Check for Wish connections status changes */
             for (i = 0; i < WISH_PORT_CONTEXT_POOL_SZ; i++) {
-                wish_context_t* ctx = &(wish_context_pool[i]);
+                wish_context_t* ctx = &(core->wish_context_pool[i]);
                 if (ctx->context_state == WISH_CONTEXT_FREE) {
                     continue;
                 }

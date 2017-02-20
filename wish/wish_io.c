@@ -25,13 +25,8 @@
 #include "utlist.h"
 
 
-/* Statically allocate some resources */
-wish_context_t wish_context_pool[WISH_CONTEXT_POOL_SZ];
-
-static wish_connection_id_t next_conn_id = 1;
-
 wish_context_t* wish_core_get_connection_pool(wish_core_t* core) {
-    return wish_context_pool;
+    return core->wish_context_pool;
 }
 
 /* Start an instance of wish communication */
@@ -41,7 +36,7 @@ wish_context_t* wish_core_start(wish_core_t* core, uint8_t *local_wuid, uint8_t 
 
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        w = &(wish_context_pool[i]);
+        w = &(core->wish_context_pool[i]);
         if (w->context_state == WISH_CONTEXT_FREE) {
             /* We have found a context we can take into use */
             w->context_state = WISH_CONTEXT_IN_MAKING;
@@ -58,7 +53,7 @@ wish_context_t* wish_core_start(wish_core_t* core, uint8_t *local_wuid, uint8_t 
     /* w now points to the vacant wish context we will use */
 
     /* Associate a connection id to the connection */
-    w->connection_id = next_conn_id++;
+    w->connection_id = core->next_conn_id++;
 
     memcpy(w->local_wuid, local_wuid, WISH_ID_LEN);
     memcpy(w->remote_wuid, remote_wuid, WISH_ID_LEN);
@@ -81,8 +76,8 @@ wish_context_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_co
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (wish_context_pool[i].connection_id == id) {
-            ctx = &(wish_context_pool[i]);
+        if (core->wish_context_pool[i].connection_id == id) {
+            ctx = &(core->wish_context_pool[i]);
             break;
         }
     }
@@ -102,19 +97,19 @@ wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
+        if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
             /* If the wish context is not in use, we can safely skip it */
             //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
             continue;
         }
 
-        if (memcmp(wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) 
+        if (memcmp(core->wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) 
                     == 0) {
-                if (memcmp(wish_context_pool[i].remote_hostid, rhid, 
+                if (memcmp(core->wish_context_pool[i].remote_hostid, rhid, 
                         WISH_WHID_LEN) == 0) {
 
-                    ctx = &(wish_context_pool[i]);
+                    ctx = &(core->wish_context_pool[i]);
                     break;
                 }
                 else {
@@ -139,16 +134,16 @@ bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t 
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
+        if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
             /* If the wish context is not in use, we can safely skip it */
             //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
             continue;
         }
 
-        if (memcmp(wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+        if (memcmp(core->wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
                 bool retval = false;
-                switch (wish_context_pool[i].context_state) {
+                switch (core->wish_context_pool[i].context_state) {
                 case WISH_CONTEXT_CONNECTED:
                     retval = true;
                     break;
@@ -611,7 +606,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_context_t* h,  enum tcp_
             bool other_connection_found = false;
 #if 1
             for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-                wish_context_t *other_ctx = &(wish_context_pool[i]);
+                wish_context_t *other_ctx = &(core->wish_context_pool[i]);
                 if (ctx == other_ctx) {
                     /* Don't examine our current wish context, the one
                      * that was just disconnected  */
@@ -1589,19 +1584,19 @@ wish_context_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
 
     int i = 0; 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (wish_context_pool[i].local_port != local_port) {
+        if (core->wish_context_pool[i].local_port != local_port) {
             continue;
         }
-        if (wish_context_pool[i].remote_port != rmt_port) {
+        if (core->wish_context_pool[i].remote_port != rmt_port) {
             continue;
         }
         int j = 0;
         for (j = 0; j < 4; j++) {
-            if (wish_context_pool[i].rmt_ip_addr[j] !=
+            if (core->wish_context_pool[i].rmt_ip_addr[j] !=
                     rmt_ip[j]) {
                 continue;
             }
-            if (wish_context_pool[i].local_ip_addr[j] !=
+            if (core->wish_context_pool[i].local_ip_addr[j] !=
                     local_ip[j]) {
                 continue;
             }
@@ -1617,7 +1612,7 @@ wish_context_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
         WISHDEBUG(LOG_CRITICAL, "Could not find the Wish context!");
         return NULL;
     }
-    return &(wish_context_pool[i]);
+    return &(core->wish_context_pool[i]);
 }
 
 /* 
@@ -1626,6 +1621,8 @@ wish_context_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
  */
 void wish_core_init(wish_core_t* core) {
     core->wish_server_port = core->wish_server_port == 0 ? 37009 : core->wish_server_port;
+    core->wish_context_pool = wish_platform_malloc(sizeof(wish_context_t)*WISH_CONTEXT_POOL_SZ);
+    core->next_conn_id = 1;
     
     wish_core_init_rpc(core);
     wish_core_app_rpc_init(core);
@@ -1644,14 +1641,14 @@ int wish_core_get_rx_buffer_free(wish_core_t* core, wish_context_t *ctx) {
 void wish_close_all_connections(wish_core_t* core) {
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        switch (wish_context_pool[i].context_state) {
+        switch (core->wish_context_pool[i].context_state) {
         case WISH_CONTEXT_FREE:
             continue;
             break;
         case WISH_CONTEXT_IN_MAKING:
             /* FALLTHROUGH */
         case WISH_CONTEXT_CONNECTED:
-            wish_close_connection(core, &(wish_context_pool[i]));
+            wish_close_connection(core, &(core->wish_context_pool[i]));
             break;
         case WISH_CONTEXT_CLOSING:
             WISHDEBUG(LOG_CRITICAL, "Not closing connection which is already closing");
