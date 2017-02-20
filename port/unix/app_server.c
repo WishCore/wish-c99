@@ -26,6 +26,7 @@
 //#include "wish_service_registry.h"
 
 #include "bson.h"
+#include "cbson.h"
 #include "bson_visitor.h"
 
 #include "wish_local_discovery.h"
@@ -221,8 +222,7 @@ again:
                     }
                 }
                 else {
-                    printf("Bad login message!\n");
-                    bson_visit(payload, elem_visitor);
+                    bson_visit("Bad login message!", payload);
                 }
 
             }

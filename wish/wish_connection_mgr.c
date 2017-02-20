@@ -32,7 +32,7 @@ void wish_connections_check(wish_core_t* core) {
             return;
         }
         
-        bson_visit(id_bson_doc, elem_visitor);
+        bson_visit("", id_bson_doc);
 
         bson_iterator it;
         bson_type bt;

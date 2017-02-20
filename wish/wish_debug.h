@@ -1,9 +1,37 @@
-#ifndef WISH_DEBUG_H
-#define WISH_DEBUG_H
+#pragma once
 
 #include "wish_platform.h"
 #include <stdarg.h>
-#include "cbson.h"
+#include "stdbool.h"
+
+#include "wish_port_config.h"
+
+#ifdef WISH_CONSOLE_COLORS
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_WHITE   "\x1b[37m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
+#define AC_WHITE_STRING    ANSI_COLOR_WHITE "%s" ANSI_COLOR_RESET
+
+#else   //WISH_CONSOLE_COLORS
+
+#define ANSI_COLOR_RED     
+#define ANSI_COLOR_GREEN   
+#define ANSI_COLOR_YELLOW  
+#define ANSI_COLOR_BLUE    
+#define ANSI_COLOR_MAGENTA 
+#define ANSI_COLOR_CYAN    
+#define ANSI_COLOR_WHITE   
+#define ANSI_COLOR_RESET   
+
+#define AC_WHITE_STRING   "%s"
+#endif  //WISH_CONSOLE_COLORS
 
 #ifdef COMPILING_FOR_ESP8266
 int os_printf_plus(const char *format, ...)  __attribute__ ((format (printf, 1, 2)));
@@ -85,8 +113,3 @@ void wish_debug_print_array(int log_lvl, char* title, uint8_t* array, uint8_t le
  * This is useful to debug problems which would othervise lead to
  * watchdog resets. */
 void wish_debug_die();
-
-
-void elem_visitor(char *elem_name, uint8_t elem_type, uint8_t *elem, uint8_t depth);
-
-#endif

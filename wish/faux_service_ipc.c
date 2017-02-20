@@ -93,8 +93,7 @@ void send_core_to_app(wish_core_t* core, uint8_t wsid[WISH_ID_LEN], uint8_t *dat
     /* Find from the list of wish apps the one with the said wsid */
     wish_app_t *dst_app = wish_app_find_by_wsid(wsid);
     if (dst_app == NULL) {
-        wish_debug_print_array(LOG_CRITICAL, "Could not find the destination service, service id", wsid, WISH_WSID_LEN);
-        //bson_visit(data, elem_visitor);
+        //bson_visit("send_app_to_core: Could not find the destination service", data);
     }
     else {
         receive_core_to_app(wish_core_t* core, dst_app, data, len);

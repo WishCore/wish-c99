@@ -190,8 +190,7 @@ void wish_core_process_message(wish_core_t* core, wish_context_t* ctx, uint8_t* 
      * time */
     bool wire_debug = false;
     if (wire_debug) {
-        WISHDEBUG(LOG_DEBUG, "Incoming message");
-        bson_visit(bson_doc, elem_visitor);
+        bson_visit("Incoming message", bson_doc);
     }
 
     /* Read the top-level and 'req'(uest), 'res'(ponse)
@@ -234,7 +233,7 @@ void wish_core_process_message(wish_core_t* core, wish_context_t* ctx, uint8_t* 
 /* Route an incoming message (from app) */
 void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LEN], uint8_t *data, size_t len) {
     //WISHDEBUG(LOG_CRITICAL, "Incoming message from app to core len %d", len);
-    //bson_visit(data, elem_visitor);
+    //bson_visit("Incoming message from app to core", data);
 
     /* Determine if it is login or what */
     uint8_t *recovered_wsid = NULL;

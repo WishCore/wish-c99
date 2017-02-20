@@ -7,6 +7,8 @@
 #include "wish_debug.h"
 #include "wish_connection_mgr.h"
 #include "wish_relay_client.h"
+#include "cbson.h"
+
 
 /* FIXME getter function? */
 extern wish_context_t wish_context_pool[WISH_CONTEXT_POOL_SZ];

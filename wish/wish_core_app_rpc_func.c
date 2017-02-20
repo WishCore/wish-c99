@@ -96,8 +96,7 @@ static void version(wish_rpc_ctx* req, uint8_t* args) {
 }
 
 static void services_send(wish_rpc_ctx* req, uint8_t* args) {
-    //WISHDEBUG(LOG_CRITICAL, "Handling services.send");
-    //bson_visit(args, elem_visitor);
+    //bson_visit("Handling services.send", args);
     
     wish_core_t* core = (wish_core_t*) req->server->context;
     
@@ -198,8 +197,7 @@ static void services_send(wish_rpc_ctx* req, uint8_t* args) {
         if (bs.err) {
             WISHDEBUG(LOG_CRITICAL, "Error creating frame to local service");
         } else {
-            //WISHDEBUG(LOG_CRITICAL, "About to send this to local service on local core:");
-            //bson_visit(upcall_doc, elem_visitor);
+            //bson_visit("About to send this to local service on local core:", upcall_doc);
             send_core_to_app(core, rsid, upcall_doc, bson_get_doc_len(upcall_doc));
         }
         return;
@@ -237,8 +235,7 @@ static void services_send(wish_rpc_ctx* req, uint8_t* args) {
     
     wish_rpc_client_bson(&core2remote_rpc_client, "send", (char*)bson_data(&bs), bson_size(&bs), NULL, client_req, client_req_len);
 
-    //WISHDEBUG(LOG_CRITICAL, "About to send this to the remote core (should be req: { op, args, id }):");
-    //bson_visit(client_req, elem_visitor);
+    //bson_visit("About to send this to the remote core (should be req: { op, args, id }):", client_req);
 
     
     //WISHDEBUG(LOG_CRITICAL, "Sending services.send");
@@ -270,8 +267,7 @@ static void services_send(wish_rpc_ctx* req, uint8_t* args) {
         bson_append_finish_object(&b);
         bson_finish(&b);
         
-        //WISHDEBUG(LOG_CRITICAL, "About to send this to the remote core (should be req: { op, args[, id] }):");
-        //bson_visit(req_buf, elem_visitor);
+        //bson_visit("About to send this to the remote core (should be req: { op, args[, id] }):", req_buf);
         
         
         int send_ret = wish_core_send_message(core, dst_ctx, req_buf, bson_get_doc_len(req_buf));
@@ -378,8 +374,7 @@ static void identity_export_handler(wish_rpc_ctx* req, uint8_t* args) {
     uint8_t id_bson_doc_unfiltered[id_bson_doc_max_len];
     int ret = wish_load_identity_bson(arg_uid, id_bson_doc_unfiltered, id_bson_doc_max_len);
 
-    //WISHDEBUG(LOG_CRITICAL, "Here's the source document while exporting...:");
-    //bson_visit(id_bson_doc_unfiltered, elem_visitor);
+    //bson_visit("Here's the source document while exporting...:", id_bson_doc_unfiltered);
     
     if (ret == 1) {
         uint8_t id_bson_doc[id_bson_doc_max_len];
@@ -651,8 +646,7 @@ static void identity_list_handler(wish_rpc_ctx* req, uint8_t* args) {
         wish_rpc_server_error(req, 997, "BSON error in identity_list_handler");
     } else {
 
-        //WISHDEBUG(LOG_CRITICAL, "identity.list response bson");
-        //bson_visit(bs.data, elem_visitor);
+        //bson_visit("identity.list response bson", bs.data);
 
         wish_rpc_server_send(req, bs.data, bson_size(&bs));
     }
@@ -1476,8 +1470,7 @@ static void wish_core_app_rpc_send(void *ctx, uint8_t *data, int len) {
 void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LEN], uint8_t *data) {
 #if 0
     // enable this for debug output of all the apps requests to core
-    WISHDEBUG(LOG_DEBUG, "wish_core_app_rpc_handle_req:");
-    bson_visit(data, elem_visitor);
+    bson_visit("wish_core_app_rpc_handle_req:", data);
 #endif
 
     char *op_str = NULL;
@@ -1644,7 +1637,7 @@ void wish_report_identity_to_local_services(wish_core_t* core, wish_identity_t* 
                         }
                         else {
                             WISHDEBUG(LOG_CRITICAL, "Sending peer message to app %s:", service_registry[i].service_name);
-                            bson_visit(buffer, elem_visitor);
+                            bson_visit("Sending peer message to app:", buffer);
                             send_core_to_app(core, service_registry[i].wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
                         }
                     }

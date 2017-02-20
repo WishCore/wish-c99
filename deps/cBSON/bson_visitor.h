@@ -1,19 +1,18 @@
-#ifndef BSON_VISITOR_H
-#define BSON_VISITOR_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include "stdint.h"
+    
 /*
  * This function traverses the bson_doc given as argument, and calls the
  * visitor_func for every element encountered. Document and
  * array elements be recursively handled in the same way. */
-void bson_visit(uint8_t *bson_doc,
-    void (*visitor_func)(char *elem_name, uint8_t elem_type, uint8_t *elem, uint8_t depth));
+void bson_visit(char* title, uint8_t *bson_doc);
 
-void bson_visit_inner(uint8_t *bson_doc, uint8_t depth,
-    void (*visitor_func)(char *elem_name, uint8_t elem_type, uint8_t *elem, uint8_t depth));
+void bson_visit_inner(uint8_t *bson_doc, uint8_t depth, void (*visitor_func)(char *elem_name, uint8_t elem_type, uint8_t *elem, uint8_t depth));
 
 /**
  * Filter out the named element from source_doc, storing the new
@@ -31,5 +30,3 @@ int bson_filter_out_elem(char *unwanted_elem_name, uint8_t
 #ifdef __cplusplus
 }
 #endif
-
-#endif  //BSON_VISITOR_H

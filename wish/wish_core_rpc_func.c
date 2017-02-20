@@ -104,9 +104,7 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
             
             bson_finish(&bs);
 
-            //WISHDEBUG(LOG_CRITICAL, "sending peers response:");
-            //bson_visit((uint8_t*)bson_data(&bs), elem_visitor);
-            //WISHDEBUG(LOG_CRITICAL, "(end)");
+            //bson_visit("sending peers response:", (uint8_t*)bson_data(&bs));
             
             //wish_core_send_message(rpc_ctx->ctx, res_doc, bson_get_doc_len(res_doc));
             wish_rpc_server_emit(rpc_ctx, (char*)bson_data(&bs), bson_size(&bs));
@@ -186,20 +184,15 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
 
     uint8_t *rsid = NULL;
     int32_t rsid_len = 0;
-    if (bson_get_binary(inner_data_doc, "rsid", &rsid,
-            &rsid_len) == BSON_FAIL) {
-
+    if (bson_get_binary(inner_data_doc, "rsid", &rsid, &rsid_len) == BSON_FAIL) {
         WISHDEBUG(LOG_CRITICAL, "No rsid in inner 'data' document");
         return;
     }
 
     char *protocol = NULL;
     int32_t protocol_len = 0;
-    if (bson_get_string(inner_data_doc, "protocol", &protocol,
-            &protocol_len) == BSON_FAIL) {
-
-        WISHDEBUG(LOG_CRITICAL, "No protocol in inner 'data' document");
-        bson_visit(payload, elem_visitor);
+    if (bson_get_string(inner_data_doc, "protocol", &protocol, &protocol_len) == BSON_FAIL) {
+        bson_visit("peers_callback: No protocol in inner 'data' document", payload);
         return;
     }
 
@@ -216,7 +209,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
     }
 
     //WISHDEBUG(LOG_CRITICAL, "peer information regarding a peer with protocol %s!", protocol);
-    //bson_visit(payload, elem_visitor);
+    //bson_visit("peers_callback: peer information regarding a peer with protocol!", payload);
 
     /* Build Core-to-App message indicating the new peer */
 
@@ -277,16 +270,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
             //WISHDEBUG(LOG_CRITICAL, "Service entry is valid");
             if (strncmp(((const char*) &(registry[i].protocols[0][0])), 
                     protocol, WISH_PROTOCOL_NAME_MAX_LEN) == 0) {
-                //WISHDEBUG(LOG_CRITICAL, "This is peer info");
-                /*
-                if (online) {
-                    WISHDEBUG(LOG_CRITICAL, "Calling send_core_to_app, online ");
-                }
-                else {
-                    WISHDEBUG(LOG_CRITICAL, "Calling send_core_to_app, offline ");
-                }
-                bson_visit(peer_info, elem_visitor);
-                */
+                //bson_visit("This is peer info", peer_info);
                 
                 send_core_to_app(core, registry[i].wsid, core_to_app, bson_get_doc_len(core_to_app));
             }
@@ -297,8 +281,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
 }
 
 static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_array) {
-    WISHDEBUG(LOG_DEBUG, "Handling send request from remote core!");
-    //bson_visit(args_array, elem_visitor);
+    //bson_visit("Handling send request from remote core!", args_array);
     
     wish_core_t* core = NULL; //(wish_core_t*) req->server->context;
 
@@ -412,8 +395,7 @@ void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
         return;
     }
 
-    //WISHDEBUG(LOG_CRITICAL, "actual outgoing data:");
-    //bson_visit( (uint8_t*)bson_data(&bs), elem_visitor);
+    //bson_visit("actual outgoing data:", (uint8_t*)bson_data(&bs));
     //WISHDEBUG(LOG_CRITICAL, "(end)");
 
     wish_core_send_message(core, wish_ctx, (uint8_t*)bson_data(&bs), bson_size(&bs));
@@ -613,8 +595,7 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_context_t *
         int i = 0;
         for (i = 0; i < WISH_MAX_SERVICES; i++) {
             if (wish_service_entry_is_valid(core, &(registry[i]))) {
-                //WISHDEBUG(LOG_CRITICAL, "This is peer info");
-                //bson_visit(peer_info, elem_visitor);
+                //bson_visit("This is peer info", peer_info);
                 //WISHDEBUG(LOG_CRITICAL, "Calling send_core_to_app, len %d",
                 //    bson_get_doc_len(core_to_app));
                 send_core_to_app(core, registry[i].wsid,

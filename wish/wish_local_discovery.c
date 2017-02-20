@@ -329,8 +329,7 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     uint8_t pubkey[WISH_PUBKEY_LEN] = { 0 };
 
     if (wish_load_pubkey(my_uid, pubkey)) {
-        WISHDEBUG(LOG_CRITICAL, "failed to load pubkey for uid");
-        bson_visit(advert_msg, elem_visitor);
+        bson_visit("failed to load pubkey for uid", advert_msg);
         return;
     }
 

@@ -8,6 +8,7 @@
 #include "mbedtls/sha256.h"
 #include "wish_debug.h"
 #include "wish_fs.h"
+#include "cbson.h"
 #include "bson_visitor.h"
 #include "wish_port_config.h"
 #include "wish_connection_mgr.h"
@@ -601,8 +602,7 @@ int wish_populate_id_from_cert(wish_identity_t *new_id,
             == BSON_FAIL) {
         WISHDEBUG(LOG_CRITICAL, "Could not extract transports from cert");
     }
-    WISHDEBUG(LOG_CRITICAL, "wish_populate_id_from_cert: transports:");
-    bson_visit(transports, elem_visitor);
+    bson_visit("wish_populate_id_from_cert: transports:", transports);
     /* FIXME copy just the first transport */
     char *url = NULL;
     int32_t url_len = 0;
