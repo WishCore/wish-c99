@@ -1636,8 +1636,8 @@ void wish_report_identity_to_local_services(wish_core_t* core, wish_identity_t* 
                             WISHDEBUG(LOG_CRITICAL, "BSON error when creating peer message: %i %s len %i", bs.err, bs.errstr, bs.dataSize);
                         }
                         else {
-                            WISHDEBUG(LOG_CRITICAL, "Sending peer message to app %s:", service_registry[i].service_name);
-                            bson_visit("Sending peer message to app:", buffer);
+                            //WISHDEBUG(LOG_CRITICAL, "Sending peer message to app %s:", service_registry[i].service_name);
+                            //bson_visit("Sending peer message to app:", buffer);
                             send_core_to_app(core, service_registry[i].wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
                         }
                     }
