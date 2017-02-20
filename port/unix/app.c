@@ -32,10 +32,6 @@
 #include "bson_visitor.h"
 #include "wish_debug.h"
 
-#if 0
-#include "wish_app_mist_modbus.h"
-#endif
-
 #include "fs_port.h"
 #include "wish_relay_client.h"
 
@@ -57,27 +53,6 @@ void error(const char *msg)
 {
     perror(msg);
     exit(0);
-}
-
-void twiddle(void) {
-    static int i;
-
-    switch (i%4) {
-    case 0:
-        printf("\b.");
-        break;
-    case 1:
-        printf("\bo");
-        break;
-    case 2:
-        printf("\bO");
-        break;
-    case 3:
-        printf("\b*");
-        break;
-    }
-    i++;
-
 }
 
 int write_to_socket(void *sockfd_ptr, unsigned char* buffer, int len) {
@@ -430,7 +405,7 @@ int serverfd = 0;
  * After this, we can start select()ing on the serverfd, and we should
  * detect readable condition immediately when a TCP client connects.
  * */
-void setup_wish_server(void) {
+void setup_wish_server(wish_core_t* core) {
     serverfd = socket(AF_INET, SOCK_STREAM, 0);
     if (serverfd < 0) {
         perror("server socket creation");
@@ -534,59 +509,16 @@ int main(int argc, char** argv) {
         as_server = true;
         as_relay_client = true;
         app_port = 9094;
-        as_app_server = true;        
+        as_app_server = true;
     }
 
     /* Iniailise Wish core (RPC servers) */
     wish_core_init(core);
 
-    WISHDEBUG(LOG_CRITICAL, "going to load identities....");
-    
     wish_core_update_identities(core);
     
-    WISHDEBUG(LOG_CRITICAL, "   loaded identities.");
-    
-
-#if 0
-    if (num_ids == 0) {
-        printf("Creating new identity.\n");
-        /* Create new identity */
-        wish_identity_t id;
-        wish_create_local_identity(&id, "Linus");
-        wish_save_identity_entry(&id);
-        num_ids = wish_load_uid_list(uid_list, 4);
-        if (num_ids == 0) {
-            printf("Could not create identity, giving up!\n");
-            exit(1);
-        }
-    }
-
-    /* Print our "own id" - the first id in database */
-    int32_t id_doc_max_len = 300;
-    uint8_t id_doc[id_doc_max_len];
-    if (wish_load_identity_bson(uid_list[0].uid, id_doc, id_doc_max_len) > 0) {
-        printf("\nThis is the local identity being used:\n");
-        bson_visit(id_doc, elem_visitor);
-    }
-#endif
-
-    if (as_client) {
-        wish_context_t *new_ctx = wish_core_start(core, core->uid_list[0].uid, remote_identity.uid);
-        uint8_t peer_ip[4] =  { 
-                (peer_addr.s_addr & 0xff), 
-                (peer_addr.s_addr & 0xff00) >> 8,
-                (peer_addr.s_addr & 0xff0000) >> 16,
-                (peer_addr.s_addr & 0xff000000) >> 24,
-        };
-        wish_ip_addr_t ip;
-        memcpy(&ip.addr, peer_ip, 4);
-        wish_open_connection(core, new_ctx, &ip, peer_port, false);
-    }
-
-
-
     if (as_server) {
-        setup_wish_server();
+        setup_wish_server(core);
     }
 
     if (listen_to_adverts) {
@@ -933,7 +865,7 @@ int main(int argc, char** argv) {
 
         if (advertize_own_uid && core->loaded_num_ids > 0) {
             static time_t ldiscover_timestamp = 0;
-            if (time(NULL) > ldiscover_timestamp + 30) {
+            if (time(NULL) > ldiscover_timestamp + 5) {
                 int c;
                 for (c=0; c<core->loaded_num_ids; c++) {
                     wish_ldiscover_advertize(core, core->uid_list[c].uid);

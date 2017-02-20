@@ -1435,41 +1435,6 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     strncpy(core->core_app_rpc_server->server_name, "core-from-app", 16);
     core->core_app_rpc_server->context = core;
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    // In the middle of adding wish_core_t* instance as a struct.
-    
-    
-    // continue here.
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    /*
-    core_rpc_server = {
-        .request_list_head = NULL,  // Initialise to NULL explicitly for the sake of utlist 
-        .server_name = "core-to-core",
-    #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
-        .rpc_ctx_pool = request_pool,
-        .rpc_ctx_pool_num_slots = REQUEST_POOL_SIZE,
-    #endif
-    };*/
-    
     wish_rpc_server_register(core->core_app_rpc_server, &methods_handler);
     wish_rpc_server_register(core->core_app_rpc_server, &version_handler);
     

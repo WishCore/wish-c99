@@ -1,7 +1,7 @@
 BUILD_BASE	= build
 
 # name for the target project
-TARGET         = mist
+TARGET         = wish
 VERSION_STRING = $(shell git describe --abbrev=4 --dirty --always --tags)
 
 # which modules (subdirectories) of the project to include in compiling

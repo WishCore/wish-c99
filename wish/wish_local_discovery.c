@@ -124,7 +124,8 @@ size_t buffer_len) {
         }
     }
 
-    WISHDEBUG(LOG_CRITICAL, "LocalDiscovery checking cache. ruid: %02x %02x %02x %02x", ruid[0], ruid[1], ruid[2], ruid[3]);
+    //WISHDEBUG(LOG_CRITICAL, "LocalDiscovery checking cache. ruid: %02x %02x %02x %02x", ruid[0], ruid[1], ruid[2], ruid[3]);
+    
     uint32_t current_time = wish_time_get_relative(core);
     bool found = false;
     int free = -1;
@@ -139,7 +140,7 @@ size_t buffer_len) {
         if (ldiscovery_db[i].occupied) {
             if( memcmp(&ldiscovery_db[i].ruid,  ruid, WISH_ID_LEN) == 0 && 
                     memcmp(&ldiscovery_db[i].rhid, rhid, WISH_ID_LEN) == 0 ) {
-                WISHDEBUG(LOG_CRITICAL, "Found entry. Updating timestamp");
+                //WISHDEBUG(LOG_CRITICAL, "Found entry. Updating timestamp");
                 found = true;
                 ldiscovery_db[i].timestamp = current_time;
                 break;
@@ -169,10 +170,9 @@ size_t buffer_len) {
      * But first, check if we already know this uid */
     wish_identity_t discovered_id;
     if (wish_load_identity(ruid, &discovered_id) > 0) {
-        WISHDEBUG(LOG_CRITICAL, "Auto-discovered uid is already in our contacts");
-    }
-    else {
-        WISHDEBUG(LOG_CRITICAL, "Ignoring auto discovery bcast for unknown uid");
+        //WISHDEBUG(LOG_CRITICAL, "Auto-discovered uid is already in our contacts");
+    } else {
+        //WISHDEBUG(LOG_CRITICAL, "Ignoring auto discovery bcast for unknown uid");
         return;
     }
 

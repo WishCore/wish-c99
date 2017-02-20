@@ -1625,13 +1625,14 @@ wish_context_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
  * system, mainly initting of RPC servers in the core 
  */
 void wish_core_init(wish_core_t* core) {
-    core->wish_server_port = 37009;
+    core->wish_server_port = core->wish_server_port == 0 ? 37009 : core->wish_server_port;
     
     wish_core_init_rpc(core);
     wish_core_app_rpc_init(core);
     
     core->core_rpc_client = wish_platform_malloc(sizeof(wish_rpc_client_t));
     core->core_rpc_client->next_id = 1;
+    core->core_rpc_client->context = core;
 }
 
 
