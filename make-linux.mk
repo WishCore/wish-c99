@@ -1,8 +1,14 @@
 BUILD_BASE	= build
 
 # name for the target project
-TARGET         = wish
+TARGET         = wish-core-$(shell git describe --abbrev=0 --dirty --always --tags)-x64-linux
 VERSION_STRING = $(shell git describe --abbrev=4 --dirty --always --tags)
+
+#ifeq ("$(shell git status --porcelain)", "") 
+#	TARGET=wish-core-$(shell git describe --abbrev=4 --dirty --always --tags)-x64-linux
+#else
+#	TARGET=wish-core-$(shell git describe --abbrev=0 --dirty --always --tags)-x64-linux
+#endif
 
 # which modules (subdirectories) of the project to include in compiling
 MODULES		= wish deps/mbedtls-2.1.2/library deps/cbson/src deps/ed25519/src port port/unix ed25519/src deps/wish-rpc-c99/src deps/bson
@@ -79,7 +85,7 @@ all: clean checkdirs $(TARGET)
 noclean:  checkdirs $(TARGET) 
 
 $(TARGET): $(OBJ)
-	gcc $(OBJ) $(LDFLAGS) $(LDLIBS) -o wish-core-$(VERSION_STRING)-x64-linux
+	gcc $(OBJ) $(LDFLAGS) $(LDLIBS) -o $(TARGET)
 
 checkdirs: $(BUILD_DIR) 
 
