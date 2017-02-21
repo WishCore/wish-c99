@@ -8,6 +8,9 @@ extern "C" {
 
 #define WISH_MAX_SERVICES 5 /* contrast with NUM_WISH_APPS due to be removed in wish_app.h */
 
+#include "stdint.h"
+#include "stdbool.h"
+    
 #include "wish_port_config.h"
 #include "wish_rpc.h"
 #include "wish_app.h"
@@ -28,6 +31,7 @@ typedef uint32_t wish_time_t;
 typedef int wish_connection_id_t;
 
 struct wish_context;
+struct wish_ldiscover_t;
 
 typedef struct wish_core {
     uint16_t wish_server_port;
@@ -55,6 +59,9 @@ typedef struct wish_core {
     /* Statically allocate some resources */
     struct wish_context* wish_context_pool;
     wish_connection_id_t next_conn_id;
+
+    bool ldiscover_allowed;
+    struct wish_ldiscover_t* ldiscovery_db;
     
 } wish_core_t;
 

@@ -10,6 +10,7 @@
 #include "wish_core.h"
 #include "wish_io.h"
 #include "wish_identity.h"
+#include "wish_local_discovery.h"
 #include "ed25519.h"
 #include "cbson.h"
 #include "bson.h"
@@ -331,38 +332,31 @@ again:
                                  * 3) Write back the data we already consumed: 
                                  * buf+3, len = (WISH_CLIENT_HELLO_LEN - 3) 
                                  * 4) Write the unconsumed data to the ring buffer */
-                                uint16_t unconsumed_data_len 
-                                    = ring_buffer_length(&(h->rx_ringbuf));
+                                uint16_t unconsumed_data_len = ring_buffer_length(&(h->rx_ringbuf));
                                 uint8_t unconsumed_data[unconsumed_data_len];
-                                ring_buffer_read(&(h->rx_ringbuf),
-                                    unconsumed_data, unconsumed_data_len);
-                                ring_buffer_write(&(h->rx_ringbuf),
-                                    buf+3, WISH_CLIENT_HELLO_LEN-3);
+                                
+                                ring_buffer_read(&(h->rx_ringbuf), unconsumed_data, unconsumed_data_len);
+                                ring_buffer_write(&(h->rx_ringbuf), buf+3, WISH_CLIENT_HELLO_LEN-3);
+                                
                                 if (unconsumed_data_len > 0) {
-                                    ring_buffer_write(&(h->rx_ringbuf),
-                                        unconsumed_data, unconsumed_data_len);
+                                    ring_buffer_write(&(h->rx_ringbuf), unconsumed_data, unconsumed_data_len);
                                 }
 
                                 /* Advance protocol states */
-                                h->curr_transport_state 
-                                    = TRANSPORT_STATE_WAIT_FRAME_LEN;
-                                h->curr_protocol_state 
-                                    = PROTO_SERVER_STATE_READ_FRIEND_CERT;
+                                h->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+                                h->curr_protocol_state = PROTO_SERVER_STATE_READ_FRIEND_CERT;
 
                                 /* Place a "synthetic" notification that
                                  * there is new data available */
                                 struct wish_event evt = { 
-                                    .event_type 
-                                        = WISH_EVENT_NEW_DATA, 
+                                    .event_type = WISH_EVENT_NEW_DATA, 
                                     .context = h 
                                 };
                                 wish_message_processor_notify(&evt);
 
                                 break;
-                            }
-                            else {
-                                WISHDEBUG(LOG_CRITICAL, "Unknown \
-connection type");
+                            } else {
+                                WISHDEBUG(LOG_CRITICAL, "Unknown connection type");
                                 wish_close_connection(core, h);
                                 break;
                             }
@@ -1208,8 +1202,7 @@ wish send handshake");
             /* Get the recepient identity of the friend request */
             int32_t recepient_uid_len = 0;
             uint8_t *recepient_uid = NULL;
-            if (bson_get_binary(payload, "ruid", &recepient_uid,
-                    &recepient_uid_len) != BSON_SUCCESS) {
+            if (bson_get_binary(payload, "ruid", &recepient_uid, &recepient_uid_len) != BSON_SUCCESS) {
                 WISHDEBUG(LOG_CRITICAL, "Did not find ruid");
             }
             if (recepient_uid_len != WISH_ID_LEN) {
@@ -1230,8 +1223,7 @@ wish send handshake");
 
             int32_t alias_len = 0;
             char *alias = NULL;
-            if (bson_get_string(cert_doc, "alias", &alias, &alias_len)
-                    != BSON_SUCCESS) {
+            if (bson_get_string(cert_doc, "alias", &alias, &alias_len) != BSON_SUCCESS) {
                 WISHDEBUG(LOG_CRITICAL, "Friend request: No alias");
             }
             WISHDEBUG(LOG_CRITICAL, "Friend request from %s", alias);
@@ -1630,6 +1622,8 @@ void wish_core_init(wish_core_t* core) {
     core->core_rpc_client = wish_platform_malloc(sizeof(wish_rpc_client_t));
     core->core_rpc_client->next_id = 1;
     core->core_rpc_client->context = core;
+    
+    wish_ldiscover_init(core);
 }
 
 

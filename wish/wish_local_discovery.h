@@ -11,7 +11,7 @@
 #include "wish_port_config.h"
 
 
-typedef struct {
+typedef struct wish_ldiscover_t {
     /* This field is used for identifying occupied/vacant app contexts.
      * Has value false if context is vacant */
     bool occupied;
@@ -26,17 +26,19 @@ typedef struct {
     uint16_t transport_port;
 } wish_ldiscover_t;
 
+void wish_ldiscover_init(wish_core_t* core);
+
 /* Start accepting local discovery messages */
-void wish_ldiscover_enable_recv(void);
+void wish_ldiscover_enable_recv(wish_core_t* core);
 
 /* Stop accepting local discovery messages */
-void wish_ldiscover_disable_recv(void);
+void wish_ldiscover_disable_recv(wish_core_t* core);
 
 /* Start advertizing using local discovery messages */
-void wish_ldiscover_enable_bcast(void);
+void wish_ldiscover_enable_bcast(wish_core_t* core);
 
 /* Stop advertizing using local discovery messages */
-void wish_ldiscover_disable_bcast(void);
+void wish_ldiscover_disable_bcast(wish_core_t* core);
 
 /* Feed local discovery message data into Wish core for processing.
  * ip[4], the originating IPv4 address
@@ -49,8 +51,8 @@ size_t buffer_len);
 void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid);
 
 /* Clear the table */
-void wish_ldiscover_clear(void);
+void wish_ldiscover_clear(wish_core_t* core);
 
-wish_ldiscover_t *wish_ldiscover_get(void);
+wish_ldiscover_t *wish_ldiscover_get(wish_core_t* core);
 
 #endif //WISH_LOCAL_DISCOVERY_H

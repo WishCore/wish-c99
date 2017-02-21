@@ -23,13 +23,13 @@
 #include "wish_time.h"
 #include "wish_io.h"
 
-bool ldiscover_allowed = false;
-
-wish_ldiscover_t ldiscovery_db[WISH_LOCAL_DISCOVERY_MAX];
+void wish_ldiscover_init(wish_core_t* core) {
+    core->ldiscovery_db = wish_platform_malloc(sizeof(wish_ldiscover_t)*WISH_LOCAL_DISCOVERY_MAX);
+}
 
 /* Start local discovery */
-void wish_ldiscover_start(void) {
-    ldiscover_allowed = true;
+void wish_ldiscover_start(wish_core_t* core) {
+    core->ldiscover_allowed = true;
 }
 
 
@@ -132,17 +132,18 @@ size_t buffer_len) {
 
     int i;
     for(i=0; i<WISH_LOCAL_DISCOVERY_MAX; i++) {
-        if (ldiscovery_db[i].occupied && current_time - ldiscovery_db[i].timestamp > 30) {
-            ldiscovery_db[i].occupied = false;
+        if (core->ldiscovery_db[i].occupied && current_time - core->ldiscovery_db[i].timestamp > 30) {
+            core->ldiscovery_db[i].occupied = false;
             WISHDEBUG(LOG_CRITICAL, "LocalDiscovery dropped timed out entry.");
         }
         
-        if (ldiscovery_db[i].occupied) {
-            if( memcmp(&ldiscovery_db[i].ruid,  ruid, WISH_ID_LEN) == 0 && 
-                    memcmp(&ldiscovery_db[i].rhid, rhid, WISH_ID_LEN) == 0 ) {
+        if (core->ldiscovery_db[i].occupied) {
+            if( memcmp(&core->ldiscovery_db[i].ruid,  ruid, WISH_ID_LEN) == 0 && 
+                    memcmp(&core->ldiscovery_db[i].rhid, rhid, WISH_ID_LEN) == 0 ) 
+            {
                 //WISHDEBUG(LOG_CRITICAL, "Found entry. Updating timestamp");
                 found = true;
-                ldiscovery_db[i].timestamp = current_time;
+                core->ldiscovery_db[i].timestamp = current_time;
                 break;
             }
         } else {
@@ -150,19 +151,19 @@ size_t buffer_len) {
         }
     }
     if(!found && free != -1) {
-        ldiscovery_db[free].occupied = true;
-        ldiscovery_db[free].timestamp = current_time;
-        memcpy(&ldiscovery_db[free].ruid, ruid, WISH_ID_LEN);
-        memcpy(&ldiscovery_db[free].rhid, rhid, WISH_ID_LEN);
-        memcpy(&ldiscovery_db[free].pubkey, pubkey_ptr, WISH_PUBKEY_LEN);
-        strncpy((char*) &ldiscovery_db[free].alias, alias, WISH_MAX_ALIAS_LEN);
+        core->ldiscovery_db[free].occupied = true;
+        core->ldiscovery_db[free].timestamp = current_time;
+        memcpy(&core->ldiscovery_db[free].ruid, ruid, WISH_ID_LEN);
+        memcpy(&core->ldiscovery_db[free].rhid, rhid, WISH_ID_LEN);
+        memcpy(&core->ldiscovery_db[free].pubkey, pubkey_ptr, WISH_PUBKEY_LEN);
+        strncpy((char*) &core->ldiscovery_db[free].alias, alias, WISH_MAX_ALIAS_LEN);
         /* FIXME ip address length here is hardcoded and assumed to be
          * IPv4 */
         /* FIXME the ip address is read from where the broadcast is
          * received from - and not from transports! */
-        memcpy(&ldiscovery_db[free].transport_ip, ip, sizeof (wish_ip_addr_t));
+        memcpy(&core->ldiscovery_db[free].transport_ip, ip, sizeof (wish_ip_addr_t));
         /* FIXME the port is hardcoded, should be read from transports */
-        ldiscovery_db[free].transport_port = tcp_port;
+        core->ldiscovery_db[free].transport_port = tcp_port;
         WISHDEBUG(LOG_DEBUG, "Inserted Local Discovered peer at index %d", free);
     }
     
@@ -355,15 +356,15 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     wish_send_advertizement(core, advert_with_magic, advert_with_magic_len);
 }
 
-void wish_ldiscover_clear() {
+void wish_ldiscover_clear(wish_core_t* core) {
     int i;
     for(i=0; i<WISH_LOCAL_DISCOVERY_MAX; i++) {
-        ldiscovery_db[i].occupied = false;
+        core->ldiscovery_db[i].occupied = false;
     }
 }
 
-wish_ldiscover_t *wish_ldiscover_get(void) {
-    return ldiscovery_db;
+wish_ldiscover_t *wish_ldiscover_get(wish_core_t* core) {
+    return core->ldiscovery_db;
 }
 
 

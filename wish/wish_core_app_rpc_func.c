@@ -1141,10 +1141,12 @@ static void connections_check_connections(wish_rpc_ctx* req, uint8_t* args) {
  * 
  */
 static void wld_list_handler(wish_rpc_ctx* req, uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
     
-    wish_ldiscover_t *db = wish_ldiscover_get();
+    wish_ldiscover_t *db = wish_ldiscover_get(core);
 
     bson bs;
     bson_init_buffer(&bs, buffer, buffer_len);
@@ -1191,10 +1193,12 @@ static void wld_list_handler(wish_rpc_ctx* req, uint8_t* args) {
  * 
  */
 static void wld_clear_handler(wish_rpc_ctx* req, uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
     int buffer_len = 1400;
     uint8_t buffer[buffer_len];
     
-    wish_ldiscover_clear();
+    wish_ldiscover_clear(core);
 
     bson bs;
     bson_init_buffer(&bs, buffer, buffer_len);
@@ -1271,7 +1275,7 @@ static void wld_friend_request_handler(wish_rpc_ctx* req, uint8_t* args) {
 
     // now check if we have the wld details for this entry
     
-    wish_ldiscover_t *db = wish_ldiscover_get();
+    wish_ldiscover_t *db = wish_ldiscover_get(core);
 
     bool found = false;
     
