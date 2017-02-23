@@ -4,3 +4,4 @@
 [submodule "deps/cbson"]
 	path = deps/cbson
 	url = foremost.cto.fi:/git/cbson
+
