@@ -49,7 +49,7 @@ typedef struct wish_core {
     wish_rpc_server_t* core_app_rpc_server;
     
     // moved from wish_service_registry.c
-    struct wish_service_entry service_registry[WISH_MAX_SERVICES];
+    struct wish_service_entry* service_registry;
     
     wish_rpc_client_t* core_rpc_client;
     

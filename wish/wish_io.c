@@ -1627,6 +1627,16 @@ void wish_core_init(wish_core_t* core) {
     memset(core->core_rpc_client, 0, sizeof(wish_rpc_client_t));
     core->core_rpc_client->next_id = 1;
     core->core_rpc_client->context = core;
+
+
+    //struct wish_service_entry service_registry[WISH_MAX_SERVICES];
+
+    int service_registry_size = sizeof(struct wish_service_entry) * WISH_MAX_SERVICES;
+
+    core->service_registry = wish_platform_malloc(service_registry_size);
+    memset(core->service_registry, 0, service_registry_size);
+    
+    WISHDEBUG(LOG_CRITICAL, "wish_core_init: service_registry p: %p size: %i", core->service_registry, service_registry_size);
     
     wish_ldiscover_init(core);
 }

@@ -147,7 +147,7 @@ static void wish_core_add_remote_service(wish_context_t *ctx,
  * client to a remote core */
 void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t payload_len) {
     wish_context_t *ctx = context;
-    wish_core_t* core = req->client->context; //(wish_core_t*) req->server->context;
+    wish_core_t* core = req->client->context;
     
     
     WISHDEBUG(LOG_DEBUG, "Peer CB: payload len: %d", bson_get_doc_len(payload));
@@ -282,8 +282,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
 
 static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_array) {
     //bson_visit("Handling send request from remote core!", args_array);
-    
-    wish_core_t* core = NULL; //(wish_core_t*) req->server->context;
+    wish_core_t* core = rpc_ctx->server->context;
 
    
     /* The remote wsid, the originator of this message, is element "0" */
