@@ -10,6 +10,7 @@
 #include "wish_core.h"
 #include "wish_io.h"
 #include "wish_identity.h"
+#include "wish_relationship.h"
 #include "wish_local_discovery.h"
 #include "ed25519.h"
 #include "cbson.h"
@@ -1274,6 +1275,8 @@ wish send handshake");
             int num_uids_in_db = wish_get_num_uid_entries();
             wish_uid_list_elem_t uid_list[num_uids_in_db];
             int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+            
+            //wish_relationship_req_add(core, recepient_uid, &new_id);
 
             bool found = false;
             int i = 0;
@@ -1318,8 +1321,7 @@ wish send handshake");
             size_t my_cert_max_len = 300;
             uint8_t my_identity[my_cert_max_len];
             
-            if (wish_load_identity_bson(ctx->local_wuid, my_identity, 
-                    my_cert_max_len) < 0) {
+            if (wish_load_identity_bson(ctx->local_wuid, my_identity, my_cert_max_len) < 0) {
                 WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
             }
             WISHDEBUG(LOG_CRITICAL, "len = %d", bson_get_doc_len(my_identity));
@@ -1332,8 +1334,7 @@ wish send handshake");
             const int32_t friend_req_frame_max_len = my_cert_max_len + 100;
             uint8_t friend_req_frame[friend_req_frame_max_len];
             bson_init_doc(friend_req_frame, friend_req_frame_max_len);
-            bson_write_binary(friend_req_frame, friend_req_frame_max_len,
-                "cert", my_cert, bson_get_doc_len(my_cert));
+            bson_write_binary(friend_req_frame, friend_req_frame_max_len, "cert", my_cert, bson_get_doc_len(my_cert));
 
             /* Encode the length of the document in the begining, then
              * send len + the frame */
@@ -1343,8 +1344,7 @@ wish send handshake");
             uint8_t frame[2+frame_len];
             uint16_t frame_len_be = uint16_native2be(frame_len);
             memcpy(frame, &frame_len_be, 2);
-            memcpy(frame+2, friend_req_frame, 
-                bson_get_doc_len(friend_req_frame));
+            memcpy(frame+2, friend_req_frame, bson_get_doc_len(friend_req_frame));
             /* Send the frame length and the key in one go */
             int ret = (*(ctx->send))(ctx->send_arg, frame, 2+frame_len);
  
@@ -1363,16 +1363,14 @@ wish send handshake");
         ;
         int32_t cert_len = 0;
         uint8_t *cert;
-        if (bson_get_binary(payload, "cert", &cert, &cert_len)
-                    == BSON_FAIL) {
+        if (bson_get_binary(payload, "cert", &cert, &cert_len) == BSON_FAIL) {
             WISHDEBUG(LOG_CRITICAL, "Cannot get certificate from friend req reply");
             break;
         }
 
         int32_t cert_alias_len = 0;
         char *cert_alias = NULL;
-        if (bson_get_string(cert, "alias", &cert_alias, &cert_alias_len)
-                != BSON_SUCCESS) {
+        if (bson_get_string(cert, "alias", &cert_alias, &cert_alias_len) != BSON_SUCCESS) {
             WISHDEBUG(LOG_CRITICAL, "Friend request response: No alias");
             break;
         }

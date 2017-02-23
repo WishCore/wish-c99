@@ -14,6 +14,7 @@ extern "C" {
 #include "wish_port_config.h"
 #include "wish_rpc.h"
 #include "wish_app.h"
+#include "bson.h"
 
 struct wish_service_entry {
     uint8_t wsid[WISH_WSID_LEN];
@@ -30,8 +31,26 @@ typedef uint32_t wish_time_t;
 
 typedef int wish_connection_id_t;
 
+typedef enum wish_discovery_type {
+    LocalDiscovery, RemoteFriendRequest, FriendRecommendation
+} wish_discovery_type_t;
+
+/*
+typedef struct {
+    wish_identity_t id;
+    wish_discovery_type_t discovery_type;
+    bson* meta;
+} wish_relationship_t;
+
+typedef struct wish_claim_t {
+    uint8_t* signature;
+    bson* document;
+} wish_claim_t;
+*/
+
 struct wish_context;
 struct wish_ldiscover_t;
+struct wish_relationship_t;
 
 typedef struct wish_core {
     uint16_t wish_server_port;
@@ -56,12 +75,13 @@ typedef struct wish_core {
     /* The number of seconds since core startup is stored here */
     wish_time_t core_time;
 
-    /* Statically allocate some resources */
     struct wish_context* wish_context_pool;
     wish_connection_id_t next_conn_id;
 
     bool ldiscover_allowed;
     struct wish_ldiscover_t* ldiscovery_db;
+    
+    struct wish_relationship_t* relationship_db;
     
 } wish_core_t;
 

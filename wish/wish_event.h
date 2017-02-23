@@ -22,7 +22,7 @@ struct wish_event {
     void* metadata;
 };
 
-/* Initialise the message processor task */
+/* Initialize the message processor task */
 void wish_message_processor_init(wish_core_t* core);
 
 /* Function implementing the message processor. The parameter ev points
