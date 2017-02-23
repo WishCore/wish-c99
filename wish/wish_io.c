@@ -10,6 +10,7 @@
 #include "wish_core.h"
 #include "wish_io.h"
 #include "wish_identity.h"
+#include "core_service_ipc.h"
 #include "wish_local_discovery.h"
 #include "ed25519.h"
 #include "cbson.h"
@@ -1614,12 +1615,16 @@ wish_context_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
 void wish_core_init(wish_core_t* core) {
     core->wish_server_port = core->wish_server_port == 0 ? 37009 : core->wish_server_port;
     core->wish_context_pool = wish_platform_malloc(sizeof(wish_context_t)*WISH_CONTEXT_POOL_SZ);
+    memset(core->wish_context_pool, 0, sizeof(wish_context_t)*WISH_CONTEXT_POOL_SZ);
     core->next_conn_id = 1;
+
+    core_service_ipc_init(core);
     
     wish_core_init_rpc(core);
     wish_core_app_rpc_init(core);
-    
+
     core->core_rpc_client = wish_platform_malloc(sizeof(wish_rpc_client_t));
+    memset(core->core_rpc_client, 0, sizeof(wish_rpc_client_t));
     core->core_rpc_client->next_id = 1;
     core->core_rpc_client->context = core;
     

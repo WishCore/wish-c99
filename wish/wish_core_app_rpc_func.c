@@ -1429,8 +1429,10 @@ struct wish_rpc_server_handler host_config_handler =            { .op_str = "hos
 
 void wish_core_app_rpc_init(wish_core_t* core) {
     core->core_app_rpc_server = wish_platform_malloc(sizeof(wish_rpc_server_t));
+    memset(core->core_app_rpc_server, 0, sizeof(wish_rpc_server_t));
     core->core_app_rpc_server->request_list_head = NULL;
     core->core_app_rpc_server->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
+    memset(core->core_app_rpc_server->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
     core->core_app_rpc_server->rpc_ctx_pool_num_slots = 10;
     strncpy(core->core_app_rpc_server->server_name, "core-from-app", 16);
     core->core_app_rpc_server->context = core;

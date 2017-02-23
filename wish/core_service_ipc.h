@@ -17,3 +17,5 @@ void receive_app_to_core(wish_core_t* core, uint8_t wsid[WISH_ID_LEN], uint8_t *
 /* wsid: the id the app which should receive the data */
 void send_core_to_app(wish_core_t* core, uint8_t wsid[WISH_ID_LEN], uint8_t *data, size_t len);
 
+void core_service_ipc_init(wish_core_t* core);
+
