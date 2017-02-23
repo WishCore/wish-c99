@@ -147,7 +147,7 @@ static void wish_core_add_remote_service(wish_context_t *ctx,
  * client to a remote core */
 void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t payload_len) {
     wish_context_t *ctx = context;
-    wish_core_t* core = req->client->context; //(wish_core_t*) req->server->context;
+    wish_core_t* core = req->client->context;
     
     
     WISHDEBUG(LOG_DEBUG, "Peer CB: payload len: %d", bson_get_doc_len(payload));
@@ -282,8 +282,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
 
 static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_array) {
     //bson_visit("Handling send request from remote core!", args_array);
-    
-    wish_core_t* core = NULL; //(wish_core_t*) req->server->context;
+    wish_core_t* core = rpc_ctx->server->context;
 
    
     /* The remote wsid, the originator of this message, is element "0" */
@@ -363,9 +362,11 @@ static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arra
 
 void wish_core_init_rpc(wish_core_t* core) {
     core->core_rpc_server = wish_platform_malloc(sizeof(wish_rpc_server_t));
+    memset(core->core_rpc_server, 0, sizeof(wish_rpc_server_t));
     
     core->core_rpc_server->request_list_head = NULL;
     core->core_rpc_server->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
+    memset(core->core_rpc_server->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
     core->core_rpc_server->rpc_ctx_pool_num_slots = 10;
     
     strncpy(core->core_rpc_server->server_name, "core-to-core", 13);

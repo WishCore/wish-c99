@@ -26,6 +26,9 @@ uint8_t wsid[WISH_WSID_LEN];
 bool login = false;
 
 
+void core_service_ipc_init(wish_core_t* wish_core) {
+    //core = wish_core;
+}
 
 void send_app_to_core(uint8_t *wsid, uint8_t *data, size_t len) {
     /* Handle the following situations:
