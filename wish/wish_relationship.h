@@ -15,9 +15,11 @@ typedef struct wish_relationship_t {
     // 
 } wish_relationship_t;
 
-typedef struct wish_relationship_req {
+typedef struct wish_relationship_req_t {
     uint8_t luid[WISH_UID_LEN];
     wish_identity_t id;
+    struct wish_relationship_req_t* prev;
+    struct wish_relationship_req_t* next;
 } wish_relationship_req_t;
 
 void wish_relationship_init(wish_core_t* core);

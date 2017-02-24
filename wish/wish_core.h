@@ -81,6 +81,7 @@ typedef struct wish_core {
     bool ldiscover_allowed;
     struct wish_ldiscover_t* ldiscovery_db;
     
+    struct wish_relationship_req_t* relationship_req_db;
     struct wish_relationship_t* relationship_db;
     
 } wish_core_t;

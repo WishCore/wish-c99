@@ -9,6 +9,7 @@
 #include "mbedtls/gcm.h"
 #include "wish_core.h"
 #include "wish_io.h"
+#include "wish_core_signals.h"
 #include "wish_identity.h"
 #include "wish_relationship.h"
 #include "core_service_ipc.h"
@@ -1186,8 +1187,9 @@ wish send handshake");
             /* Start pinging process */
 
             ctx->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
-            struct wish_event evt = { .event_type =
-                WISH_EVENT_NEW_CORE_CONNECTION, .context = ctx };
+            struct wish_event evt = { 
+                .event_type = WISH_EVENT_NEW_CORE_CONNECTION,
+                .context = ctx };
             wish_message_processor_notify(&evt);
 
 
@@ -1230,69 +1232,16 @@ wish send handshake");
             }
             WISHDEBUG(LOG_CRITICAL, "Friend request from %s", alias);
 
+            wish_relationship_req_t req;
+            strncpy(req.luid, recepient_uid, WISH_UID_LEN);
 
-            /* FIXME Quarantine the identity represented by 'cert', it
-             * should be released only when the user decides to allow it! */
+            wish_identity_t* new_id = &req.id;
+            memset(new_id, 0, sizeof (wish_identity_t));
 
-    #ifdef WISH_ACCEPT_ANY_FRIEND_REQ_IF_NO_FRIENDS
-            /* If WISH_ACCEPT_ANY_FRIEND_IF_NO_FRIENDS is defined, then we allow a
-             * friend request if there is only one identity in the id
-             * database. */
-            {
-                wish_uid_list_elem_t uid_list[2];
-                memset(uid_list, 0, sizeof (uid_list));
+            wish_populate_id_from_cert(new_id, cert_doc);
 
-                int num_ids = wish_load_uid_list(uid_list, 2);
-                if (num_ids > 1) {
-                    WISHDEBUG(LOG_CRITICAL, "Since number of identities in db is %d,\
-    we deny     the friend request automatically.", num_ids);
-                    break;
-                }
-                else {
-                    WISHDEBUG(LOG_CRITICAL, "Since number of identities in db is %d \
-    we accep    t the friend request automatically.", num_ids);
-                }
-            }
-    #else
-    #ifndef WISH_ALLOW_ALL_FRIEND_REQS
-
-    #error  Stop! Unimpelemnted feature! You must have WISH_ALLOW_ALL_FRIEND_REQS or WISH_ACCEPT_ANY_FRIEND_REQ_IF_NO_FRIENDS
-
-    #else
-            WISHDEBUG(LOG_CRITICAL, "Since WISH_ALLOW_ALL_FRIEND_REQS is defined, welcoming stranger with open arms!");
-
-    #endif  //WISH_ALLOW_ALL_FRIEND_REQS
-    #endif  //WISH_ACCEPT_ANY_FRIEND_REQ_IF_NO_FRIENDS
-
-            /* FIXME Now just saving the identity in the database and
-             * allowing it in */
-            wish_identity_t new_id;
-            memset(&new_id, 0, sizeof (wish_identity_t));
-
-            wish_populate_id_from_cert(&new_id, cert_doc);
-
-            // Check if identity is already in db
-
-            int num_uids_in_db = wish_get_num_uid_entries();
-            wish_uid_list_elem_t uid_list[num_uids_in_db];
-            int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+            wish_relationship_req_add(core, &req);
             
-            //wish_relationship_req_add(core, recepient_uid, &new_id);
-
-            bool found = false;
-            int i = 0;
-            for (i = 0; i < num_uids; i++) {
-                if ( memcmp(&uid_list[i].uid, &new_id.uid, WISH_ID_LEN) == 0 ) {
-                    WISHDEBUG(LOG_CRITICAL, "Identity already in DB, we wont add it multiple times.");
-                    found = true;
-                    break;
-                }
-            }
-
-            if(!found) {
-                wish_save_identity_entry(&new_id);
-            }
-
             /* Save the 'id' element in payload to wish context. It will be
              * used later, if/when user accepts friend request, to retrieve
              * the friend request from "quarantine" and really add it to
@@ -1303,13 +1252,28 @@ wish send handshake");
              * context. This information will be used later when exporting
              * the cert */
             memcpy(ctx->local_wuid, recepient_uid, WISH_ID_LEN);
+            memcpy(ctx->remote_wuid, new_id->uid, WISH_ID_LEN);
+            
+            WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", ctx->local_wuid[0], ctx->local_wuid[1], ctx->local_wuid[2], ctx->local_wuid[3]);
+            WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", ctx->remote_wuid[0], ctx->remote_wuid[1], ctx->remote_wuid[2], ctx->remote_wuid[3]);
 
-            struct wish_event evt = { 
+            struct wish_event evt = {
                 .event_type = WISH_EVENT_FRIEND_REQUEST, 
                 .context = ctx 
             };
             wish_message_processor_notify(&evt);
-
+            
+            int buf_len = 1024;
+            char buf[1024];
+            
+            bson bs;
+            bson_init_buffer(&bs, buf, buf_len);
+            bson_append_start_array(&bs, "data");
+            bson_append_string(&bs, "0", "friendRequest");
+            bson_append_finish_array(&bs);
+            bson_finish(&bs);
+            
+            wish_core_signals_emit(core, &bs);
         }
         break;
     case PROTO_SERVER_STATE_REPLY_FRIEND_REQ:
@@ -1319,7 +1283,7 @@ wish send handshake");
             /* First, load the identity... The UID of the identity that
              * the remote wish core wanted to befriend with is stored in
              * ctx->local_wuid FIXME? */
-            size_t my_cert_max_len = 300;
+            size_t my_cert_max_len = 512;
             uint8_t my_identity[my_cert_max_len];
             
             if (wish_load_identity_bson(ctx->local_wuid, my_identity, my_cert_max_len) < 0) {

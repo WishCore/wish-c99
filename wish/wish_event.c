@@ -67,31 +67,51 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
         wish_core_process_data(core, wish_handle);
         break;
     case WISH_EVENT_NEW_CORE_CONNECTION:
-        wish_core_send_peers_rpc_req(core, e->context);
+        wish_core_send_peers_rpc_req(core, wish_handle);
         break;
     case WISH_EVENT_FRIEND_REQUEST:
-        WISHDEBUG(LOG_CRITICAL, "Accepting friend request");
-        struct wish_event new_evt = {
-            .event_type = WISH_EVENT_ACCEPT_FRIEND_REQUEST,
-            .context = e->context,
-        };
-        wish_message_processor_notify(&new_evt);
+        WISHDEBUG(LOG_CRITICAL, "Received friend request");
+        
+#ifdef WISH_ACCEPT_ANY_FRIEND_REQ_IF_NO_FRIENDS
+        /* If WISH_ACCEPT_ANY_FRIEND_IF_NO_FRIENDS is defined, then we allow a
+         * friend request if there is only one identity in the id
+         * database. */
+        {
+            wish_uid_list_elem_t uid_list[2];
+            memset(uid_list, 0, sizeof (uid_list));
+
+            int num_ids = wish_load_uid_list(uid_list, 2);
+            if (num_ids > 1) {
+                WISHDEBUG(LOG_CRITICAL, "Since number of identities in db is %d, we deny the friend request automatically.", num_ids);
+                break;
+            }
+            else {
+                WISHDEBUG(LOG_CRITICAL, "Since number of identities in db is %d we accept the friend request automatically.", num_ids);
+                
+                struct wish_event new_evt = {
+                    .event_type = WISH_EVENT_ACCEPT_FRIEND_REQUEST,
+                    .context = wish_handle,
+                };
+                wish_message_processor_notify(&new_evt);
+                
+            }
+        }
+#endif
+        
         break;
     case WISH_EVENT_ACCEPT_FRIEND_REQUEST:
-        if (e->context->curr_protocol_state 
-                == PROTO_SERVER_STATE_READ_FRIEND_CERT) {
-            e->context->curr_protocol_state 
-                = PROTO_SERVER_STATE_REPLY_FRIEND_REQ;
-            wish_core_handle_payload(core, e->context, NULL, 0);
+        if (wish_handle->curr_protocol_state == PROTO_SERVER_STATE_READ_FRIEND_CERT) {
+            wish_handle->curr_protocol_state = PROTO_SERVER_STATE_REPLY_FRIEND_REQ;
+            wish_core_handle_payload(core, wish_handle, NULL, 0);
         }
         else {
             WISHDEBUG(LOG_CRITICAL, "Unexpected state, closing connection!");
-            wish_close_connection(core, e->context);
+            wish_close_connection(core, wish_handle);
         }
 
         break;
     case WISH_EVENT_REQUEST_CONNECTION_CLOSING:
-        wish_close_connection(core, e->context);
+        wish_close_connection(core, wish_handle);
         break;
     default:
         WISHDEBUG(LOG_CRITICAL,"Uknown event type %d\n\r", e->event_type);

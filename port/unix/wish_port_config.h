@@ -30,7 +30,7 @@
 //#define WISH_ACCEPT_ANY_FRIEND_REQ_IF_NO_FRIENDS
 
 /** If this is defined, all fried requests are automatically accepted! */
-#define WISH_ALLOW_ALL_FRIEND_REQS
+//#define WISH_ALLOW_ALL_FRIEND_REQS
 
 /** With this define you get fancy ANSI colored output on the console */
 #define WISH_CONSOLE_COLORS

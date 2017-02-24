@@ -6,6 +6,7 @@
 #include "wish_rpc.h"
 #include "wish_version.h"
 #include "wish_identity.h"
+#include "wish_event.h"
 #include "wish_core_signals.h"
 #include "wish_io.h"
 #include "wish_core_app_rpc_func.h"
@@ -23,6 +24,7 @@
 
 #include "wish_debug.h"
 #include "wish_port_config.h"
+#include "wish_relationship.h"
 
 /*
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
@@ -899,6 +901,181 @@ static void identity_verify(wish_rpc_ctx* req, uint8_t* args) {
 }
 
 /*
+ * identity.listFriendRequests
+ *
+ * App to core: { op: "identity.verify", args: [ <Buffer> uid, <Buffer> signature, <Buffer> hash ], id: 5 }
+ */
+static void identity_friend_request_list(wish_rpc_ctx* req, uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
+    uint8_t buffer[buffer_len];
+
+    bson bs;
+
+    bson_init_buffer(&bs, buffer, buffer_len);
+    bson_append_start_array(&bs, "data");
+    
+    wish_relationship_req_t* elt;
+    
+    int i = 0;
+    
+    DL_FOREACH(core->relationship_req_db, elt) {
+        char idx[21];
+        BSON_NUMSTR(idx, i);
+        bson_append_start_object(&bs, idx);
+        bson_append_binary(&bs, "luid", elt->luid, WISH_UID_LEN);
+        bson_append_binary(&bs, "ruid", elt->id.uid, WISH_UID_LEN);
+        bson_append_string(&bs, "alias", elt->id.alias);
+        bson_append_binary(&bs, "pubkey", elt->id.pubkey, WISH_PUBKEY_LEN);
+        bson_append_finish_object(&bs);
+    }
+    
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
+
+    if(bs.err != 0) {
+        wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        return;
+    }
+
+    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+}
+
+/*
+ * identity.listFriendRequests
+ *
+ * App to core: { op: "identity.verify", args: [ <Buffer> uid, <Buffer> signature, <Buffer> hash ], id: 5 }
+ */
+static void identity_friend_request_accept(wish_rpc_ctx* req, uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+
+
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        wish_rpc_server_error(req, 345, "Invalid luid.");
+        return;
+    }
+
+    const char* luid = 0;
+    luid = bson_iterator_bin_data(&it);
+
+    bson_find_from_buffer(&it, args, "1");
+    
+    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        wish_rpc_server_error(req, 345, "Invalid ruid.");
+        return;
+    }
+
+    const char* ruid = 0;
+    ruid = bson_iterator_bin_data(&it);
+    
+    wish_relationship_req_t* elt;
+    wish_relationship_req_t* tmp;
+    
+    bool found = false;
+    
+    DL_FOREACH_SAFE(core->relationship_req_db, elt, tmp) {
+        if ( memcmp(elt->luid, luid, WISH_UID_LEN) == 0 
+                && memcmp(elt->id.uid, ruid, WISH_UID_LEN) == 0 ) {
+            found = true;
+            DL_DELETE(core->relationship_req_db, elt);
+            break;
+        }
+    }
+    
+    if (!found) {
+        wish_rpc_server_error(req, 356, "No such friend request found.");
+        return;
+    }
+    
+    // Find the connection which was used for receiving the friend request   
+    
+    int i = 0;
+    found = false;
+    
+    wish_context_t* wish_connection = NULL;
+
+    for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
+            continue;
+        }
+
+        if (memcmp(core->wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+                found = true;
+                WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->wish_context_pool[i].context_state, core->wish_context_pool[i].curr_protocol_state);
+                wish_connection = &core->wish_context_pool[i];
+                break;
+            }
+            else {
+                WISHDEBUG(LOG_DEBUG, "ruid mismatch");
+            }
+        }
+        else {
+            WISHDEBUG(LOG_DEBUG, "luid mismatch");
+        }
+
+    }
+
+    if (!found) {
+        wish_rpc_server_error(req, 344, "Friend request connection not found while trying to accept.");
+        return;
+    }
+    
+    // found the connection (wish_connection)
+
+    // Check if identity is already in db
+
+    int num_uids_in_db = wish_get_num_uid_entries();
+    wish_uid_list_elem_t uid_list[num_uids_in_db];
+    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+
+
+    found = false;
+    i = 0;
+    for (i = 0; i < num_uids; i++) {
+        if ( memcmp(&uid_list[i].uid, ruid, WISH_ID_LEN) == 0 ) {
+            WISHDEBUG(LOG_CRITICAL, "Identity already in DB, we wont add it multiple times.");
+            found = true;
+            break;
+        }
+    }
+
+    if(!found) {
+        wish_save_identity_entry(&elt->id);
+    }
+
+    
+    WISHDEBUG(LOG_CRITICAL, "Accepting friend request");
+    struct wish_event new_evt = {
+        .event_type = WISH_EVENT_ACCEPT_FRIEND_REQUEST,
+        .context = wish_connection,
+    };
+    wish_message_processor_notify(&new_evt);
+
+    
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
+    uint8_t buffer[buffer_len];
+
+    bson bs;
+
+    bson_init_buffer(&bs, buffer, buffer_len);
+    bson_append_bool(&bs, "data", true);
+    bson_finish(&bs);
+
+    if(bs.err != 0) {
+        wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        return;
+    }
+
+    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+    wish_platform_free(elt);
+}
+
+/*
  * identity.get
  *
  * App to core: { op: "identity.get", args: [ Buffer(32) uid ], id: 5 }
@@ -1036,6 +1213,8 @@ static void connections_list_handler(wish_rpc_ctx* req, uint8_t* args) {
     int p = 0;
     for(i=0; i< WISH_CONTEXT_POOL_SZ; i++) {
         if(db[i].context_state != WISH_CONTEXT_FREE) {
+            if (db[i].curr_protocol_state != PROTO_STATE_WISH_RUNNING) { continue; }
+            
             bson_numstrn((char *)nbuf, NBUFL, p);
             //bson_append_start_object(&bs, nbuf);
             bson_append_start_object(&bs, (char *)nbuf);
@@ -1056,7 +1235,6 @@ static void connections_list_handler(wish_rpc_ctx* req, uint8_t* args) {
             */
             bson_append_finish_object(&bs);
             p++;
-            if(p >= 4) { break; }
         }
     }
 
@@ -1425,6 +1603,8 @@ struct wish_rpc_server_handler version_handler =                { .op_str = "ver
 struct wish_rpc_server_handler services_send_handler =          { .op_str = "services.send",          .handler = services_send };
 struct wish_rpc_server_handler identity_sign_handler =          { .op_str = "identity.sign",          .handler = identity_sign };
 struct wish_rpc_server_handler identity_verify_handler =        { .op_str = "identity.verify",        .handler = identity_verify };
+struct wish_rpc_server_handler identity_friend_request_list_handler =        { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list };
+struct wish_rpc_server_handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",        .handler = identity_friend_request_accept };
 struct wish_rpc_server_handler host_config_handler =            { .op_str = "host.config",            .handler = host_config };
 
 void wish_core_app_rpc_init(wish_core_t* core) {
@@ -1452,6 +1632,8 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     wish_rpc_server_add_handler(core->core_app_rpc_server, "identity.remove", identity_remove_handler);
     wish_rpc_server_register(core->core_app_rpc_server, &identity_sign_handler);
     wish_rpc_server_register(core->core_app_rpc_server, &identity_verify_handler);
+    wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_list_handler);
+    wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_accept_handler);
     
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.list", connections_list_handler);
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.disconnect", connections_disconnect_handler);
