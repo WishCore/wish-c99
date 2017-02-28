@@ -53,12 +53,19 @@ struct wish_ldiscover_t;
 struct wish_relationship_t;
 
 typedef struct wish_core {
+    /* Configurations */
+    bool config_skip_connection_acl;
+    bool config_skip_service_acl;
+    
+    /* TCP Server */
     uint16_t wish_server_port;
     
+    /* Identities */
     int num_ids;
     int loaded_num_ids;
     wish_uid_list_elem_t uid_list[WISH_PORT_MAX_UIDS];
     
+    /* RPC Servers */
     #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
     #define REQUEST_POOL_SIZE (3*WISH_CONTEXT_POOL_SZ)
     struct wish_rpc_context_list_elem request_pool[REQUEST_POOL_SIZE];
@@ -67,7 +74,7 @@ typedef struct wish_core {
     wish_rpc_server_t* core_rpc_server;
     wish_rpc_server_t* core_app_rpc_server;
     
-    // moved from wish_service_registry.c
+    /* Services */
     struct wish_service_entry* service_registry;
     
     wish_rpc_client_t* core_rpc_client;
@@ -75,12 +82,15 @@ typedef struct wish_core {
     /* The number of seconds since core startup is stored here */
     wish_time_t core_time;
 
+    /* Connections */
     struct wish_context* wish_context_pool;
     wish_connection_id_t next_conn_id;
 
+    /* Local discovery */
     bool ldiscover_allowed;
     struct wish_ldiscover_t* ldiscovery_db;
     
+    /* Relationship management */
     struct wish_relationship_req_t* relationship_req_db;
     struct wish_relationship_t* relationship_db;
     
