@@ -59,7 +59,7 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
         break;
     }
 
-    wish_context_t* wish_handle = e->context;
+    wish_connection_t* wish_handle = e->context;
 
     switch (e->event_type) {
     case WISH_EVENT_CONTINUE:

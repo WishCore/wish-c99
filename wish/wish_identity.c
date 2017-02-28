@@ -702,7 +702,7 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
     wish_fs_rename(newpath, oldpath);
     
     /* For all connections: if identity is either in luid or ruid, close the connection. */
-    wish_context_t *wish_context_pool = wish_core_get_connection_pool(core);
+    wish_connection_t *wish_context_pool = wish_core_get_connection_pool(core);
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
         if (wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {

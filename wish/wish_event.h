@@ -18,7 +18,7 @@ enum wish_event_type {
 
 struct wish_event {
     enum wish_event_type event_type;
-    wish_context_t *context;
+    wish_connection_t *context;
     void* metadata;
 };
 
@@ -36,11 +36,11 @@ struct wish_event * wish_get_next_event(void);
 void wish_message_processor_notify(struct wish_event *ev);
 
 /* This function is called when a new service is first detected */
-void wish_report_new_service(wish_context_t *ctx, uint8_t *wsid, 
+void wish_report_new_service(wish_connection_t *ctx, uint8_t *wsid, 
     char *protocol_name_str);
 
 /* This function is called when a Wish service goes up or down */
-void wish_report_service_status_change(wish_context_t *ctx, uint8_t *wsid, 
+void wish_report_service_status_change(wish_connection_t *ctx, uint8_t *wsid, 
     bool online);
 
 #endif

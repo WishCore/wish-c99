@@ -206,7 +206,7 @@ static void services_send(wish_rpc_ctx* req, uint8_t* args) {
         return;
     }
     /* Destination is determined to be a remote service on a remote core. */
-    wish_context_t *dst_ctx = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
+    wish_connection_t *dst_ctx = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
 
     /* Build the actual on-wire message:
      *
@@ -996,7 +996,7 @@ static void identity_friend_request_accept(wish_rpc_ctx* req, uint8_t* args) {
     int i = 0;
     found = false;
     
-    wish_context_t* wish_connection = NULL;
+    wish_connection_t* wish_connection = NULL;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
         if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
@@ -1203,7 +1203,7 @@ static void connections_list_handler(wish_rpc_ctx* req, uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
     
-    wish_context_t *db = wish_core_get_connection_pool(core);
+    wish_connection_t *db = wish_core_get_connection_pool(core);
     
     bson bs;
     bson_init_buffer(&bs, buffer, buffer_len);
@@ -1254,7 +1254,7 @@ static void connections_disconnect_handler(wish_rpc_ctx* req, uint8_t* args) {
     int buffer_len = 1400;
     uint8_t buffer[buffer_len];
     
-    wish_context_t *db = wish_core_get_connection_pool(core);
+    wish_connection_t *db = wish_core_get_connection_pool(core);
 
     bson_iterator it;
     bson_find_from_buffer(&it, args, "0");
@@ -1473,7 +1473,7 @@ static void wld_friend_request_handler(wish_rpc_ctx* req, uint8_t* args) {
         return;
     }
 
-    wish_context_t *friend_req_ctx = wish_connection_init(core, luid, ruid);
+    wish_connection_t *friend_req_ctx = wish_connection_init(core, luid, ruid);
     friend_req_ctx->friend_req_connection = true;
     uint8_t *ip = db[i].transport_ip.addr;
     WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", 

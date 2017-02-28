@@ -191,7 +191,7 @@ size_t buffer_len) {
         return;
     }
 
-    wish_context_t *existing_conn_ctx = wish_core_lookup_ctx_by_luid_ruid_rhid(core, uid_list[0].uid, ruid, rhid);
+    wish_connection_t *existing_conn_ctx = wish_core_lookup_ctx_by_luid_ruid_rhid(core, uid_list[0].uid, ruid, rhid);
     if (existing_conn_ctx != NULL) {
         if (existing_conn_ctx->context_state == WISH_CONTEXT_CONNECTED) {
             /* Found that we already have a wish connection where one of
@@ -224,7 +224,7 @@ size_t buffer_len) {
 
     /* FIXME currently always using first uid of list */
     uint8_t *my_uid = uid_list[0].uid;
-    wish_context_t *new_ctx = wish_connection_init(core, my_uid, ruid);
+    wish_connection_t *new_ctx = wish_connection_init(core, my_uid, ruid);
     if (new_ctx != NULL) {
         /* FIXME the ipshould be read from * 'transports' */
         WISHDEBUG(LOG_CRITICAL, "wld: Will start connection to: %u.%u.%u.%u:%hu\n", 

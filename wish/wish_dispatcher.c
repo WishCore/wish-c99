@@ -21,7 +21,7 @@
 
 /* Embedded Wish */
 
-void wish_core_send_pong(wish_core_t* core, wish_context_t* ctx) {
+void wish_core_send_pong(wish_core_t* core, wish_connection_t* ctx) {
     WISHDEBUG(LOG_DEBUG, "Ping, sending pong!");
     /* Enqueue a pong message as answer to ping */
     int32_t pong_msg_max_len = 50;
@@ -131,7 +131,7 @@ void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t b
  * Note that if you wish (heh-heh) to retain any part of the bson_doc for later
  * processing, you MUST explicitly make a copy of the data, as the parameter
  * bson_doc is allocated from stack! */
-void wish_core_process_handshake(wish_core_t* core, wish_context_t* ctx, uint8_t* bson_doc) {
+void wish_core_process_handshake(wish_core_t* core, wish_connection_t* ctx, uint8_t* bson_doc) {
     uint32_t doc_len = bson_get_doc_len(bson_doc);
     WISHDEBUG(LOG_DEBUG, "In process handshake");
     WISHDEBUG(LOG_DEBUG, "We obtained BSON document with len=%d", doc_len);
@@ -182,7 +182,7 @@ int32_t generate_service_msg_id(void) {
 }
 
 
-void wish_core_process_message(wish_core_t* core, wish_context_t* ctx, uint8_t* bson_doc) {
+void wish_core_process_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* bson_doc) {
     uint32_t doc_len = bson_get_doc_len(bson_doc);
     WISHDEBUG(LOG_DEBUG, "We obtained BSON document with len=%d\n\r", doc_len);
 
@@ -303,9 +303,9 @@ void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
              * Iterate through the list of Wish connections, and 
              * send online signal for each service on each active core connection */
             int i = 0;
-            wish_context_t *wish_context_pool = wish_core_get_connection_pool(core);
+            wish_connection_t *wish_context_pool = wish_core_get_connection_pool(core);
             for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-                wish_context_t *ctx = &(wish_context_pool[i]);
+                wish_connection_t *ctx = &(wish_context_pool[i]);
                 if (ctx->context_state == WISH_CONTEXT_CONNECTED) {
                     wish_send_online_offline_signal_to_apps(core, ctx, true);
                 }

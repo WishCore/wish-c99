@@ -74,7 +74,7 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_ctx_t *rctx
                  * The actual IDs will be established during handshake
                  * */
                 uint8_t null_id[WISH_ID_LEN] = { 0 };
-                wish_context_t *new_ctx = wish_connection_init(core, null_id, null_id);
+                wish_connection_t *new_ctx = wish_connection_init(core, null_id, null_id);
                 /* Register the relay context to the newly created wish
                  * context, this is because we need to send over the
                  * relay session id */

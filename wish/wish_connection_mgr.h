@@ -7,12 +7,12 @@
 
 /* Initiate a wish connection to specified ip and port, and associate
  * the wish_context ctx to the connection */
-int wish_open_connection(wish_core_t* core, wish_context_t *ctx, wish_ip_addr_t *ip, uint16_t port, bool via_relay);
+int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr_t *ip, uint16_t port, bool via_relay);
     
 int wish_send_advertizement(wish_core_t* core, uint8_t *ad, size_t ad_len);
 
 /* Gracefully initiate a TCP socket close */
-void wish_close_connection(wish_core_t* core, wish_context_t *ctx);
+void wish_close_connection(wish_core_t* core, wish_connection_t *ctx);
 
 void wish_close_all_connections(wish_core_t* core);
 

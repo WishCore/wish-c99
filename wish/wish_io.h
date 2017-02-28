@@ -157,7 +157,7 @@ typedef struct wish_context {
      * peer in order to send a friend request */
     bool friend_req_connection;
     struct wish_remote_service *rsid_list_head;
-} wish_context_t;
+} wish_connection_t;
 
 struct wish_peer {
     uint8_t *luid;  /* Local wuid */
@@ -172,11 +172,11 @@ struct wish_peer {
 size_t get_local_hostid(char** hostid);
 
 /* Start an instance of wish communication */
-wish_context_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid);
+wish_connection_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid);
 
 
 /* Feed raw data into wish core */
-void wish_core_feed(wish_core_t* core, wish_context_t* h, unsigned char* data, int len);
+void wish_core_feed(wish_core_t* core, wish_connection_t* h, unsigned char* data, int len);
 
 /* This function will process data saved into the ringbuffer by function
  * wish_core_feed. 
@@ -184,22 +184,22 @@ void wish_core_feed(wish_core_t* core, wish_context_t* h, unsigned char* data, i
  * processing is possible. 
  * Returns 0 when there is no more data to be read at this time.
  */
-void wish_core_process_data(wish_core_t* core, wish_context_t* h);
+void wish_core_process_data(wish_core_t* core, wish_connection_t* h);
 
 /* Register a function which will be used by wish core when data is
  * to be sent.
  *
  * The send function is called with the argument given as arg */
-void wish_core_register_send(wish_core_t* core, wish_context_t* h, int (*send)(void *,
+void wish_core_register_send(wish_core_t* core, wish_connection_t* h, int (*send)(void *,
 unsigned char*, int), void* arg);
 
-void wish_core_signal_tcp_event(wish_core_t* core, wish_context_t* h, enum tcp_event);
+void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h, enum tcp_event);
 
-void wish_core_handle_payload(wish_core_t* core, wish_context_t* ctx, uint8_t* payload, int len);
+void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t* payload, int len);
 
 /* Decrypt a "Wish frame" - 
  */
-int wish_core_decrypt(wish_core_t* core, wish_context_t* ctx, uint8_t* ciphertxt, size_t 
+int wish_core_decrypt(wish_core_t* core, wish_connection_t* ctx, uint8_t* ciphertxt, size_t 
 ciphertxt_len, uint8_t* auth_tag, size_t auth_tag_len, uint8_t* plaintxt,
 size_t plaintxt_len );
 
@@ -210,25 +210,25 @@ size_t plaintxt_len );
  * @return 0, if sending succeeded, non-zero if fail. This is directly
  * the return value of the platform-specific sending function
  */
-int wish_core_send_message(wish_core_t* core, wish_context_t* ctx, uint8_t* payload_clrtxt, int payload_len);
+int wish_core_send_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* payload_clrtxt, int payload_len);
     
 uint16_t uint16_native2be(uint16_t);
 
-void wish_core_subscribe_services(wish_core_t* core, wish_context_t* ctx);
+void wish_core_subscribe_services(wish_core_t* core, wish_connection_t* ctx);
 
 /* Returns pointer to first element in connection pool, where there are 
  * WISH_CONTEXT_POOL_SZ elements */
-wish_context_t* wish_core_get_connection_pool(wish_core_t* core);
+wish_connection_t* wish_core_get_connection_pool(wish_core_t* core);
 
 /* This function returns the wish context associated with the provided
  * remote IP, remote port, local IP, local port. If no matching wish
  * context is found, return NULL. */
-wish_context_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4], 
+wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4], 
     uint16_t rmt_port, uint8_t local_ip[4], uint16_t local_port);
 
 /* This function returns the pointer to the wish context corresponding
  * to the id number given as argument */
-wish_context_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_connection_id_t connection_id);
+wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_connection_id_t connection_id);
 
 /** This function returns a pointer to the wish context which matches the
  * specified luid, ruid, rhid identities 
@@ -236,7 +236,7 @@ wish_context_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_co
  * Please note: The context returned here could a countext which is not
  * yet ready for use, because it is e.g. just being created.
  */
-wish_context_t* wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t *ruid,
+wish_connection_t* wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t *ruid,
         uint8_t *rhid);
 
 /* returns true if there is any connection form luid to ruid */
@@ -251,4 +251,4 @@ void wish_core_init(wish_core_t* core);
 /*
  * This function returns the number of bytes free in the ring buffer 
  */
-int wish_core_get_rx_buffer_free(wish_core_t* core, wish_context_t *ctx);
+int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t *ctx);

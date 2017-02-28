@@ -6,14 +6,14 @@
 /* Embedded Wish */
 
 /* Submit a handshake message (extracted from the wire) to the Wish core */
-void wish_core_process_handshake(wish_core_t* core, wish_context_t* ctx, uint8_t* bson_doc);
+void wish_core_process_handshake(wish_core_t* core, wish_connection_t* ctx, uint8_t* bson_doc);
 
 void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t buffer_len);
 
 /* Submit an actual Wish service message */
-void wish_core_process_message(wish_core_t* core, wish_context_t* ctx, uint8_t* bson_doc);
+void wish_core_process_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* bson_doc);
 
-void wish_core_process_service_meta(wish_core_t* core, wish_context_t* ctx,
+void wish_core_process_service_meta(wish_core_t* core, wish_connection_t* ctx,
 uint8_t* service_reply_doc);
 
 void user_notify_service_subscribe_sent(wish_core_t* core);

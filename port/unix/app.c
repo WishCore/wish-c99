@@ -47,7 +47,7 @@ wish_core_t* core = &core_inst;
 
 void hw_init(void);
 
-extern wish_context_t wish_context_pool[];  /* Defined in wish_io.c */
+extern wish_connection_t wish_context_pool[];  /* Defined in wish_io.c */
 
 void error(const char *msg)
 {
@@ -83,22 +83,22 @@ void socket_set_nonblocking(int sockfd) {
 
 /* When the wish connection "i" is connecting and connect succeeds
  * (socket becomes writable) this function is called */
-void connected_cb(wish_context_t *ctx) {
+void connected_cb(wish_connection_t *ctx) {
     //printf("Signaling wish session connected \n");
     wish_core_signal_tcp_event(ctx->core, ctx, TCP_CONNECTED);
 }
 
-void connected_cb_relay(wish_context_t *ctx) {
+void connected_cb_relay(wish_connection_t *ctx) {
     //printf("Signaling relayed wish session connected \n");
     wish_core_signal_tcp_event(ctx->core, ctx, TCP_RELAY_SESSION_CONNECTED);
 }
 
-void connect_fail_cb(wish_context_t *ctx) {
+void connect_fail_cb(wish_connection_t *ctx) {
     printf("Connect fail... \n");
     wish_core_signal_tcp_event(ctx->core, ctx, TCP_DISCONNECTED);
 }
 
-int wish_open_connection(wish_core_t* core, wish_context_t *ctx, wish_ip_addr_t *ip, uint16_t port, bool relaying) {
+int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr_t *ip, uint16_t port, bool relaying) {
     ctx->core = core;
     
     //printf("should start connect\n");
@@ -149,7 +149,7 @@ int wish_open_connection(wish_core_t* core, wish_context_t *ctx, wish_ip_addr_t 
     return 0;
 }
 
-void wish_close_connection(wish_core_t* core, wish_context_t *ctx) {
+void wish_close_connection(wish_core_t* core, wish_connection_t *ctx) {
     /* Note that because we don't get a callback invocation when closing
      * succeeds, we need to excplicitly call TCP_DISCONNECTED so that
      * clean-up will happen */
@@ -595,7 +595,7 @@ int main(int argc, char** argv) {
 
         int i = -1;
         for (i = 0; i < WISH_PORT_CONTEXT_POOL_SZ; i++) {
-            wish_context_t* ctx = &(core->wish_context_pool[i]);
+            wish_connection_t* ctx = &(core->wish_context_pool[i]);
             if (ctx->context_state == WISH_CONTEXT_FREE) {
                 continue;
             }
@@ -737,7 +737,7 @@ int main(int argc, char** argv) {
 
             /* Check for Wish connections status changes */
             for (i = 0; i < WISH_PORT_CONTEXT_POOL_SZ; i++) {
-                wish_context_t* ctx = &(core->wish_context_pool[i]);
+                wish_connection_t* ctx = &(core->wish_context_pool[i]);
                 if (ctx->context_state == WISH_CONTEXT_FREE) {
                     continue;
                 }
@@ -829,7 +829,7 @@ int main(int argc, char** argv) {
                      * The actual IDs will be established during handshake
                      * */
                     uint8_t null_id[WISH_ID_LEN] = { 0 };
-                    wish_context_t *ctx = wish_connection_init(core, null_id, null_id);
+                    wish_connection_t *ctx = wish_connection_init(core, null_id, null_id);
                     if (ctx == NULL) {
                         /* Fail... no more contexts in our pool */
                         printf("No new Wish connections can be accepted!\n");
@@ -924,14 +924,14 @@ int main(int argc, char** argv) {
  
 
 /* This function is called when a new service is first detected */
-void wish_report_new_service(wish_context_t *ctx, uint8_t *wsid,
+void wish_report_new_service(wish_connection_t *ctx, uint8_t *wsid,
     char *protocol_name_str) {
     printf("Detected new service, protocol %s",
         protocol_name_str);
 }
 
 /* This function is called when a Wish service goes up or down */
-void wish_report_service_status_change(wish_context_t *ctx, uint8_t *wsid, bool online) {
+void wish_report_service_status_change(wish_connection_t *ctx, uint8_t *wsid, bool online) {
     printf("Detected service status change");
 }
 

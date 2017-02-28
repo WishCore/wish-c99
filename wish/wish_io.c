@@ -29,14 +29,14 @@
 #include "utlist.h"
 
 
-wish_context_t* wish_core_get_connection_pool(wish_core_t* core) {
+wish_connection_t* wish_core_get_connection_pool(wish_core_t* core) {
     return core->wish_context_pool;
 }
 
 /* Start an instance of wish communication */
-wish_context_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid) {
+wish_connection_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid) {
 
-    wish_context_t* connection;
+    wish_connection_t* connection;
 
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
@@ -78,8 +78,8 @@ wish_context_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, uin
 
 /* This function returns the pointer to the wish context corresponding
  * to the id number given as argument */
-wish_context_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_connection_id_t id) {
-    wish_context_t *ctx = NULL;
+wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_connection_id_t id) {
+    wish_connection_t *ctx = NULL;
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
@@ -97,10 +97,10 @@ wish_context_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_co
  * Please note: The context returned here could a countext which is not
  * yet ready for use, because it is e.g. just being created.
  */
-wish_context_t* 
+wish_connection_t* 
 wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t *ruid,
         uint8_t *rhid) {
-    wish_context_t *ctx = NULL;
+    wish_connection_t *ctx = NULL;
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
@@ -182,7 +182,7 @@ bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t 
 
 
 /* Feed raw data into wish core */
-void wish_core_feed(wish_core_t* core, wish_context_t* h, unsigned char* data, int len) {
+void wish_core_feed(wish_core_t* core, wish_connection_t* h, unsigned char* data, int len) {
     WISHDEBUG(LOG_INFO, "Got data, len %d ", len);
     int i = 0;
     for (i = 0; i < len; i++) {
@@ -210,7 +210,7 @@ The ringbuffer currently has %hu free bytes. Not going any further",
 
 /* Check if the connection attempt by a remote client presenting these
  * wish id's can be accepted or not */
-bool wish_core_check_wsid(wish_core_t* core, wish_context_t* ctx, uint8_t* dst_id, uint8_t* src_id) {
+bool wish_core_check_wsid(wish_core_t* core, wish_connection_t* ctx, uint8_t* dst_id, uint8_t* src_id) {
     bool retval = false;
 
     /* Whitelist/ACL processing? */
@@ -241,7 +241,7 @@ bool wish_core_check_wsid(wish_core_t* core, wish_context_t* ctx, uint8_t* dst_i
  * processing is possible. 
  * Returns 0 when there is no more data to be read at this time.
  */
-void wish_core_process_data(wish_core_t* core, wish_context_t* h) {
+void wish_core_process_data(wish_core_t* core, wish_connection_t* h) {
 again:
     ;
     /* This variable is used when the wish protocol state is 
@@ -491,12 +491,12 @@ again:
  * to be sent.
  *
  * The send function is called with the argument given as arg */
-void wish_core_register_send(wish_core_t* core, wish_context_t* h, int (*send)(void *, unsigned char*, int), void* arg) {
+void wish_core_register_send(wish_core_t* core, wish_connection_t* h, int (*send)(void *, unsigned char*, int), void* arg) {
     h->send = send;
     h->send_arg = arg;
 }
 
-void wish_core_signal_tcp_event(wish_core_t* core, wish_context_t* h,  enum tcp_event ev) {
+void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum tcp_event ev) {
     WISHDEBUG(LOG_DEBUG, "TCP Event for connection id %d", h->connection_id);
     switch (ev) {
     case TCP_CONNECTED:
@@ -601,12 +601,12 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_context_t* h,  enum tcp_
          * there are no other connections active to the same luid, ruid,
          * rhid combination. */
         {
-            wish_context_t *ctx = h;
+            wish_connection_t *ctx = h;
             int i = 0;
             bool other_connection_found = false;
 #if 1
             for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-                wish_context_t *other_ctx = &(core->wish_context_pool[i]);
+                wish_connection_t *other_ctx = &(core->wish_context_pool[i]);
                 if (ctx == other_ctx) {
                     /* Don't examine our current wish context, the one
                      * that was just disconnected  */
@@ -663,7 +663,7 @@ offline signal because other connection luid and ruid found!");
         
 
         /* Just set everything to zero - a reliable way to reset it */
-        memset(h, 0, sizeof(wish_context_t));
+        memset(h, 0, sizeof(wish_connection_t));
 
         h->curr_protocol_state = PROTO_STATE_INITIAL;
         h->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
@@ -748,7 +748,7 @@ static void update_nonce(unsigned char* nonce_bin) {
 /* This function generates the "client" and "server" hashes, using the
  * DHM secret (384 byte long). The hashes are saved to the wish context.
  * */
-static void build_client_and_server_hashes(wish_context_t *ctx, 
+static void build_client_and_server_hashes(wish_connection_t *ctx, 
         uint8_t *secret) {
     /* Now that we have the key handy, let's build the client
      * and server hashes */
@@ -782,7 +782,7 @@ static void build_client_and_server_hashes(wish_context_t *ctx,
 }
 
 
-void wish_core_handle_payload(wish_core_t* core, wish_context_t* ctx, uint8_t* payload, int len) {
+void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t* payload, int len) {
     switch (ctx->curr_protocol_state) {
     case PROTO_STATE_DH:
         /* Diffie-hellman key exchange */
@@ -1402,7 +1402,7 @@ uint16_t uint16_native2be(uint16_t in) {
 /**
  * @return 0, if sending succeeds, else non-zero for an error
  */
-int wish_core_send_message(wish_core_t* core, wish_context_t* ctx, uint8_t* payload_clrtxt, int payload_len) {
+int wish_core_send_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* payload_clrtxt, int payload_len) {
     mbedtls_gcm_context aes_gcm_ctx;
     mbedtls_gcm_init(&aes_gcm_ctx);
     WISHDEBUG(LOG_DEBUG, "send payload len %d", payload_len);
@@ -1464,7 +1464,7 @@ int wish_core_send_message(wish_core_t* core, wish_context_t* ctx, uint8_t* payl
 }
 
 
-int wish_core_decrypt(wish_core_t* core, wish_context_t* ctx, uint8_t* ciphertxt, size_t 
+int wish_core_decrypt(wish_core_t* core, wish_connection_t* ctx, uint8_t* ciphertxt, size_t 
 ciphertxt_len, uint8_t* auth_tag, size_t auth_tag_len, uint8_t* plaintxt,
 size_t plaintxt_len) {
     mbedtls_gcm_context aes_gcm_ctx;
@@ -1535,7 +1535,7 @@ size_t plaintxt_len) {
 /* This function returns the wish context associated with the provided
  * remote IP, remote port, local IP, local port. If no matching wish
  * context is found, return NULL. */
-wish_context_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4], 
+wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4], 
     uint16_t rmt_port, uint8_t local_ip[4], uint16_t local_port) {
 
     bool found = false;
@@ -1579,8 +1579,8 @@ wish_context_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
  */
 void wish_core_init(wish_core_t* core) {
     core->wish_server_port = core->wish_server_port == 0 ? 37009 : core->wish_server_port;
-    core->wish_context_pool = wish_platform_malloc(sizeof(wish_context_t)*WISH_CONTEXT_POOL_SZ);
-    memset(core->wish_context_pool, 0, sizeof(wish_context_t)*WISH_CONTEXT_POOL_SZ);
+    core->wish_context_pool = wish_platform_malloc(sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
+    memset(core->wish_context_pool, 0, sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
     core->next_conn_id = 1;
 
     core_service_ipc_init(core);
@@ -1607,7 +1607,7 @@ void wish_core_init(wish_core_t* core) {
 }
 
 
-int wish_core_get_rx_buffer_free(wish_core_t* core, wish_context_t *ctx) {
+int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t *ctx) {
     return ring_buffer_space(&(ctx->rx_ringbuf));
 }
 

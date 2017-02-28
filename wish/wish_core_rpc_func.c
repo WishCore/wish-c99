@@ -116,7 +116,7 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
  * This function adds information (rsid and protocol) about a remote
  * service to the wish connection context, but checks first if it exists
  * in the list or not. */
-static void wish_core_add_remote_service(wish_context_t *ctx, 
+static void wish_core_add_remote_service(wish_connection_t *ctx, 
         uint8_t rsid[WISH_WSID_LEN], char *protocol) {
     struct wish_remote_service *tmp;
     /* Find out if we already know this peer */
@@ -146,7 +146,7 @@ static void wish_core_add_remote_service(wish_context_t *ctx,
 /** Client callback function for 'peers' RPC request send by core RPC
  * client to a remote core */
 void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t payload_len) {
-    wish_context_t *ctx = context;
+    wish_connection_t *ctx = context;
     wish_core_t* core = req->client->context;
     
     
@@ -327,7 +327,7 @@ static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arra
     uint8_t peer_doc[peer_doc_max_len];
     bson_init_doc(peer_doc, peer_doc_max_len);
 
-    wish_context_t* ctx = rpc_ctx->ctx;
+    wish_connection_t* ctx = rpc_ctx->ctx;
     
     bson_write_binary(peer_doc, peer_doc_max_len, "luid", ctx->local_wuid, WISH_ID_LEN);
     bson_write_binary(peer_doc, peer_doc_max_len, "ruid", ctx->remote_wuid, WISH_ID_LEN);
@@ -377,7 +377,7 @@ void wish_core_init_rpc(wish_core_t* core) {
 }
 
 void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
-    wish_context_t* wish_ctx = ctx;
+    wish_connection_t* wish_ctx = ctx;
     wish_core_t* core = wish_ctx->core;
 
     bson bp;
@@ -405,7 +405,7 @@ void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
 /* Feed to core's RPC server. You should feed the document which is as the
  * element 'req' 
  */
-void wish_core_feed_to_rpc_server(wish_core_t* core, wish_context_t *ctx, uint8_t *data, size_t len) {
+void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *ctx, uint8_t *data, size_t len) {
 
     char *op_str = NULL;
     int32_t op_str_len = 0;
@@ -468,12 +468,12 @@ void wish_core_feed_to_rpc_server(wish_core_t* core, wish_context_t *ctx, uint8_
  * You should feed the document which is as the element 'res' 
  */
 
-void wish_core_feed_to_rpc_client(wish_core_t* core, wish_context_t *ctx, uint8_t *data, size_t len) {
+void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t *ctx, uint8_t *data, size_t len) {
     wish_rpc_client_handle_res(core->core_rpc_client, ctx, data, len);
 }
 
 
-void wish_core_send_peers_rpc_req(wish_core_t* core, wish_context_t *ctx) {
+void wish_core_send_peers_rpc_req(wish_core_t* core, wish_connection_t *ctx) {
     size_t request_max_len = 100;
     uint8_t request[request_max_len];
     size_t buffer_max_len = 75;
@@ -516,7 +516,7 @@ void wish_core_send_peers_rpc_req(wish_core_t* core, wish_context_t *ctx) {
  * rhid are taken. 
  *
  */
-void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_context_t *ctx, bool online) {
+void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_t *ctx, bool online) {
     struct wish_remote_service *service;
     struct wish_remote_service *tmp;
     /* Generate and send sparate peer status update messages for each
@@ -617,7 +617,7 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_context_t *
  This function is used to clean up the core RPC server from old requests when a connection to a remote core is severed 
  @param ctx the core connection context of the severed link
  */
-void wish_cleanup_core_rpc_server(wish_core_t* core, wish_context_t *ctx) {
+void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
     struct wish_rpc_context_list_elem *list_elem = NULL;
     struct wish_rpc_context_list_elem *tmp = NULL;
     

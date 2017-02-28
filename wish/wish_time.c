@@ -20,7 +20,7 @@
 static void check_connection_liveliness(wish_core_t* core) {
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        wish_context_t* w = &(core->wish_context_pool[i]);
+        wish_connection_t* w = &(core->wish_context_pool[i]);
         switch (w->context_state) {
         case WISH_CONTEXT_CONNECTED:
             /* We have found a connected context we must examine */
