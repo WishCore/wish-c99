@@ -208,7 +208,7 @@ user_tcp_server_connect_cb(void *arg)
 {
     struct espconn *pespconn = arg;
     uint8_t null_wuid[WISH_ID_LEN] = { 0 };
-    wish_context_t* wish_handle = wish_core_start(null_wuid, null_wuid);
+    wish_context_t* wish_handle = wish_connection_init(null_wuid, null_wuid);
     if (wish_handle == NULL) {
         os_printf("We cannot accempt incoming connections right now\n");
         espconn_disconnect(pespconn);

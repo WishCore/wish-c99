@@ -34,18 +34,18 @@ wish_context_t* wish_core_get_connection_pool(wish_core_t* core) {
 }
 
 /* Start an instance of wish communication */
-wish_context_t* wish_core_start(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid) {
+wish_context_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid) {
 
-    wish_context_t* w;
+    wish_context_t* connection;
 
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        w = &(core->wish_context_pool[i]);
-        if (w->context_state == WISH_CONTEXT_FREE) {
+        connection = &(core->wish_context_pool[i]);
+        if (connection->context_state == WISH_CONTEXT_FREE) {
             /* We have found a context we can take into use */
-            w->context_state = WISH_CONTEXT_IN_MAKING;
+            connection->context_state = WISH_CONTEXT_IN_MAKING;
             /* Update timestamp */
-            w->latest_input_timestamp = wish_time_get_relative(core);
+            connection->latest_input_timestamp = wish_time_get_relative(core);
             break;
         }
     }
@@ -56,20 +56,23 @@ wish_context_t* wish_core_start(wish_core_t* core, uint8_t *local_wuid, uint8_t 
     }
     /* w now points to the vacant wish context we will use */
 
-    /* Associate a connection id to the connection */
-    w->connection_id = core->next_conn_id++;
-
-    memcpy(w->local_wuid, local_wuid, WISH_ID_LEN);
-    memcpy(w->remote_wuid, remote_wuid, WISH_ID_LEN);
+    // 
+    connection->core = core;
     
-    w->rx_ringbuf.max_len = RX_RINGBUF_LEN;
-    w->rx_ringbuf.data = w->rx_ringbuf_backing;
+    /* Associate a connection id to the connection */
+    connection->connection_id = core->next_conn_id++;
 
-    w->curr_transport_state = TRANSPORT_STATE_INITIAL;
-    w->curr_protocol_state = PROTO_STATE_INITIAL;
-    w->rsid_list_head = NULL;
+    memcpy(connection->local_wuid, local_wuid, WISH_ID_LEN);
+    memcpy(connection->remote_wuid, remote_wuid, WISH_ID_LEN);
+    
+    connection->rx_ringbuf.max_len = RX_RINGBUF_LEN;
+    connection->rx_ringbuf.data = connection->rx_ringbuf_backing;
 
-    return w;
+    connection->curr_transport_state = TRANSPORT_STATE_INITIAL;
+    connection->curr_protocol_state = PROTO_STATE_INITIAL;
+    connection->rsid_list_head = NULL;
+
+    return connection;
 }
 
 

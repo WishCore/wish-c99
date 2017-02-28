@@ -32,7 +32,7 @@ void wish_connections_check(wish_core_t* core) {
             return;
         }
         
-        bson_visit("", id_bson_doc);
+        bson_visit("wish_connections_check -- id_bson_doc", id_bson_doc);
 
         bson_iterator it;
         bson_type bt;
@@ -83,7 +83,7 @@ void wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t *rui
 
     /* FIXME currently always using first uid of list */
     uint8_t *my_uid = uid_list[0].uid;
-    wish_context_t *new_ctx = wish_core_start(core, my_uid, ruid);
+    wish_context_t *new_ctx = wish_connection_init(core, my_uid, ruid);
     if (new_ctx != NULL) {
         /* FIXME the ipshould be read from * 'transports' */
         WISHDEBUG(LOG_CRITICAL, "wld: Will start connection to: %u.%u.%u.%u:%hu\n", 

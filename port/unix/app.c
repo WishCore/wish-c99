@@ -99,6 +99,8 @@ void connect_fail_cb(wish_context_t *ctx) {
 }
 
 int wish_open_connection(wish_core_t* core, wish_context_t *ctx, wish_ip_addr_t *ip, uint16_t port, bool relaying) {
+    ctx->core = core;
+    
     //printf("should start connect\n");
     int *sockfd_ptr = malloc(sizeof(int));
     if (sockfd_ptr == NULL) {
@@ -827,7 +829,7 @@ int main(int argc, char** argv) {
                      * The actual IDs will be established during handshake
                      * */
                     uint8_t null_id[WISH_ID_LEN] = { 0 };
-                    wish_context_t *ctx = wish_core_start(core, null_id, null_id);
+                    wish_context_t *ctx = wish_connection_init(core, null_id, null_id);
                     if (ctx == NULL) {
                         /* Fail... no more contexts in our pool */
                         printf("No new Wish connections can be accepted!\n");

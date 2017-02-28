@@ -172,7 +172,7 @@ struct wish_peer {
 size_t get_local_hostid(char** hostid);
 
 /* Start an instance of wish communication */
-wish_context_t* wish_core_start(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid);
+wish_context_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid);
 
 
 /* Feed raw data into wish core */

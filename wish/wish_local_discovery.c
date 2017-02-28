@@ -224,7 +224,7 @@ size_t buffer_len) {
 
     /* FIXME currently always using first uid of list */
     uint8_t *my_uid = uid_list[0].uid;
-    wish_context_t *new_ctx = wish_core_start(core, my_uid, ruid);
+    wish_context_t *new_ctx = wish_connection_init(core, my_uid, ruid);
     if (new_ctx != NULL) {
         /* FIXME the ipshould be read from * 'transports' */
         WISHDEBUG(LOG_CRITICAL, "wld: Will start connection to: %u.%u.%u.%u:%hu\n", 

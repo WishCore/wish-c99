@@ -1473,7 +1473,7 @@ static void wld_friend_request_handler(wish_rpc_ctx* req, uint8_t* args) {
         return;
     }
 
-    wish_context_t *friend_req_ctx = wish_core_start(core, luid, ruid);
+    wish_context_t *friend_req_ctx = wish_connection_init(core, luid, ruid);
     friend_req_ctx->friend_req_connection = true;
     uint8_t *ip = db[i].transport_ip.addr;
     WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", 
