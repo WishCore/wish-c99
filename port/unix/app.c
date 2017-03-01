@@ -864,18 +864,6 @@ int main(int argc, char** argv) {
              */
         }
 
-
-        if (advertize_own_uid && core->loaded_num_ids > 0) {
-            static time_t ldiscover_timestamp = 0;
-            if (time(NULL) > ldiscover_timestamp + 5) {
-                int c;
-                for (c=0; c<core->loaded_num_ids; c++) {
-                    wish_ldiscover_advertize(core, core->uid_list[c].uid);
-                    ldiscover_timestamp = time(NULL);
-                }
-            }
-        }
-
         if (as_relay_client) {
             static time_t relay_check_timestamp = 0;
             if (time(NULL) > relay_check_timestamp + 10) {

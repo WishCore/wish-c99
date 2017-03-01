@@ -24,13 +24,20 @@
 #include "wish_io.h"
 
 static void wish_ldiscover_periodic(wish_core_t* core, void* ctx) {
-    WISHDEBUG(LOG_CRITICAL, "Do some discovering... %p", ctx);
+    WISHDEBUG(LOG_CRITICAL, "Do some discovering...", ctx);
+    
+    //if (advertize_own_uid && core->loaded_num_ids > 0) {
+    if (core->loaded_num_ids > 0) {
+        int c;
+        for (c=0; c<core->loaded_num_ids; c++) {
+            wish_ldiscover_advertize(core, core->uid_list[c].uid);
+        }
+    }
 }
 
 void wish_ldiscover_init(wish_core_t* core) {
     core->ldiscovery_db = wish_platform_malloc(sizeof(wish_ldiscover_t)*WISH_LOCAL_DISCOVERY_MAX);
     wish_core_time_set_interval(core, &wish_ldiscover_periodic, NULL, 5);
-    wish_core_time_set_timeout(core, &wish_ldiscover_periodic, (void*) 858585, 13);
 }
 
 /* Start local discovery */
@@ -314,6 +321,9 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     wish_identity_t my_identity;
     wish_load_identity(my_uid, &my_identity);
 
+    // Local discovery will not advertise if we don't have a private key
+    if (!my_identity.has_privkey) { return; }
+    
     const size_t transports_array_max_len = 50;
     uint8_t transports_array[transports_array_max_len];
     if (create_transports_array(core, transports_array, transports_array_max_len)) {
@@ -325,13 +335,11 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     uint8_t advert_msg[advert_msg_max_len];
 
     bson_init_doc(advert_msg, advert_msg_max_len);
-    bson_write_binary(advert_msg, advert_msg_max_len, "wuid",
-        my_uid, WISH_ID_LEN);
+    bson_write_binary(advert_msg, advert_msg_max_len, "wuid", my_uid, WISH_ID_LEN);
 
     uint8_t host_id[WISH_WHID_LEN];
     wish_core_get_local_hostid(core, host_id);
-    bson_write_binary(advert_msg, advert_msg_max_len, "whid",
-        host_id, WISH_ID_LEN);
+    bson_write_binary(advert_msg, advert_msg_max_len, "whid", host_id, WISH_ID_LEN);
 
     uint8_t pubkey[WISH_PUBKEY_LEN] = { 0 };
 
@@ -340,15 +348,9 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
         return;
     }
 
-    bson_write_binary(advert_msg, advert_msg_max_len, "pubkey",
-        pubkey, WISH_PUBKEY_LEN);
-
-    bson_write_embedded_doc_or_array(advert_msg, advert_msg_max_len,
-        "transports", transports_array, BSON_KEY_ARRAY);
-
-    bson_write_string(advert_msg, advert_msg_max_len, 
-        "alias", my_identity.alias);
-
+    bson_write_binary(advert_msg, advert_msg_max_len, "pubkey", pubkey, WISH_PUBKEY_LEN);
+    bson_write_embedded_doc_or_array(advert_msg, advert_msg_max_len, "transports", transports_array, BSON_KEY_ARRAY);
+    bson_write_string(advert_msg, advert_msg_max_len, "alias", my_identity.alias);
 
     /* Send away the advert message, but first add the magic bytes in
      * front of the message */
@@ -358,6 +360,8 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     advert_with_magic[1] = '.';
     memcpy(advert_with_magic + 2, advert_msg, bson_get_doc_len(advert_msg));
     size_t advert_with_magic_len = 2 + bson_get_doc_len(advert_msg);
+    
+    bson_visit("Advertisement message going out from core:", advert_msg);
     
     wish_send_advertizement(core, advert_with_magic, advert_with_magic_len);
 }
