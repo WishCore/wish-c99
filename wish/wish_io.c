@@ -1581,6 +1581,8 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
 void wish_core_init(wish_core_t* core) {
     wish_core_config_load(core);
     
+    core->time_db = NULL;
+    
     core->wish_server_port = core->wish_server_port == 0 ? 37009 : core->wish_server_port;
     core->wish_context_pool = wish_platform_malloc(sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
     memset(core->wish_context_pool, 0, sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);

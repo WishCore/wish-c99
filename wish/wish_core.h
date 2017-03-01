@@ -27,7 +27,17 @@ typedef struct {
     uint8_t uid[WISH_ID_LEN];
 } wish_uid_list_elem_t;
 
+struct wish_core;
+
 typedef uint32_t wish_time_t;
+typedef struct wish_timer_db {
+    void (*cb)(struct wish_core* core, void* ctx);
+    void *cb_ctx;
+    wish_time_t time;
+    wish_time_t interval;
+    bool singleShot;
+    struct wish_timer_db* next;
+} wish_timer_db_t;
 
 typedef int wish_connection_id_t;
 
@@ -81,6 +91,7 @@ typedef struct wish_core {
     
     /* The number of seconds since core startup is stored here */
     wish_time_t core_time;
+    wish_timer_db_t* time_db;
 
     /* Connections */
     struct wish_context* wish_context_pool;

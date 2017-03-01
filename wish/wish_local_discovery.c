@@ -23,8 +23,14 @@
 #include "wish_time.h"
 #include "wish_io.h"
 
+static void wish_ldiscover_periodic(wish_core_t* core, void* ctx) {
+    WISHDEBUG(LOG_CRITICAL, "Do some discovering... %p", ctx);
+}
+
 void wish_ldiscover_init(wish_core_t* core) {
     core->ldiscovery_db = wish_platform_malloc(sizeof(wish_ldiscover_t)*WISH_LOCAL_DISCOVERY_MAX);
+    wish_core_time_set_interval(core, &wish_ldiscover_periodic, NULL, 5);
+    wish_core_time_set_timeout(core, &wish_ldiscover_periodic, (void*) 858585, 13);
 }
 
 /* Start local discovery */
