@@ -5,6 +5,7 @@
 /mist-api
 /wish_id_db.bson
 /wish_hostid.raw
+/wish.conf
 /mappings.bin
 *.o
 *.d

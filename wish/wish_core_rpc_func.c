@@ -631,7 +631,7 @@ void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
             WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", list_elem->request_ctx.op_str);
             LL_DELETE(core->core_rpc_server->request_list_head, list_elem);
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
-            memset(&(list_elem->request_ctx), 0, sizeof(wish_rpc_ctx));
+            memset(&(list_elem->request_ctx), 0, sizeof(rpc_server_req));
 #else
 #error not implemented
             //wish_platform_free....

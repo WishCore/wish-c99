@@ -44,7 +44,7 @@ wish_rpc_server_t core_app_rpc_server = {
 /* FIXME each Wish connection must have its own RCP client, so this has to be moved to ctx */
 wish_rpc_client_t core2remote_rpc_client;
 
-void write_bson_error(wish_rpc_ctx* ctx, int errno, char *errmsg);
+void write_bson_error(rpc_server_req* ctx, int errno, char *errmsg);
 
 // NBUFL and nbuf are used for writing BSON array indexes
 #define NBUFL 8
@@ -64,7 +64,7 @@ uint8_t nbuf[NBUFL];
  *       }
  *
  */
-static void methods(wish_rpc_ctx* req, uint8_t* args) {
+static void methods(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     struct wish_rpc_server_handler *h = core->core_app_rpc_server->list_head;
@@ -87,7 +87,7 @@ static void methods(wish_rpc_ctx* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
-static void version(wish_rpc_ctx* req, uint8_t* args) {
+static void version(rpc_server_req* req, uint8_t* args) {
     
     bson bs; 
     bson_init(&bs);
@@ -98,7 +98,7 @@ static void version(wish_rpc_ctx* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
-static void services_send(wish_rpc_ctx* req, uint8_t* args) {
+static void services_send(rpc_server_req* req, uint8_t* args) {
     //bson_visit("Handling services.send", args);
     
     wish_core_t* core = (wish_core_t*) req->server->context;
@@ -301,7 +301,7 @@ static void services_send(wish_rpc_ctx* req, uint8_t* args) {
     }
 }
 
-static void services_list_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void services_list_handler(rpc_server_req* req, uint8_t* args) {
     int buffer_len = 300;
     uint8_t buffer[buffer_len];
     WISHDEBUG(LOG_CRITICAL, "Handling services.list buffer_len: %d", buffer_len);
@@ -334,7 +334,7 @@ static void services_list_handler(wish_rpc_ctx* req, uint8_t* args) {
  *       }
  *
  */
-static void identity_export_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
@@ -433,7 +433,7 @@ static void identity_export_handler(wish_rpc_ctx* req, uint8_t* args) {
  *   The first arg is alias and second argument is the uid of the imported id
  *
  */
-static void identity_import_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_import_handler(rpc_server_req* req, uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
@@ -582,7 +582,7 @@ static void identity_import_handler(wish_rpc_ctx* req, uint8_t* args) {
  *       ]
  *
  */
-static void identity_list_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_list_handler(rpc_server_req* req, uint8_t* args) {
     
     int num_uids_in_db = wish_get_num_uid_entries();
     wish_uid_list_elem_t uid_list[num_uids_in_db];
@@ -672,7 +672,7 @@ static void identity_list_handler(wish_rpc_ctx* req, uint8_t* args) {
  *  identity.create (An identity creation always involves creation of
  *  private key and public key)
  */
-static void identity_create_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_create_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -740,7 +740,7 @@ static void identity_create_handler(wish_rpc_ctx* req, uint8_t* args) {
  *  identity.create (An identity creation always involves creation of
  *  private key and public key)
  */
-static void identity_remove_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -785,7 +785,7 @@ static void identity_remove_handler(wish_rpc_ctx* req, uint8_t* args) {
  *
  * App to core: { op: "identity.sign", args: [ <Buffer> uid, <Buffer> hash ], id: 5 }
  */
-static void identity_sign(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_sign(rpc_server_req* req, uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
@@ -840,7 +840,7 @@ static void identity_sign(wish_rpc_ctx* req, uint8_t* args) {
  *
  * App to core: { op: "identity.verify", args: [ <Buffer> uid, <Buffer> signature, <Buffer> hash ], id: 5 }
  */
-static void identity_verify(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_verify(rpc_server_req* req, uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
@@ -905,7 +905,7 @@ static void identity_verify(wish_rpc_ctx* req, uint8_t* args) {
  *
  * App to core: { op: "identity.verify", args: [ <Buffer> uid, <Buffer> signature, <Buffer> hash ], id: 5 }
  */
-static void identity_friend_request_list(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_friend_request_list(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -947,7 +947,7 @@ static void identity_friend_request_list(wish_rpc_ctx* req, uint8_t* args) {
  *
  * App to core: { op: "identity.verify", args: [ <Buffer> uid, <Buffer> signature, <Buffer> hash ], id: 5 }
  */
-static void identity_friend_request_accept(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
 
 
@@ -1092,7 +1092,7 @@ static void identity_friend_request_accept(wish_rpc_ctx* req, uint8_t* args) {
  *  identity.create (An identity creation always involves creation of
  *  private key and public key)
  */
-static void identity_get_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void identity_get_handler(rpc_server_req* req, uint8_t* args) {
     WISHDEBUG(LOG_DEBUG, "In identity_get_handler");
 
     bson bs; 
@@ -1197,7 +1197,7 @@ static void identity_get_handler(wish_rpc_ctx* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
-static void connections_list_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void connections_list_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1248,7 +1248,7 @@ static void connections_list_handler(wish_rpc_ctx* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-static void connections_disconnect_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void connections_disconnect_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = 1400;
@@ -1284,7 +1284,7 @@ static void connections_disconnect_handler(wish_rpc_ctx* req, uint8_t* args) {
 /**
  *  
  */
-static void connections_check_connections(wish_rpc_ctx* req, uint8_t* args) {
+static void connections_check_connections(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = 1400;
@@ -1318,7 +1318,7 @@ static void connections_check_connections(wish_rpc_ctx* req, uint8_t* args) {
  * }
  * 
  */
-static void wld_list_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void wld_list_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1370,7 +1370,7 @@ static void wld_list_handler(wish_rpc_ctx* req, uint8_t* args) {
  * }
  * 
  */
-static void wld_clear_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void wld_clear_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = 1400;
@@ -1407,7 +1407,7 @@ static void wld_clear_handler(wish_rpc_ctx* req, uint8_t* args) {
 
 
 
-static void wld_friend_request_handler(wish_rpc_ctx* req, uint8_t* args) {
+static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = 1400;
@@ -1494,7 +1494,7 @@ static void wld_friend_request_handler(wish_rpc_ctx* req, uint8_t* args) {
     wish_rpc_server_emit(req, bson_data(&bs), bson_size(&bs));
 }
 
-static void host_config(wish_rpc_ctx* req, uint8_t* args) {
+static void host_config(rpc_server_req* req, uint8_t* args) {
     int buffer_len = 1400;
     uint8_t buffer[buffer_len];
     
@@ -1576,7 +1576,7 @@ static void debug_disable(struct wish_rpc_context* req,
 }
 */
 
-void write_bson_error(wish_rpc_ctx* req, int errno, char *errmsg) {
+void write_bson_error(rpc_server_req* req, int errno, char *errmsg) {
     int buffer_len = 400;
     uint8_t buffer[buffer_len];
 
@@ -1702,7 +1702,7 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         rpc_ctx->send_context = rpc_ctx;
         memcpy(rpc_ctx->op_str, op_str, MAX_RPC_OP_LEN);
         rpc_ctx->id = id;
-        rpc_ctx->local_wsid = src_wsid;
+        memcpy(rpc_ctx->local_wsid, src_wsid, WISH_WSID_LEN);
     
         if (wish_rpc_server_handle(core->core_app_rpc_server, rpc_ctx, args)) {
             WISHDEBUG(LOG_DEBUG, "RPC server fail: wish_core_app_rpc_func");
@@ -1717,7 +1717,7 @@ void wish_core_app_rpc_cleanup_requests(wish_core_t* core, uint8_t *wsid) {
         if (memcmp(list_elem->request_ctx.local_wsid, wsid, WISH_WSID_LEN)) {
             WISHDEBUG(LOG_CRITICAL, "App rpc server clean up: request op %s", list_elem->request_ctx.op_str);
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
-            memset(&(list_elem->request_ctx), 0, sizeof(wish_rpc_ctx));
+            memset(&(list_elem->request_ctx), 0, sizeof(rpc_server_req));
 #else
 #error not implemented
             //wish_platform_free....
