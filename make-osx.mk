@@ -1,13 +1,23 @@
 BUILD_BASE	= build
 
 # name for the target project
-TARGET		= mist
+TARGET         = wish-core-$(shell git describe --abbrev=0 --dirty --always --tags)-x64-linux
+VERSION_STRING = $(shell git describe --abbrev=4 --dirty --always --tags)
+
+#ifeq ("$(shell git status --porcelain)", "") 
+#	TARGET=wish-core-$(shell git describe --abbrev=4 --dirty --always --tags)-x64-linux
+#else
+#	TARGET=wish-core-$(shell git describe --abbrev=0 --dirty --always --tags)-x64-linux
+#endif
 
 # which modules (subdirectories) of the project to include in compiling
-MODULES		= wish deps/mbedtls-2.1.2/library deps/cBSON deps/ed25519/src mist apps/chat port port/unix \
-ed25519/src wish_app wish_rpc deps/bson
-# Disabled MODULES:  apps/mist-example
-EXTRA_INCDIR    = deps/mbedtls-2.1.2/include deps/cBSON deps/bson deps/ed25519/src deps/uthash/include
+MODULES		= wish deps/mbedtls-2.1.2/library deps/cbson/src deps/ed25519/src port port/unix ed25519/src deps/wish-rpc-c99/src deps/bson
+
+# Disabled Mist Apps in linux build
+# MODULES:       mist apps/mist-modbus apps/mist-example apps/mist-modbus/mbmaster apps/mist-modbus/mbmaster/rtu apps/mist-modbus/mbmaster/functions apps/mist-modbus/mbmaster/common apps/mist-modbus/mbmaster_port
+# EXTRA_INCDIR:  apps/mist-modbus/mbmaster/include apps/mist-modbus/mbmaster_port
+
+EXTRA_INCDIR    = deps/libuv/include deps/mbedtls-2.1.2/include deps/cbson/src deps/wish-rpc-c99/src deps/bson deps/ed25519/src deps/uthash/include
 
 # libraries used in this project, mainly provided by the SDK
 LIBS		= 
@@ -21,6 +31,8 @@ LIBS		=
 #CFLAGS		=  -g -Wall
 CFLAGS		=  -g -Wall -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-variable -pthread -MD -DSTDC_HEADERS -DHAVE_STDLIB_H -DENABLE_PTHREAD 
 # -Wno-unused-but-set-variable
+
+CFLAGS         += -DWISH_CORE_VERSION_STRING=\"$(VERSION_STRING)\"
 
 # ASM flags
 ASFLAGS     = -MD 
@@ -75,7 +87,7 @@ all: clean checkdirs $(TARGET)
 noclean:  checkdirs $(TARGET) 
 
 $(TARGET): $(OBJ)
-	gcc $(OBJ) $(LDFLAGS) $(LDLIBS) -o mist_c99
+	gcc $(OBJ) $(LDFLAGS) $(LDLIBS) -o  $(TARGET)
 
 checkdirs: $(BUILD_DIR) 
 

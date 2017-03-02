@@ -282,7 +282,7 @@ static int create_transports_array(wish_core_t* core, uint8_t *transports_array,
             sa = (struct sockaddr_in *) ifa->ifa_addr;
             addr = inet_ntoa(sa->sin_addr);
             //printf("Interface: %s\tAddress: %s\n", ifa->ifa_name, addr);
-            wish_platform_sprintf(transport_url, "wish://%s:%d", addr, wish_get_host_port());
+            wish_platform_sprintf(transport_url, "wish://%s:%d", addr, wish_get_host_port(core));
             
             if (bson_write_string(transports_array, transports_array_max_len,
                                   "0", transport_url) == BSON_FAIL) {
