@@ -728,6 +728,8 @@ static void identity_create_handler(rpc_server_req* req, uint8_t* args) {
 
     wish_ldiscover_advertize(core, new_id.uid);
     wish_report_identity_to_local_services(core, &new_id, true);
+
+    wish_core_signals_emit_string(core, "identity");
 }
 /*
  * identity.remove
@@ -775,6 +777,8 @@ static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
 
         wish_core_update_identities(core);
         wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+        
+        wish_core_signals_emit_string(core, "identity");
     } else {
         write_bson_error(req, 343, "Invalid argument. Expecting 32 byte bin data.");
     }
