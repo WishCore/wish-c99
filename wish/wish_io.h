@@ -37,29 +37,32 @@ enum transport_state {
 
 enum protocol_state {
     PROTO_STATE_INITIAL,
-    PROTO_STATE_DH, /* State where shared key is decided upon with DH
-    procedure */
-    PROTO_STATE_ID_VERIFY_SEND_CLIENT_HASH, /* State where the client
-    hash is sent to remote server for validation */
-    PROTO_STATE_ID_VERIFY_SERVER_HASH,  /* State where the server hash
-    is received and checked */
-    PROTO_STATE_WISH_HANDSHAKE,    /* State where Wish connection metadata is
-    exchanged */
-    PROTO_STATE_WISH_RUNNING, /* State where Wish connection is open */
-    PROTO_SERVER_STATE_DH,  /* Server's state where DH procedure is
-    completed using the client's input; after that, Wish handshake is
-    sent using the new encrypted link */
-    PROTO_SERVER_STATE_VERIFY_CLIENT_HASH,  /* State where the client
-    hash is received and verified, and signature of server's own hash is sent */
+    /* State where shared key is decided upon with DH procedure */
+    PROTO_STATE_DH,
+    /* State where the client hash is sent to remote server for validation */
+    PROTO_STATE_ID_VERIFY_SEND_CLIENT_HASH,
+    /* State where the server hash is received and checked */
+    PROTO_STATE_ID_VERIFY_SERVER_HASH,
+    /* State where Wish connection metadata is exchanged */
+    PROTO_STATE_WISH_HANDSHAKE,
+    /* State where Wish connection is open */
+    PROTO_STATE_WISH_RUNNING,
+    /* Server's state where DH procedure is completed using the client's input; after that, Wish handshake is sent using the new encrypted link */
+    PROTO_SERVER_STATE_DH,
+    /* State where the client hash is received and verified, and signature of server's own hash is sent */
+    PROTO_SERVER_STATE_VERIFY_CLIENT_HASH,
+    /* State where server sends handshake message */
     PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE,
-    PROTO_SERVER_STATE_WISH_HANDSHAKE_READ_REPLY, /* Server's state
-    where the handshake reply sent by client is processed */
-    PROTO_SERVER_STATE_READ_FRIEND_CERT,    /* Server is handling a
-    friend request, examine certificate */
-    PROTO_SERVER_STATE_REPLY_FRIEND_REQ,    /* Friend request accepted
-    by user, send own certificate back */
-    PROTO_STATE_FRIEND_REQ_RESPONSE,    /* Friend request was sent by us, and
-    now we are recieveing a reply from the new friend */
+    /* Server's state where the handshake reply sent by client is processed */
+    PROTO_SERVER_STATE_WISH_HANDSHAKE_READ_REPLY, 
+    /* Server is handling a friend request, examine certificate */
+    PROTO_SERVER_STATE_READ_FRIEND_CERT,
+    /* Friend request accepted by user, send own certificate back */
+    PROTO_SERVER_STATE_REPLY_FRIEND_REQ_ACCEPTED,    
+    /* Friend request declined by user, sends response depending on type of decline (ignore, ban, decline) */
+    PROTO_SERVER_STATE_REPLY_FRIEND_REQ_DECLINED,    
+    /* Friend request was sent by us, and now we are recieveing a reply from the new friend */
+    PROTO_STATE_FRIEND_REQ_RESPONSE,
 };
 
 enum tcp_event {

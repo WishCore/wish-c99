@@ -13,6 +13,7 @@ enum wish_event_type {
     WISH_EVENT_FRIEND_REQUEST,  /* Friend request received, waiting for
     user approval */
     WISH_EVENT_ACCEPT_FRIEND_REQUEST,   /* Fried request accepted */
+    WISH_EVENT_DECLINE_FRIEND_REQUEST,   /* Fried request declined */
     WISH_EVENT_REQUEST_CONNECTION_CLOSING,
 };
 

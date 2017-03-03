@@ -1280,7 +1280,7 @@ wish send handshake");
             wish_core_signals_emit(core, &bs);
         }
         break;
-    case PROTO_SERVER_STATE_REPLY_FRIEND_REQ:
+    case PROTO_SERVER_STATE_REPLY_FRIEND_REQ_ACCEPTED:
         {
             WISHDEBUG(LOG_CRITICAL, "Replying to friend request");
 
@@ -1325,15 +1325,53 @@ wish send handshake");
 
         }
         break;
+    case PROTO_SERVER_STATE_REPLY_FRIEND_REQ_DECLINED:
+        {
+            WISHDEBUG(LOG_CRITICAL, "Replying to friend request with decline");
+            
+            int buf_len = 512;
+            char buf[buf_len];
+            
+            bson bs;
+            bson_init_buffer(&bs, buf, buf_len);
+            bson_append_bool(&bs, "decline", true);
+            bson_finish(&bs);
+            
+            uint16_t frame_len = bson_size(&bs);
+            uint8_t frame[2+frame_len];
+            uint16_t frame_len_be = uint16_native2be(frame_len);
+            memcpy(frame, &frame_len_be, 2);
+            memcpy(frame+2, bson_data(&bs), bson_size(&bs));
+            /* Send the frame length and the key in one go */
+            int ret = ctx->send(ctx->send_arg, frame, 2+frame_len);
+ 
+            if (ret != 0) {
+                /* Sending failed */
+                WISHDEBUG(LOG_CRITICAL, "Sending failed");
+            }
+            wish_close_connection(core, ctx);
+        }
+        break;
     case PROTO_STATE_FRIEND_REQ_RESPONSE: {
         /* This state is entered after we have sent a friend request to
          * a peer, and the peer has sent some kind of a reply to us 
          * (usually a cert, if the frient request was accepted) */
         ;
+        
+        bson_iterator it;
+        bson_type type = bson_find_from_buffer(&it, payload, "decline");
+        
+        if ( BSON_BOOL == type ) {
+            WISHDEBUG(LOG_CRITICAL, "Friend request was declined.");
+            wish_close_connection(core, ctx);
+            break;
+        }
+        
         int32_t cert_len = 0;
         uint8_t *cert;
         if (bson_get_binary(payload, "cert", &cert, &cert_len) == BSON_FAIL) {
             WISHDEBUG(LOG_CRITICAL, "Cannot get certificate from friend req reply");
+            wish_close_connection(core, ctx);
             break;
         }
 
@@ -1341,6 +1379,7 @@ wish send handshake");
         char *cert_alias = NULL;
         if (bson_get_string(cert, "alias", &cert_alias, &cert_alias_len) != BSON_SUCCESS) {
             WISHDEBUG(LOG_CRITICAL, "Friend request response: No alias");
+            wish_close_connection(core, ctx);
             break;
         }
         WISHDEBUG(LOG_CRITICAL, "Yay, we are making friends with %s", cert_alias);
@@ -1374,7 +1413,6 @@ wish send handshake");
          * discovery, or via relay server once checkConnections is
          * implemented */
         wish_close_connection(core, ctx);
-
         break;
     }
     case PROTO_STATE_INITIAL:

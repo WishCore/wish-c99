@@ -905,9 +905,9 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
 }
 
 /*
- * identity.listFriendRequests
+ * identity.friendRequestList
  *
- * App to core: { op: "identity.verify", args: [ <Buffer> uid, <Buffer> signature, <Buffer> hash ], id: 5 }
+ * App to core: { op: "identity.friendRequestList", args: [], id: 5 }
  */
 static void identity_friend_request_list(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
@@ -947,9 +947,9 @@ static void identity_friend_request_list(rpc_server_req* req, uint8_t* args) {
 }
 
 /*
- * identity.listFriendRequests
+ * identity.friendRequestAccept
  *
- * App to core: { op: "identity.verify", args: [ <Buffer> uid, <Buffer> signature, <Buffer> hash ], id: 5 }
+ * App to core: { op: "identity.friendRequestAccept", args: [ <Buffer> luid, <Buffer> ruid ], id: 5 }
  */
 static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
@@ -1056,6 +1056,117 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
     WISHDEBUG(LOG_CRITICAL, "Accepting friend request");
     struct wish_event new_evt = {
         .event_type = WISH_EVENT_ACCEPT_FRIEND_REQUEST,
+        .context = wish_connection,
+    };
+    wish_message_processor_notify(&new_evt);
+
+    
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
+    uint8_t buffer[buffer_len];
+
+    bson bs;
+
+    bson_init_buffer(&bs, buffer, buffer_len);
+    bson_append_bool(&bs, "data", true);
+    bson_finish(&bs);
+
+    if(bs.err != 0) {
+        wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        return;
+    }
+
+    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+    wish_platform_free(elt);
+}
+
+/*
+ * identity.friendRequestDecline
+ *
+ * App to core: { op: "identity.friendRequestDecline", args: [ <Buffer> luid, <Buffer> ruid ], id: 5 }
+ */
+static void identity_friend_request_decline(rpc_server_req* req, uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+
+
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        wish_rpc_server_error(req, 345, "Invalid luid.");
+        return;
+    }
+
+    const char* luid = 0;
+    luid = bson_iterator_bin_data(&it);
+
+    bson_find_from_buffer(&it, args, "1");
+    
+    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        wish_rpc_server_error(req, 345, "Invalid ruid.");
+        return;
+    }
+
+    const char* ruid = 0;
+    ruid = bson_iterator_bin_data(&it);
+    
+    wish_relationship_req_t* elt;
+    wish_relationship_req_t* tmp;
+    
+    bool found = false;
+    
+    DL_FOREACH_SAFE(core->relationship_req_db, elt, tmp) {
+        if ( memcmp(elt->luid, luid, WISH_UID_LEN) == 0 
+                && memcmp(elt->id.uid, ruid, WISH_UID_LEN) == 0 ) {
+            found = true;
+            DL_DELETE(core->relationship_req_db, elt);
+            break;
+        }
+    }
+    
+    if (!found) {
+        wish_rpc_server_error(req, 356, "No such friend request found.");
+        return;
+    }
+    
+    // Find the connection which was used for receiving the friend request   
+    
+    int i = 0;
+    found = false;
+    
+    wish_connection_t* wish_connection = NULL;
+
+    for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
+            continue;
+        }
+
+        if (memcmp(core->wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+                found = true;
+                WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->wish_context_pool[i].context_state, core->wish_context_pool[i].curr_protocol_state);
+                wish_connection = &core->wish_context_pool[i];
+                break;
+            }
+            else {
+                WISHDEBUG(LOG_DEBUG, "ruid mismatch");
+            }
+        }
+        else {
+            WISHDEBUG(LOG_DEBUG, "luid mismatch");
+        }
+
+    }
+
+    if (!found) {
+        wish_rpc_server_error(req, 344, "Friend request connection not found while trying to accept.");
+        return;
+    }
+    
+    // found the connection (wish_connection)
+    
+    WISHDEBUG(LOG_CRITICAL, "Declining friend request (informing requester)");
+    struct wish_event new_evt = {
+        .event_type = WISH_EVENT_DECLINE_FRIEND_REQUEST,
         .context = wish_connection,
     };
     wish_message_processor_notify(&new_evt);
@@ -1488,14 +1599,14 @@ static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
 
     bson bs;
     bson_init_buffer(&bs, buffer, buffer_len);
-    bson_append_string(&bs, "data", "wait");
+    bson_append_bool(&bs, "data", true);
     bson_finish(&bs);
     
     if (bs.err) {
         write_bson_error(req, 303, "Failed writing bson.");
     }
     
-    wish_rpc_server_emit(req, bson_data(&bs), bson_size(&bs));
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 static void host_config(rpc_server_req* req, uint8_t* args) {
@@ -1608,7 +1719,8 @@ struct wish_rpc_server_handler services_send_handler =          { .op_str = "ser
 struct wish_rpc_server_handler identity_sign_handler =          { .op_str = "identity.sign",          .handler = identity_sign };
 struct wish_rpc_server_handler identity_verify_handler =        { .op_str = "identity.verify",        .handler = identity_verify };
 struct wish_rpc_server_handler identity_friend_request_list_handler =        { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list };
-struct wish_rpc_server_handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",        .handler = identity_friend_request_accept };
+struct wish_rpc_server_handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",      .handler = identity_friend_request_accept };
+struct wish_rpc_server_handler identity_friend_request_decline_handler =     { .op_str = "identity.friendRequestDecline",     .handler = identity_friend_request_decline };
 struct wish_rpc_server_handler host_config_handler =            { .op_str = "host.config",            .handler = host_config };
 
 void wish_core_app_rpc_init(wish_core_t* core) {
@@ -1638,6 +1750,7 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     wish_rpc_server_register(core->core_app_rpc_server, &identity_verify_handler);
     wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_list_handler);
     wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_accept_handler);
+    wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_decline_handler);
     
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.list", connections_list_handler);
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.disconnect", connections_disconnect_handler);
