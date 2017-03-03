@@ -59,15 +59,15 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
         break;
     }
 
-    wish_connection_t* wish_handle = e->context;
+    wish_connection_t* connection = e->context;
 
     switch (e->event_type) {
     case WISH_EVENT_CONTINUE:
     case WISH_EVENT_NEW_DATA:
-        wish_core_process_data(core, wish_handle);
+        wish_core_process_data(core, connection);
         break;
     case WISH_EVENT_NEW_CORE_CONNECTION:
-        wish_core_send_peers_rpc_req(core, wish_handle);
+        wish_core_send_peers_rpc_req(core, connection);
         break;
     case WISH_EVENT_FRIEND_REQUEST:
         WISHDEBUG(LOG_CRITICAL, "Received friend request");
@@ -90,7 +90,7 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
                 
                 struct wish_event new_evt = {
                     .event_type = WISH_EVENT_ACCEPT_FRIEND_REQUEST,
-                    .context = wish_handle,
+                    .context = connection,
                 };
                 wish_message_processor_notify(&new_evt);
                 
@@ -100,18 +100,18 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
         
         break;
     case WISH_EVENT_ACCEPT_FRIEND_REQUEST:
-        if (wish_handle->curr_protocol_state == PROTO_SERVER_STATE_READ_FRIEND_CERT) {
-            wish_handle->curr_protocol_state = PROTO_SERVER_STATE_REPLY_FRIEND_REQ;
-            wish_core_handle_payload(core, wish_handle, NULL, 0);
+        if (connection->curr_protocol_state == PROTO_SERVER_STATE_READ_FRIEND_CERT) {
+            connection->curr_protocol_state = PROTO_SERVER_STATE_REPLY_FRIEND_REQ;
+            wish_core_handle_payload(core, connection, NULL, 0);
         }
         else {
             WISHDEBUG(LOG_CRITICAL, "Unexpected state, closing connection!");
-            wish_close_connection(core, wish_handle);
+            wish_close_connection(core, connection);
         }
 
         break;
     case WISH_EVENT_REQUEST_CONNECTION_CLOSING:
-        wish_close_connection(core, wish_handle);
+        wish_close_connection(core, connection);
         break;
     default:
         WISHDEBUG(LOG_CRITICAL,"Uknown event type %d\n\r", e->event_type);
