@@ -251,6 +251,7 @@ void app_connection_cleanup(wish_core_t* core, int i) {
     
     /* We should now notify the Wish core that the service has gone way. The core will then send 'peers' updates ("offline-messages") to other cores which are subscribed to 'peers' */
     wish_service_register_remove(core, apps[i].wsid);
+    
     /* Low-level clean-up: */
     app_states[i] = APP_CONNECTION_INITIAL;
     app_transport_states[i] = APP_TRANSPORT_INITIAL;

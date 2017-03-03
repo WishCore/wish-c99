@@ -24,8 +24,7 @@ bool wish_service_entry_is_valid(wish_core_t* core, struct wish_service_entry *e
     return retval;
 }
 
-void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name, 
-    uint8_t *protocols_array, uint8_t *permissions_array) {
+void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name, uint8_t *protocols_array, uint8_t *permissions_array) {
     WISHDEBUG(LOG_DEBUG, "%s", "wish_service_register_add");
 
     int i = 0;
@@ -34,10 +33,8 @@ void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name,
         if (wish_service_entry_is_valid(core, &(core->service_registry[i]))) {
             /* We have found a valid entry in the service registery. Now
              * check if the wsids match */
-            if (memcmp(src_wsid, core->service_registry[i].wsid, WISH_WSID_LEN) 
-                    == 0) {
-                WISHDEBUG(LOG_CRITICAL, "Service was already registered");
-
+            if (memcmp(src_wsid, core->service_registry[i].wsid, WISH_WSID_LEN) == 0) {
+                WISHDEBUG(LOG_CRITICAL, "Service was already registered %s", name);
                 return;
             }
         }
@@ -48,8 +45,7 @@ void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name,
                 == false) {
             /* Found free service slot */
             memcpy(core->service_registry[i].wsid, src_wsid, WISH_WSID_LEN);
-            strncpy(core->service_registry[i].service_name, name, 
-                WISH_APP_NAME_MAX_LEN);
+            strncpy(core->service_registry[i].service_name, name, WISH_APP_NAME_MAX_LEN);
 
             int j = 0;
             for (j = 0; j < WISH_APP_MAX_PROTOCOLS; j++) {

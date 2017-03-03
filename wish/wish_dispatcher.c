@@ -242,8 +242,7 @@ void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
     /* If the incoming message is a 'ready' from the service, the state is saved here */
     bool app_ready = false;
     
-    if (bson_get_binary(data, "wsid", &recovered_wsid, &recovered_wsid_len)
-            == BSON_SUCCESS) {
+    if (bson_get_binary(data, "wsid", &recovered_wsid, &recovered_wsid_len) == BSON_SUCCESS) {
         /* Most likely a login message */
         WISHDEBUG(LOG_DEBUG, "Service-to-core login detected");
         if (recovered_wsid_len != WISH_WSID_LEN) {
@@ -281,10 +280,8 @@ void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         const size_t ready_signal_max_len = 100;
         uint8_t ready_signal[ready_signal_max_len];
         bson_init_doc(ready_signal, ready_signal_max_len);
-        bson_write_string(ready_signal, ready_signal_max_len, 
-            "type", "signal");
-        bson_write_string(ready_signal, ready_signal_max_len, 
-            "signal", "ready");
+        bson_write_string(ready_signal, ready_signal_max_len, "type", "signal");
+        bson_write_string(ready_signal, ready_signal_max_len, "signal", "ready");
         send_core_to_app(core, src_wsid, ready_signal, ready_signal_max_len);
     }
     else if (bson_get_boolean(data, "ready", &app_ready) == BSON_SUCCESS) {
