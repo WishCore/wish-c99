@@ -783,8 +783,8 @@ static void build_client_and_server_hashes(wish_connection_t *ctx,
 }
 
 
-void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t* payload, int len) {
-    switch (ctx->curr_protocol_state) {
+void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, uint8_t* payload, int len) {
+    switch (connection->curr_protocol_state) {
     case PROTO_STATE_DH:
         /* Diffie-hellman key exchange */
         {
@@ -796,13 +796,13 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             int ret = mbedtls_mpi_read_string(&dhm_ctx.P, 16, MBEDTLS_DHM_RFC3526_MODP_3072_P);
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, "Error setting up DHM P");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             ret = mbedtls_mpi_read_string(&dhm_ctx.G, 16, MBEDTLS_DHM_RFC3526_MODP_3072_G);
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, "Error setting up DHM G");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
 
@@ -812,7 +812,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             ret = mbedtls_dhm_read_public(&dhm_ctx, payload, len);
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, "Error reading DHM peer public ");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
 
@@ -822,7 +822,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
                 output, wr_len, wish_platform_fill_random, NULL);
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, "Error writing DHM own public %hhx", ret);
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             /* Send our public value to the peer */
@@ -838,14 +838,14 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             memcpy(out_buffer, frame_len_data, 2);
             memcpy(out_buffer+2, output, 384);
             /* Send the frame length and the key in one go */
-            (*(ctx->send))(ctx->send_arg, out_buffer, 2+384);
+            (*(connection->send))(connection->send_arg, out_buffer, 2+384);
 
             /* Calculate shared secret */
             ret = mbedtls_dhm_calc_secret(&dhm_ctx, 
                 output, 384, &wr_len, NULL, NULL);
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, "Error deriving shared secret %x", ret);
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             else {
@@ -861,24 +861,24 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             /* Copy AES key and IV vectors for in the outgoing (they are
              * the same at first, but then their nonce parts are
              * separately incremented at every transmission and receive*/
-            memcpy(ctx->aes_gcm_key_in, output+32, 16);
-            memcpy(ctx->aes_gcm_key_out, output, 16);
-            memcpy(ctx->aes_gcm_iv_in, output+32+16, 12);
-            memcpy(ctx->aes_gcm_iv_out, output+16, 12);
+            memcpy(connection->aes_gcm_key_in, output+32, 16);
+            memcpy(connection->aes_gcm_key_out, output, 16);
+            memcpy(connection->aes_gcm_iv_in, output+32+16, 12);
+            memcpy(connection->aes_gcm_iv_out, output+16, 12);
 
             int i = 0;
             /* Print out key */
             WISHDEBUG(LOG_INFO, "IN key: ");
             for (i = 0; i < 16; i++) {
-                WISHDEBUG2(LOG_INFO, "0x%x ", ctx->aes_gcm_key_in[i]);
+                WISHDEBUG2(LOG_INFO, "0x%x ", connection->aes_gcm_key_in[i]);
             }
 
             /* Build the client and server hashes now, because we have
              * the secret at hand. The hashes are stored
              * in the wish context struct */
-            build_client_and_server_hashes(ctx, output);
+            build_client_and_server_hashes(connection, output);
 
-            ctx->curr_protocol_state = PROTO_STATE_ID_VERIFY_SEND_CLIENT_HASH;
+            connection->curr_protocol_state = PROTO_STATE_ID_VERIFY_SEND_CLIENT_HASH;
         }
 
         break;
@@ -888,18 +888,18 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
         {
             uint8_t signature[ED25519_SIGNATURE_LEN];
             uint8_t local_privkey[WISH_PRIVKEY_LEN];
-            if (wish_load_privkey(ctx->local_wuid, local_privkey)) {
+            if (wish_load_privkey(connection->local_wuid, local_privkey)) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load privkey");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             else {
-                ed25519_sign(signature, ctx->client_hash, SHA256_HASH_LEN,
+                ed25519_sign(signature, connection->client_hash, SHA256_HASH_LEN,
                     local_privkey);
             }
 
             wish_debug_print_array(LOG_DEBUG, "Signature:", signature, ED25519_SIGNATURE_LEN);
-            wish_core_send_message(core, ctx, signature, ED25519_SIGNATURE_LEN);
+            wish_core_send_message(core, connection, signature, ED25519_SIGNATURE_LEN);
 
             /* Then, check that we can read a frame whose length
              * corresponds to the server hash */
@@ -913,32 +913,32 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             /* Pointer to the beginning of the auth_tag */
             uint8_t* auth_tag = payload + ciphertxt_len;
 
-            if (wish_core_decrypt(core, ctx, payload, ciphertxt_len, 
+            if (wish_core_decrypt(core, connection, payload, ciphertxt_len, 
                     auth_tag, AES_GCM_AUTH_TAG_LEN, 
                         server_signature, server_signature_len)) {
                 WISHDEBUG(LOG_CRITICAL, "Decryption fails in server hash check");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             
             uint8_t remote_pubkey[WISH_PUBKEY_LEN] = { 0 };
-            if (wish_load_pubkey(ctx->remote_wuid, remote_pubkey)) {
+            if (wish_load_pubkey(connection->remote_wuid, remote_pubkey)) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load remote pubkey");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
 
-            if (ed25519_verify(server_signature, ctx->server_hash,
+            if (ed25519_verify(server_signature, connection->server_hash,
                     SHA256_HASH_LEN, remote_pubkey) == 0) {
                 WISHDEBUG(LOG_CRITICAL, "Server hash signature check fail");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             else {
                 WISHDEBUG(LOG_DEBUG, "Server hash signature check OK");
             }
 
-            ctx->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
+            connection->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
         }
         break;
     case PROTO_STATE_WISH_HANDSHAKE:
@@ -952,22 +952,22 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             /* Pointer to the beginning of the auth_tag */
             uint8_t* auth_tag = payload + ciphertxt_len;
 
-            if (wish_core_decrypt(core, ctx, payload, ciphertxt_len, auth_tag,
+            if (wish_core_decrypt(core, connection, payload, ciphertxt_len, auth_tag,
                 AES_GCM_AUTH_TAG_LEN, plaintxt, plaintxt_len)) {
 
                 WISHDEBUG(LOG_CRITICAL, "Decrypt fails in Wish handshake");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
 
             }
 
             /* Submit the decrypted message upwards in the stack */
             wish_debug_print_array(LOG_TRIVIAL, "Performing local handshake steps", plaintxt, len-AES_GCM_AUTH_TAG_LEN);
-            wish_core_process_handshake(core, ctx, plaintxt);
-            ctx->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
+            wish_core_process_handshake(core, connection, plaintxt);
+            connection->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
 
             struct wish_event evt = { .event_type =
-                WISH_EVENT_NEW_CORE_CONNECTION, .context = ctx };
+                WISH_EVENT_NEW_CORE_CONNECTION, .context = connection };
             wish_message_processor_notify(&evt);
 
        }
@@ -987,22 +987,22 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             uint8_t* plaintxt = (uint8_t*) wish_platform_malloc(plaintxt_len);
             if (plaintxt == NULL) {
                 WISHDEBUG(LOG_CRITICAL, "Could not allocate memory");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
 
-            int ret = wish_core_decrypt(core, ctx, payload, ciphertxt_len, 
+            int ret = wish_core_decrypt(core, connection, payload, ciphertxt_len, 
                 auth_tag, AES_GCM_AUTH_TAG_LEN, plaintxt, plaintxt_len);
 
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, 
                     "There was an error while decrypting Wish message");
                 wish_platform_free(plaintxt);
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             wish_debug_print_array(LOG_TRIVIAL, "Plaintext", plaintxt, len);
-            wish_core_process_message(core, ctx, plaintxt);
+            wish_core_process_message(core, connection, plaintxt);
             wish_platform_free(plaintxt);
         }
         break;
@@ -1014,7 +1014,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
          * we are ready to calculate the secret. */
         {
 
-            mbedtls_dhm_context* server_dhm_ctx = ctx->server_dhm_ctx;
+            mbedtls_dhm_context* server_dhm_ctx = connection->server_dhm_ctx;
             /* Read peer's public value */
             int ret 
                 = mbedtls_dhm_read_public(server_dhm_ctx, payload, len);
@@ -1029,7 +1029,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
                 output, 384, &wr_len, NULL, NULL);
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, "Error deriving shared secret %x", ret);
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
  
             }
@@ -1046,32 +1046,32 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             /* Copy AES key and IV vectors for in the outgoing (they are
              * the same at first, but then their nonce parts are
              * separately incremented at every transmission and receive*/
-            memcpy(ctx->aes_gcm_key_out, output+32, 16);
-            memcpy(ctx->aes_gcm_key_in, output, 16);
-            memcpy(ctx->aes_gcm_iv_out, output+32+16, 12);
-            memcpy(ctx->aes_gcm_iv_in, output+16, 12);
+            memcpy(connection->aes_gcm_key_out, output+32, 16);
+            memcpy(connection->aes_gcm_key_in, output, 16);
+            memcpy(connection->aes_gcm_iv_out, output+32+16, 12);
+            memcpy(connection->aes_gcm_iv_in, output+16, 12);
 
             wish_platform_free(server_dhm_ctx);
 
             /* Save the client and server hashes, because we have the
              * secret at hand */
-            build_client_and_server_hashes(ctx, output);
+            build_client_and_server_hashes(connection, output);
 
             /* We can now communicate securely, proceed to identity check.
              * First, send the server hash signature to client */
             uint8_t signature[ED25519_SIGNATURE_LEN];
             uint8_t local_privkey[WISH_PRIVKEY_LEN];
-            if (wish_load_privkey(ctx->local_wuid, local_privkey)) {
+            if (wish_load_privkey(connection->local_wuid, local_privkey)) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load privkey");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
-            ed25519_sign(signature, ctx->server_hash, SHA256_HASH_LEN,
+            ed25519_sign(signature, connection->server_hash, SHA256_HASH_LEN,
                 local_privkey);
 
-            wish_core_send_message(core, ctx, signature, ED25519_SIGNATURE_LEN);
+            wish_core_send_message(core, connection, signature, ED25519_SIGNATURE_LEN);
 
-            ctx->curr_protocol_state 
+            connection->curr_protocol_state 
                 = PROTO_SERVER_STATE_VERIFY_CLIENT_HASH;
         }
         break;
@@ -1087,25 +1087,25 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             /* Pointer to the beginning of the auth_tag */
             uint8_t* auth_tag = payload + ciphertxt_len;
 
-            if (wish_core_decrypt(core, ctx, payload, ciphertxt_len, 
+            if (wish_core_decrypt(core, connection, payload, ciphertxt_len, 
                     auth_tag, AES_GCM_AUTH_TAG_LEN, 
                         client_signature, client_signature_len)) {
                 WISHDEBUG(LOG_CRITICAL, "Decryption fails in client hash check");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             
             uint8_t remote_pubkey[WISH_PUBKEY_LEN] = { 0 };
-            if (wish_load_pubkey(ctx->remote_wuid, remote_pubkey)) {
+            if (wish_load_pubkey(connection->remote_wuid, remote_pubkey)) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load remote pubkey");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
 
-            if (ed25519_verify(client_signature, ctx->client_hash,
+            if (ed25519_verify(client_signature, connection->client_hash,
                     SHA256_HASH_LEN, remote_pubkey) == 0) {
                 WISHDEBUG(LOG_CRITICAL, "Client hash signature check fail");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             else {
@@ -1114,7 +1114,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             }
 
             /* Identities have now been successfully verified */
-            ctx->curr_protocol_state 
+            connection->curr_protocol_state 
                 = PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE;
         }
         /* WARNING: FALLTHROUGH */
@@ -1130,7 +1130,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
             WISHDEBUG(LOG_DEBUG, "We have generated BSON message of len %d", 
                 bson_get_doc_len(handshake_msg));
 
-            if (wish_core_send_message(core, ctx, handshake_msg, 
+            if (wish_core_send_message(core, connection, handshake_msg, 
                     bson_get_doc_len(handshake_msg))) {
                 /* Send error. Skip sending this time */
                 WISHDEBUG(LOG_CRITICAL, "Send fails in server state \
@@ -1138,7 +1138,7 @@ wish send handshake");
                 break;
             }
             /* Sending OK */
-            ctx->curr_protocol_state 
+            connection->curr_protocol_state 
                 = PROTO_SERVER_STATE_WISH_HANDSHAKE_READ_REPLY;
         }
         break;
@@ -1148,7 +1148,7 @@ wish send handshake");
             uint8_t* plaintxt = (uint8_t*) wish_platform_malloc(len);
             if (plaintxt == NULL) {
                 WISHDEBUG(LOG_CRITICAL, "Out of memory in server handshake read reply phase");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
             int ciphertxt_len = len-AES_GCM_AUTH_TAG_LEN;
@@ -1156,14 +1156,14 @@ wish send handshake");
             uint8_t* auth_tag = payload + ciphertxt_len;
 
 
-            int ret = wish_core_decrypt(core, ctx, payload, ciphertxt_len, 
+            int ret = wish_core_decrypt(core, connection, payload, ciphertxt_len, 
                 auth_tag, AES_GCM_AUTH_TAG_LEN, plaintxt, len);
 
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, 
                     "There was an error while decrypting Wish message");
                 wish_platform_free(plaintxt);
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
 
@@ -1178,7 +1178,7 @@ wish send handshake");
                 return;
             }
             if (host_id_len == WISH_WHID_LEN) {
-                memcpy(ctx->remote_hostid, host_id, WISH_WHID_LEN);
+                memcpy(connection->remote_hostid, host_id, WISH_WHID_LEN);
             }
             else {
                 WISHDEBUG(LOG_CRITICAL, "Bad hostid length in client handshake");
@@ -1190,10 +1190,10 @@ wish send handshake");
 
             /* Start pinging process */
 
-            ctx->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
+            connection->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
             struct wish_event evt = { 
                 .event_type = WISH_EVENT_NEW_CORE_CONNECTION,
-                .context = ctx };
+                .context = connection };
             wish_message_processor_notify(&evt);
 
 
@@ -1203,7 +1203,7 @@ wish send handshake");
         {
             if (len != bson_get_doc_len(payload)) {
                 WISHDEBUG(LOG_CRITICAL, "Friend request: Unexpected cert len");
-                wish_close_connection(core, ctx);
+                wish_close_connection(core, connection);
                 break;
             }
 
@@ -1255,15 +1255,15 @@ wish send handshake");
             /* Save the recipient UID of the friend request as luid for the
              * context. This information will be used later when exporting
              * the cert */
-            memcpy(ctx->local_wuid, recepient_uid, WISH_ID_LEN);
-            memcpy(ctx->remote_wuid, new_id->uid, WISH_ID_LEN);
+            memcpy(connection->local_wuid, recepient_uid, WISH_ID_LEN);
+            memcpy(connection->remote_wuid, new_id->uid, WISH_ID_LEN);
             
-            WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", ctx->local_wuid[0], ctx->local_wuid[1], ctx->local_wuid[2], ctx->local_wuid[3]);
-            WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", ctx->remote_wuid[0], ctx->remote_wuid[1], ctx->remote_wuid[2], ctx->remote_wuid[3]);
+            WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", connection->local_wuid[0], connection->local_wuid[1], connection->local_wuid[2], connection->local_wuid[3]);
+            WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", connection->remote_wuid[0], connection->remote_wuid[1], connection->remote_wuid[2], connection->remote_wuid[3]);
 
             struct wish_event evt = {
                 .event_type = WISH_EVENT_FRIEND_REQUEST, 
-                .context = ctx 
+                .context = connection 
             };
             wish_message_processor_notify(&evt);
             
@@ -1290,7 +1290,7 @@ wish send handshake");
             size_t my_cert_max_len = 512;
             uint8_t my_identity[my_cert_max_len];
             
-            if (wish_load_identity_bson(ctx->local_wuid, my_identity, my_cert_max_len) < 0) {
+            if (wish_load_identity_bson(connection->local_wuid, my_identity, my_cert_max_len) < 0) {
                 WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
             }
             WISHDEBUG(LOG_CRITICAL, "len = %d", bson_get_doc_len(my_identity));
@@ -1315,13 +1315,13 @@ wish send handshake");
             memcpy(frame, &frame_len_be, 2);
             memcpy(frame+2, friend_req_frame, bson_get_doc_len(friend_req_frame));
             /* Send the frame length and the key in one go */
-            int ret = (*(ctx->send))(ctx->send_arg, frame, 2+frame_len);
+            int ret = (*(connection->send))(connection->send_arg, frame, 2+frame_len);
  
             if (ret != 0) {
                 /* Sending failed */
                 WISHDEBUG(LOG_CRITICAL, "Sending failed");
             }
-            wish_close_connection(core, ctx);
+            wish_close_connection(core, connection);
 
         }
         break;
@@ -1343,13 +1343,13 @@ wish send handshake");
             memcpy(frame, &frame_len_be, 2);
             memcpy(frame+2, bson_data(&bs), bson_size(&bs));
             /* Send the frame length and the key in one go */
-            int ret = ctx->send(ctx->send_arg, frame, 2+frame_len);
+            int ret = connection->send(connection->send_arg, frame, 2+frame_len);
  
             if (ret != 0) {
                 /* Sending failed */
                 WISHDEBUG(LOG_CRITICAL, "Sending failed");
             }
-            wish_close_connection(core, ctx);
+            wish_close_connection(core, connection);
         }
         break;
     case PROTO_STATE_FRIEND_REQ_RESPONSE: {
@@ -1363,7 +1363,7 @@ wish send handshake");
         
         if ( BSON_BOOL == type ) {
             WISHDEBUG(LOG_CRITICAL, "Friend request was declined.");
-            wish_close_connection(core, ctx);
+            wish_close_connection(core, connection);
             break;
         }
         
@@ -1371,7 +1371,7 @@ wish send handshake");
         uint8_t *cert;
         if (bson_get_binary(payload, "cert", &cert, &cert_len) == BSON_FAIL) {
             WISHDEBUG(LOG_CRITICAL, "Cannot get certificate from friend req reply");
-            wish_close_connection(core, ctx);
+            wish_close_connection(core, connection);
             break;
         }
 
@@ -1379,7 +1379,7 @@ wish send handshake");
         char *cert_alias = NULL;
         if (bson_get_string(cert, "alias", &cert_alias, &cert_alias_len) != BSON_SUCCESS) {
             WISHDEBUG(LOG_CRITICAL, "Friend request response: No alias");
-            wish_close_connection(core, ctx);
+            wish_close_connection(core, connection);
             break;
         }
         WISHDEBUG(LOG_CRITICAL, "Yay, we are making friends with %s", cert_alias);
@@ -1412,13 +1412,13 @@ wish send handshake");
         /* Hang up the connection. A re-connection will happen via local
          * discovery, or via relay server once checkConnections is
          * implemented */
-        wish_close_connection(core, ctx);
+        wish_close_connection(core, connection);
         break;
     }
     case PROTO_STATE_INITIAL:
-        WISHDEBUG(LOG_CRITICAL, "PROTO_STATE_INITIAL: id %d", ctx->connection_id);
+        WISHDEBUG(LOG_CRITICAL, "PROTO_STATE_INITIAL: id %d", connection->connection_id);
     default:
-        WISHDEBUG(LOG_CRITICAL, "illegal protocol state reached, connection id %d\n\r", ctx->connection_id);
+        WISHDEBUG(LOG_CRITICAL, "illegal protocol state reached, connection id %d\n\r", connection->connection_id);
         break;
     }
 
