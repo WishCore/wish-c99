@@ -2,8 +2,15 @@
 
 #include "wish_core.h"
 
+#define PING_INTERVAL 10    /* seconds */
+#define PING_TIMEOUT (PING_INTERVAL + 30) /* seconds, must be larger than PING_INTERVAL */
+
+#define CONNECTION_TIMEOUT 30 /* seconds */
+
 /* Wish connection manager interface.
  * These functions will usually be implemented in port-specific code */
+
+void wish_connections_init(wish_core_t* core);
 
 /* Initiate a wish connection to specified ip and port, and associate
  * the wish_context ctx to the connection */
@@ -17,6 +24,8 @@ void wish_close_connection(wish_core_t* core, wish_connection_t *ctx);
 void wish_close_all_connections(wish_core_t* core);
 
 void wish_connections_check(wish_core_t* core);
+
+void check_connection_liveliness(wish_core_t* core, void* ctx);
 
 /**
  * Get the local host IP addr formatted as a C string. The retuned

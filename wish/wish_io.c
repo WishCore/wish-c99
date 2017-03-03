@@ -1622,9 +1622,8 @@ void wish_core_init(wish_core_t* core) {
     core->time_db = NULL;
     
     core->wish_server_port = core->wish_server_port == 0 ? 37009 : core->wish_server_port;
-    core->wish_context_pool = wish_platform_malloc(sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
-    memset(core->wish_context_pool, 0, sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
-    core->next_conn_id = 1;
+    
+    wish_connections_init(core);
 
     core_service_ipc_init(core);
     

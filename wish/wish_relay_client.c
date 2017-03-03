@@ -93,8 +93,7 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_ctx_t *rctx
                 WISHDEBUG(LOG_CRITICAL, "Relay error: Unexepected data");
                 break;
             }
-        }
-        else {
+        } else {
             /* There was no data to read right now. Check that we are
              * not in "timeout" */
             if (wish_time_get_relative(core) > (rctx->last_input_timestamp + RELAY_SERVER_TIMEOUT)) {
@@ -117,16 +116,13 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_ctx_t *rctx
 
 }
 
-void wish_relay_client_feed(wish_core_t* core, wish_relay_client_ctx_t *rctx, 
-        uint8_t *data, size_t data_len) {
+void wish_relay_client_feed(wish_core_t* core, wish_relay_client_ctx_t *rctx, uint8_t *data, size_t data_len) {
     ring_buffer_write(&(rctx->rx_ringbuf), data, data_len);
     rctx->last_input_timestamp = wish_time_get_relative(core);
 }
 
 
-int wish_relay_get_preferred_server_url(char *url_str, 
-        int url_str_max_len) {
-
+int wish_relay_get_preferred_server_url(char *url_str, int url_str_max_len) {
     wish_platform_sprintf(url_str, "wish://%d.%d.%d.%d:%d", 
         RELAY_SERVER_IP0, RELAY_SERVER_IP1, RELAY_SERVER_IP2,
         RELAY_SERVER_IP3, RELAY_SERVER_PORT);

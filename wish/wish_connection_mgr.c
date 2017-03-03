@@ -10,7 +10,15 @@
 #include "cbson.h"
 #include "bson_visitor.h"
 #include "wish_connection_mgr.h"
+#include "string.h"
 
+void wish_connections_init(wish_core_t* core) {
+    core->wish_context_pool = wish_platform_malloc(sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
+    memset(core->wish_context_pool, 0, sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
+    core->next_conn_id = 1;
+    
+    wish_core_time_set_interval(core, &check_connection_liveliness, NULL, 1);
+}
 
 void wish_connections_check(wish_core_t* core) {
     int num_uids_in_db = wish_get_num_uid_entries();
@@ -68,6 +76,54 @@ void wish_connections_check(wish_core_t* core) {
                 }
             }
         } while ((bt = bson_iterator_next(&it)) != BSON_EOO);
+    }
+}
+
+/* This function will check the connections and send a 'ping' if they
+ * have not received anything lately */
+void check_connection_liveliness(wish_core_t* core, void* ctx) {
+    //WISHDEBUG(LOG_CRITICAL, "check_connection_liveliness");
+    int i = 0;
+    for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        wish_connection_t* connection = &(core->wish_context_pool[i]);
+        switch (connection->context_state) {
+        case WISH_CONTEXT_CONNECTED:
+            /* We have found a connected context we must examine */
+            if ((core->core_time > (connection->latest_input_timestamp + PING_INTERVAL))
+                && (connection->ping_sent_timestamp <= connection->latest_input_timestamp)) 
+            {
+                WISHDEBUG(LOG_DEBUG, "Pinging connection %d", i);
+ 
+                /* Enqueue a ping message */
+                int32_t ping_msg_max_len = 50;
+                uint8_t ping_msg[ping_msg_max_len];
+                bson_init_doc(ping_msg, ping_msg_max_len);
+                /* Send: { ping: true } */
+                bson_write_boolean(ping_msg, ping_msg_max_len, "ping", true);
+                wish_core_send_message(core, connection, ping_msg, bson_get_doc_len(ping_msg));
+                connection->ping_sent_timestamp = core->core_time;
+            }
+
+            if (core->core_time > (connection->latest_input_timestamp + PING_TIMEOUT) &&
+                (connection->ping_sent_timestamp > connection->latest_input_timestamp)) {
+                WISHDEBUG(LOG_CRITICAL, "Connection ping: Killing connection because of inactivity");
+                wish_close_connection(core, connection);
+            }
+            break;
+        case WISH_CONTEXT_IN_MAKING:
+            if (core->core_time > (connection->latest_input_timestamp + PING_TIMEOUT)) {
+                WISHDEBUG(LOG_CRITICAL, "Connection ping: Killing connection because it has been in handshake phase for too long");
+                wish_close_connection(core, connection);
+            }
+            break;
+        case WISH_CONTEXT_CLOSING:
+            WISHDEBUG(LOG_CRITICAL, "Connection ping: Found context in closing state! Forcibly closing it.");
+            wish_close_connection(core, connection);
+            break;
+        case WISH_CONTEXT_FREE:
+            /* Obviously we don't ping unused contexts! */
+            break;
+        }
     }
 }
 
