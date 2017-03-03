@@ -80,16 +80,16 @@ wish_connection_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, 
 /* This function returns the pointer to the wish context corresponding
  * to the id number given as argument */
 wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_connection_id_t id) {
-    wish_connection_t *ctx = NULL;
+    wish_connection_t *connection = NULL;
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
         if (core->wish_context_pool[i].connection_id == id) {
-            ctx = &(core->wish_context_pool[i]);
+            connection = &(core->wish_context_pool[i]);
             break;
         }
     }
-    return ctx;
+    return connection;
 }
 
 /** This function returns a pointer to the wish context which matches the
@@ -101,7 +101,7 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
 wish_connection_t* 
 wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t *ruid,
         uint8_t *rhid) {
-    wish_connection_t *ctx = NULL;
+    wish_connection_t *connection = NULL;
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
@@ -117,7 +117,7 @@ wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t
                 if (memcmp(core->wish_context_pool[i].remote_hostid, rhid, 
                         WISH_WHID_LEN) == 0) {
 
-                    ctx = &(core->wish_context_pool[i]);
+                    connection = &(core->wish_context_pool[i]);
                     break;
                 }
                 else {
@@ -134,7 +134,7 @@ wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t
         }
 
     }
-    return ctx;
+    return connection;
 }
 
 
@@ -242,7 +242,7 @@ bool wish_core_check_wsid(wish_core_t* core, wish_connection_t* ctx, uint8_t* ds
  * processing is possible. 
  * Returns 0 when there is no more data to be read at this time.
  */
-void wish_core_process_data(wish_core_t* core, wish_connection_t* h) {
+void wish_core_process_data(wish_core_t* core, wish_connection_t* connection) {
 again:
     ;
     /* This variable is used when the wish protocol state is 
@@ -257,19 +257,19 @@ again:
     int expect_payload_len = 0;
 
     /* Consume data from the ring buffer */
-    switch (h->curr_transport_state) {
+    switch (connection->curr_transport_state) {
         case TRANSPORT_STATE_WAIT_FRAME_LEN:
             /* In this case we always expect a 2-byte long frame
              * length */
-            if (ring_buffer_length(&(h->rx_ringbuf)) >= 2) {
+            if (ring_buffer_length(&(connection->rx_ringbuf)) >= 2) {
                 /* Read out the expected byte count */
                 /* Note: Byte count is expressend in Big Endian format */
                 uint8_t bytes[2] = { 0 };
-                ring_buffer_read(&(h->rx_ringbuf), bytes, 2);
-                h->expect_bytes = (bytes[0] << 8) | bytes[1];
-                WISHDEBUG(LOG_INFO, "Now expecting %d bytes of payload", h->expect_bytes);
-                h->curr_transport_state = TRANSPORT_STATE_WAIT_PAYLOAD;
-                if (ring_buffer_length(&(h->rx_ringbuf)) >= h->expect_bytes) {
+                ring_buffer_read(&(connection->rx_ringbuf), bytes, 2);
+                connection->expect_bytes = (bytes[0] << 8) | bytes[1];
+                WISHDEBUG(LOG_INFO, "Now expecting %d bytes of payload", connection->expect_bytes);
+                connection->curr_transport_state = TRANSPORT_STATE_WAIT_PAYLOAD;
+                if (ring_buffer_length(&(connection->rx_ringbuf)) >= connection->expect_bytes) {
                     /* There is more data to be read, so signal that
                      * function can continue */
                     goto again;
@@ -277,15 +277,15 @@ again:
             }
             break;
         case TRANSPORT_STATE_WAIT_PAYLOAD:
-            expect_payload_len = h->expect_bytes;
-            if (ring_buffer_length(&(h->rx_ringbuf)) >= expect_payload_len) {
-                uint8_t* buf = (uint8_t*) wish_platform_malloc(h->expect_bytes);
+            expect_payload_len = connection->expect_bytes;
+            if (ring_buffer_length(&(connection->rx_ringbuf)) >= expect_payload_len) {
+                uint8_t* buf = (uint8_t*) wish_platform_malloc(connection->expect_bytes);
                 if (buf != NULL) {
-                    ring_buffer_read(&(h->rx_ringbuf), buf, h->expect_bytes);
-                    wish_core_handle_payload(core, h, buf, h->expect_bytes);
+                    ring_buffer_read(&(connection->rx_ringbuf), buf, connection->expect_bytes);
+                    wish_core_handle_payload(core, connection, buf, connection->expect_bytes);
                     wish_platform_free(buf);
-                    h->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
-                    if (ring_buffer_length(&(h->rx_ringbuf)) >= 2) {
+                    connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+                    if (ring_buffer_length(&(connection->rx_ringbuf)) >= 2) {
                         /* There is more data to be read */
                         goto again;
                     }
@@ -300,11 +300,11 @@ again:
             /* This is the initial state in server mode. 
              * Wait for the handshake to appear in the ringbugger */
             {
-                if (ring_buffer_length(&(h->rx_ringbuf)) 
+                if (ring_buffer_length(&(connection->rx_ringbuf)) 
                         >= WISH_CLIENT_HELLO_LEN) {
                     /* Step 1. Read in the expected bytes from ring buffer */
                     uint8_t buf[WISH_CLIENT_HELLO_LEN] = { 0 };
-                    ring_buffer_read(&(h->rx_ringbuf), buf, WISH_CLIENT_HELLO_LEN);
+                    ring_buffer_read(&(connection->rx_ringbuf), buf, WISH_CLIENT_HELLO_LEN);
                     
                     /* 2. decide if we have a Wish connection incoming */
                     if (buf[0] == 'W' && buf[1] == '.') {
@@ -316,7 +316,7 @@ again:
                         if (wire_version != WISH_WIRE_VERSION) {
                             /* Client wants unsupported protocol or version */
                             WISHDEBUG(LOG_CRITICAL, "Bad version attempted");
-                            wish_close_connection(core, h);
+                            wish_close_connection(core, connection);
                             break;
                         }
                         else {
@@ -339,32 +339,32 @@ again:
                                  * 3) Write back the data we already consumed: 
                                  * buf+3, len = (WISH_CLIENT_HELLO_LEN - 3) 
                                  * 4) Write the unconsumed data to the ring buffer */
-                                uint16_t unconsumed_data_len = ring_buffer_length(&(h->rx_ringbuf));
+                                uint16_t unconsumed_data_len = ring_buffer_length(&(connection->rx_ringbuf));
                                 uint8_t unconsumed_data[unconsumed_data_len];
                                 
-                                ring_buffer_read(&(h->rx_ringbuf), unconsumed_data, unconsumed_data_len);
-                                ring_buffer_write(&(h->rx_ringbuf), buf+3, WISH_CLIENT_HELLO_LEN-3);
+                                ring_buffer_read(&(connection->rx_ringbuf), unconsumed_data, unconsumed_data_len);
+                                ring_buffer_write(&(connection->rx_ringbuf), buf+3, WISH_CLIENT_HELLO_LEN-3);
                                 
                                 if (unconsumed_data_len > 0) {
-                                    ring_buffer_write(&(h->rx_ringbuf), unconsumed_data, unconsumed_data_len);
+                                    ring_buffer_write(&(connection->rx_ringbuf), unconsumed_data, unconsumed_data_len);
                                 }
 
                                 /* Advance protocol states */
-                                h->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
-                                h->curr_protocol_state = PROTO_SERVER_STATE_READ_FRIEND_CERT;
+                                connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+                                connection->curr_protocol_state = PROTO_SERVER_STATE_READ_FRIEND_CERT;
 
                                 /* Place a "synthetic" notification that
                                  * there is new data available */
                                 struct wish_event evt = { 
                                     .event_type = WISH_EVENT_NEW_DATA, 
-                                    .context = h 
+                                    .context = connection 
                                 };
                                 wish_message_processor_notify(&evt);
 
                                 break;
                             } else {
                                 WISHDEBUG(LOG_CRITICAL, "Unknown connection type");
-                                wish_close_connection(core, h);
+                                wish_close_connection(core, connection);
                                 break;
                             }
                         }
@@ -374,7 +374,7 @@ again:
                     else {
                         /* Error */
                         WISHDEBUG(LOG_CRITICAL, "Bad connection attempt");
-                        wish_close_connection(core, h);
+                        wish_close_connection(core, connection);
                         break;
                     }
                     /* 3. Decide if we want to continue, depending on
@@ -382,9 +382,9 @@ again:
                     uint8_t* dst_id = &(buf[3]);
                     uint8_t* src_id = &(buf[3+WISH_ID_LEN]);
 
-                    if (wish_core_check_wsid(core, h, dst_id, src_id) == false) {
+                    if (wish_core_check_wsid(core, connection, dst_id, src_id) == false) {
                         WISHDEBUG(LOG_CRITICAL, "Refusing connection (no privkey)");
-                        wish_close_connection(core, h);
+                        wish_close_connection(core, connection);
                         break;
                     }
                     else {
@@ -392,18 +392,18 @@ again:
                         wish_debug_print_array(LOG_DEBUG, "remote: ", dst_id, WISH_ID_LEN);
                     }
 
-                    memcpy(h->local_wuid, dst_id, WISH_ID_LEN);
-                    memcpy(h->remote_wuid, src_id, WISH_ID_LEN);
+                    memcpy(connection->local_wuid, dst_id, WISH_ID_LEN);
+                    memcpy(connection->remote_wuid, src_id, WISH_ID_LEN);
 
                     /* 4. Initiate DHE key exchange */
-                    h->server_dhm_ctx = (mbedtls_dhm_context*)
+                    connection->server_dhm_ctx = (mbedtls_dhm_context*)
                         wish_platform_malloc(sizeof(mbedtls_dhm_context));
-                    if (h->server_dhm_ctx == 0) {
+                    if (connection->server_dhm_ctx == 0) {
                         WISHDEBUG(LOG_CRITICAL, "Failed allocation near line %d", __LINE__);
-                        wish_close_connection(core, h);
+                        wish_close_connection(core, connection);
                         break;
                     }
-                    mbedtls_dhm_context* server_dhm_ctx = h->server_dhm_ctx;
+                    mbedtls_dhm_context* server_dhm_ctx = connection->server_dhm_ctx;
                     mbedtls_dhm_init(server_dhm_ctx);
                     /* Wish TCP transport is specified to use the
                      * modp15 group, which is defined in RFC3526 section 4, 
@@ -413,7 +413,7 @@ again:
                             MBEDTLS_DHM_RFC3526_MODP_3072_P);
                     if (ret) {
                         WISHDEBUG(LOG_CRITICAL, "Error setting up DHM P, closing connection");
-                        wish_close_connection(core, h);
+                        wish_close_connection(core, connection);
                         break;
                     }
                     ret 
@@ -421,7 +421,7 @@ again:
                             MBEDTLS_DHM_RFC3526_MODP_3072_G);
                     if (ret) {
                         WISHDEBUG(LOG_CRITICAL, "Error setting up DHM G, closing connection");
-                        wish_close_connection(core, h);
+                        wish_close_connection(core, connection);
                         break;
                     }
 
@@ -433,7 +433,7 @@ again:
                         output, wr_len, wish_platform_fill_random, NULL);
                     if (ret) {
                         WISHDEBUG(LOG_CRITICAL, "Error writing DHM own public %hhx", ret);
-                        wish_close_connection(core, h);
+                        wish_close_connection(core, connection);
                         break;
                     }
                     /* Send our public value to the peer (the client) */
@@ -449,10 +449,10 @@ again:
                     memcpy(out_buffer+2, output, 384);
                     /* Send the frame length and the key in one go */
                     WISHDEBUG(LOG_DEBUG, "Attempting to send data");
-                    (*(h->send))(h->send_arg, out_buffer, 2+384);
+                    connection->send(connection->send_arg, out_buffer, 2+384);
 
-                    h->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
-                    h->curr_protocol_state = PROTO_SERVER_STATE_DH;
+                    connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+                    connection->curr_protocol_state = PROTO_SERVER_STATE_DH;
                     WISHDEBUG(LOG_DEBUG, "movint to TRANSPORT_STATE_WAIT_FRAME_LEN");
                 }
             }
@@ -472,10 +472,10 @@ again:
                 msg[2] = (WISH_WIRE_VERSION << 4) | 
                     WISH_WIRE_TYPE_RELAY_SESSION;
                 /* Copy the relay session id */
-                memcpy(msg + 3, h->rctx->session_id, RELAY_SESSION_ID_LEN);
+                memcpy(msg + 3, connection->rctx->session_id, RELAY_SESSION_ID_LEN);
 
-                (*(h->send))(h->send_arg, msg, msg_len);
-                h->curr_transport_state = TRANSPORT_STATE_SERVER_WAIT_INITIAL;
+                connection->send(connection->send_arg, msg, msg_len);
+                connection->curr_transport_state = TRANSPORT_STATE_SERVER_WAIT_INITIAL;
             }
 
             break;
@@ -492,20 +492,20 @@ again:
  * to be sent.
  *
  * The send function is called with the argument given as arg */
-void wish_core_register_send(wish_core_t* core, wish_connection_t* h, int (*send)(void *, unsigned char*, int), void* arg) {
-    h->send = send;
-    h->send_arg = arg;
+void wish_core_register_send(wish_core_t* core, wish_connection_t* connection, int (*send)(void *, unsigned char*, int), void* arg) {
+    connection->send = send;
+    connection->send_arg = arg;
 }
 
-void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum tcp_event ev) {
-    WISHDEBUG(LOG_DEBUG, "TCP Event for connection id %d", h->connection_id);
+void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection,  enum tcp_event ev) {
+    WISHDEBUG(LOG_DEBUG, "TCP Event for connection id %d", connection->connection_id);
     switch (ev) {
     case TCP_CONNECTED:
         WISHDEBUG(LOG_DEBUG, "Event TCP_CONNECTED\n\r");
 
-        h->outgoing = true;
+        connection->outgoing = true;
         
-        if (h->friend_req_connection == false) {
+        if (connection->friend_req_connection == false) {
             /* Start the whole show by sending the handshake bytes */
             const int buffer_len = 2+1+WISH_ID_LEN+WISH_ID_LEN;
             unsigned char buffer[buffer_len];
@@ -514,14 +514,14 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum t
             /* Protocol version and function */
             buffer[2] = (WISH_WIRE_VERSION << 4) | (WISH_WIRE_TYPE_NORMAL); 
             /* Now copy the destination id */
-            memcpy(buffer+3, h->remote_wuid, WISH_ID_LEN);
+            memcpy(buffer+3, connection->remote_wuid, WISH_ID_LEN);
             /* then copy the source id */
-            memcpy(buffer+3+WISH_ID_LEN, h->local_wuid, WISH_ID_LEN);
-            h->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
-            h->curr_protocol_state = PROTO_STATE_DH;
+            memcpy(buffer+3+WISH_ID_LEN, connection->local_wuid, WISH_ID_LEN);
+            connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+            connection->curr_protocol_state = PROTO_STATE_DH;
 
             /* Maestro, take it away please */
-            (*(h->send))(h->send_arg, buffer, buffer_len);
+            connection->send(connection->send_arg, buffer, buffer_len);
         }
         else {
             WISHDEBUG(LOG_CRITICAL, "Sending frient request!");
@@ -546,7 +546,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum t
 
             bson bs;
             bson_init_buffer(&bs, doc, doc_len);
-            bson_append_binary(&bs, "ruid", h->remote_wuid, WISH_ID_LEN);
+            bson_append_binary(&bs, "ruid", connection->remote_wuid, WISH_ID_LEN);
             int req_id_len = 7;
             uint8_t req_id[req_id_len];
             wish_platform_fill_random(NULL, req_id, req_id_len);
@@ -561,7 +561,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum t
             size_t my_cert_max_len = 300;
             uint8_t my_identity[my_cert_max_len];
             
-            if (wish_load_identity_bson(h->local_wuid, my_identity, my_cert_max_len) < 0) {
+            if (wish_load_identity_bson(connection->local_wuid, my_identity, my_cert_max_len) < 0) {
                 WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
                 break;
             }
@@ -582,13 +582,13 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum t
                 uint8_t *frame_hdr = buffer + 3;
                 uint16_t frame_len_be = uint16_native2be(frame_len);
                 memcpy(frame_hdr, &frame_len_be, 2);
-                int ret = (*(h->send))(h->send_arg, buffer, 3+2+frame_len);
+                int ret = connection->send(connection->send_arg, buffer, 3+2+frame_len);
                 if (ret) {
                     WISHDEBUG(LOG_CRITICAL, "Failed sending friend request");
                     break;
                 }
-                h->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
-                h->curr_protocol_state = PROTO_STATE_FRIEND_REQ_RESPONSE;
+                connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+                connection->curr_protocol_state = PROTO_STATE_FRIEND_REQ_RESPONSE;
             }
         }
         break;
@@ -602,13 +602,13 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum t
          * there are no other connections active to the same luid, ruid,
          * rhid combination. */
         {
-            wish_connection_t *ctx = h;
+            wish_connection_t *conn = connection;
             int i = 0;
             bool other_connection_found = false;
 #if 1
             for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-                wish_connection_t *other_ctx = &(core->wish_context_pool[i]);
-                if (ctx == other_ctx) {
+                wish_connection_t *other_conn = &(core->wish_context_pool[i]);
+                if (conn == other_conn) {
                     /* Don't examine our current wish context, the one
                      * that was just disconnected  */
                     continue;
@@ -616,11 +616,11 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum t
                 else {
                     /* FIXME can this be refactored to use the
                      * "lookup-by-luid-ruid-rhid" function instead? */
-                    if (memcmp(other_ctx->local_wuid, ctx->local_wuid,
+                    if (memcmp(other_conn->local_wuid, conn->local_wuid,
                             WISH_ID_LEN) == 0) {
-                        if (memcmp(other_ctx->remote_wuid,
-                                ctx->remote_wuid, WISH_ID_LEN) == 0) {
-                            if (other_ctx->context_state ==
+                        if (memcmp(other_conn->remote_wuid,
+                                conn->remote_wuid, WISH_ID_LEN) == 0) {
+                            if (other_conn->context_state ==
                                     WISH_CONTEXT_CONNECTED) {
                                 /* Found other connection, do
                                  * not send offline */
@@ -638,12 +638,12 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h,  enum t
 offline signal because other connection luid and ruid found!");
             }
             else {
-                wish_send_online_offline_signal_to_apps(core, h, false);
+                wish_send_online_offline_signal_to_apps(core, connection, false);
             }
         }
         
         /* Delete any outstanding RPC request contexts */
-        wish_cleanup_core_rpc_server(core, h);
+        wish_cleanup_core_rpc_server(core, connection);
 
         /* Do some housework to ensure the stack is left in consistent
          * state */
@@ -653,31 +653,31 @@ offline signal because other connection luid and ruid found!");
          * the element */
         struct wish_remote_service *service;
         struct wish_remote_service *tmp;
-        LL_FOREACH_SAFE(h->rsid_list_head, service, tmp) {
-            LL_DELETE(h->rsid_list_head, service);
+        LL_FOREACH_SAFE(connection->rsid_list_head, service, tmp) {
+            LL_DELETE(connection->rsid_list_head, service);
             wish_platform_free(service);
         }
 
         /* Empty the ring buffer */
-        ring_buffer_skip(&(h->rx_ringbuf), 
-            ring_buffer_length(&(h->rx_ringbuf)));
+        ring_buffer_skip(&(connection->rx_ringbuf), 
+            ring_buffer_length(&(connection->rx_ringbuf)));
         
 
         /* Just set everything to zero - a reliable way to reset it */
-        memset(h, 0, sizeof(wish_connection_t));
+        memset(connection, 0, sizeof(wish_connection_t));
 
-        h->curr_protocol_state = PROTO_STATE_INITIAL;
-        h->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+        connection->curr_protocol_state = PROTO_STATE_INITIAL;
+        connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
 
-        h->context_state = WISH_CONTEXT_FREE;
+        connection->context_state = WISH_CONTEXT_FREE;
 
-        h->close_timestamp = 0;
-        h->send_arg = NULL;
+        connection->close_timestamp = 0;
+        connection->send_arg = NULL;
         break;
     case TCP_CLIENT_CONNECTED:
         WISHDEBUG(LOG_DEBUG, "Event TCP_CLIENT_CONNECTED");
-        h->outgoing = false;
-        h->curr_transport_state = TRANSPORT_STATE_SERVER_WAIT_INITIAL;
+        connection->outgoing = false;
+        connection->curr_transport_state = TRANSPORT_STATE_SERVER_WAIT_INITIAL;
         break;
     case TCP_RELAY_SESSION_CONNECTED:
         /* If this event happens, it means that the we (as a relay
@@ -685,9 +685,9 @@ offline signal because other connection luid and ruid found!");
          * for the purpose of accepting an incoming connection that is waiting 
          * at the relay server */
         WISHDEBUG(LOG_DEBUG, "Event TCP_RELAY_SESSION_CONNECTED");
-        h->curr_transport_state
+        connection->curr_transport_state
                     = TRANSPORT_STATE_RELAY_CLIENT_SEND_SESSION_ID;
-        wish_core_process_data(core, h);
+        wish_core_process_data(core, connection);
 
         break;
     }
@@ -749,7 +749,7 @@ static void update_nonce(unsigned char* nonce_bin) {
 /* This function generates the "client" and "server" hashes, using the
  * DHM secret (384 byte long). The hashes are saved to the wish context.
  * */
-static void build_client_and_server_hashes(wish_connection_t *ctx, 
+static void build_client_and_server_hashes(wish_connection_t *connection, 
         uint8_t *secret) {
     /* Now that we have the key handy, let's build the client
      * and server hashes */
@@ -763,7 +763,7 @@ static void build_client_and_server_hashes(wish_connection_t *ctx,
     mbedtls_sha256_update(&sha256_ctx, (const unsigned char*) client_str, 
         strlen(client_str)); 
     mbedtls_sha256_update(&sha256_ctx, secret, 384); 
-    mbedtls_sha256_finish(&sha256_ctx, ctx->client_hash);
+    mbedtls_sha256_finish(&sha256_ctx, connection->client_hash);
     mbedtls_sha256_free(&sha256_ctx);
     //wish_debug_print_array(LOG_CRITICAL, ctx->client_hash, SHA256_HASH_LEN);
     
@@ -777,7 +777,7 @@ static void build_client_and_server_hashes(wish_connection_t *ctx,
     mbedtls_sha256_update(&sha256_ctx, (const unsigned char*) server_str, 
         strlen(server_str)); 
     mbedtls_sha256_update(&sha256_ctx, secret, 384); 
-    mbedtls_sha256_finish(&sha256_ctx, ctx->server_hash);
+    mbedtls_sha256_finish(&sha256_ctx, connection->server_hash);
     mbedtls_sha256_free(&sha256_ctx);
 
 }
@@ -838,7 +838,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             memcpy(out_buffer, frame_len_data, 2);
             memcpy(out_buffer+2, output, 384);
             /* Send the frame length and the key in one go */
-            (*(connection->send))(connection->send_arg, out_buffer, 2+384);
+            connection->send(connection->send_arg, out_buffer, 2+384);
 
             /* Calculate shared secret */
             ret = mbedtls_dhm_calc_secret(&dhm_ctx, 
@@ -1315,7 +1315,7 @@ wish send handshake");
             memcpy(frame, &frame_len_be, 2);
             memcpy(frame+2, friend_req_frame, bson_get_doc_len(friend_req_frame));
             /* Send the frame length and the key in one go */
-            int ret = (*(connection->send))(connection->send_arg, frame, 2+frame_len);
+            int ret = connection->send(connection->send_arg, frame, 2+frame_len);
  
             if (ret != 0) {
                 /* Sending failed */
@@ -1441,12 +1441,12 @@ uint16_t uint16_native2be(uint16_t in) {
 /**
  * @return 0, if sending succeeds, else non-zero for an error
  */
-int wish_core_send_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* payload_clrtxt, int payload_len) {
+int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, uint8_t* payload_clrtxt, int payload_len) {
     mbedtls_gcm_context aes_gcm_ctx;
     mbedtls_gcm_init(&aes_gcm_ctx);
     WISHDEBUG(LOG_DEBUG, "send payload len %d", payload_len);
     int ret = mbedtls_gcm_setkey(&aes_gcm_ctx, MBEDTLS_CIPHER_ID_AES, 
-                ctx->aes_gcm_key_out, AES_GCM_KEY_LEN*8);
+                connection->aes_gcm_key_out, AES_GCM_KEY_LEN*8);
     if (ret) {
         WISHDEBUG(LOG_CRITICAL, "Set key failed (out)");
         return 1;
@@ -1463,7 +1463,7 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* p
 
     ret = mbedtls_gcm_crypt_and_tag(&aes_gcm_ctx, MBEDTLS_GCM_ENCRYPT, 
         payload_len, 
-        ctx->aes_gcm_iv_out, AES_GCM_IV_LEN, NULL, 0,
+        connection->aes_gcm_iv_out, AES_GCM_IV_LEN, NULL, 0,
         payload_clrtxt, frame+2,
         AES_GCM_AUTH_TAG_LEN, frame+2+payload_len);
     mbedtls_gcm_free(&aes_gcm_ctx);
@@ -1488,11 +1488,11 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* p
     memcpy(frame, &frame_len_be, 2);
     /* Send the frame length and the key in one go */
     WISHDEBUG(LOG_DEBUG, "About to send %d", frame_len);
-    ret = (*(ctx->send))(ctx->send_arg, frame, frame_len);
+    ret = connection->send(connection->send_arg, frame, frame_len);
     if (ret == 0) {
         /* Sending not failed */
         WISHDEBUG(LOG_DEBUG, "Sent %d", frame_len);
-        update_nonce(ctx->aes_gcm_iv_out+4);
+        update_nonce(connection->aes_gcm_iv_out+4);
     }
     else {
         WISHDEBUG(LOG_CRITICAL, "Porting layer send function reported failure");
