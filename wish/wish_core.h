@@ -22,7 +22,7 @@ typedef struct {
     
 typedef struct wish_service_entry {
     uint8_t wsid[WISH_WSID_LEN];
-    char service_name[WISH_APP_NAME_MAX_LEN];
+    char name[WISH_APP_NAME_MAX_LEN];
     wish_protocol_t protocols[WISH_APP_MAX_PROTOCOLS]; 
     //uint8_t permissions[WISH_PERMISSION_NAME_MAX_LEN][WISH_APP_MAX_PERMISSIONS];
 } wish_app_entry_t;

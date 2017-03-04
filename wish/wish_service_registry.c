@@ -18,7 +18,7 @@ struct wish_service_entry * wish_service_get_registry(wish_core_t* core) {
 
 bool wish_service_entry_is_valid(wish_core_t* core, struct wish_service_entry *entry) {
     bool retval = false;
-    if (strnlen(entry->service_name, WISH_APP_NAME_MAX_LEN) > 0) {
+    if (strnlen(entry->name, WISH_APP_NAME_MAX_LEN) > 0) {
         retval = true;
     }
     return retval;
@@ -45,7 +45,7 @@ void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name,
                 == false) {
             /* Found free service slot */
             memcpy(core->service_registry[i].wsid, src_wsid, WISH_WSID_LEN);
-            strncpy(core->service_registry[i].service_name, name, WISH_APP_NAME_MAX_LEN);
+            strncpy(core->service_registry[i].name, name, WISH_APP_NAME_MAX_LEN);
 
             int j = 0;
             for (j = 0; j < WISH_APP_MAX_PROTOCOLS; j++) {
@@ -61,7 +61,7 @@ void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name,
                         protocol_name, WISH_PROTOCOL_NAME_MAX_LEN);
                 }
                 else {
-                    WISHDEBUG(LOG_DEBUG, "No more protocols found for service %s", core->service_registry[i].service_name);
+                    WISHDEBUG(LOG_DEBUG, "No more protocols found for service %s", core->service_registry[i].name);
                 }
             }
             /* We now have registered all the protocols that the service

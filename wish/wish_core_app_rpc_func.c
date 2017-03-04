@@ -305,36 +305,30 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
  * return list of services on this host
  * 
  * [
- *   { name: 'Wish CLI',    sid: <Buffer c9 ed ... d3 fb>, protocols: [] },
- *   { name: 'GPS', sid: <Buffer 47 50 ... 6a 73>, protocols: ['ucp'] }
+ *   { name: 'Wish CLI', sid: <Buffer c9 ed ... d3 fb>, protocols: [] },
+ *   { name: 'GPS',      sid: <Buffer 47 50 ... 6a 73>, protocols: ['ucp'] }
  * ]
  */
 static void services_list_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
-    WISHDEBUG(LOG_CRITICAL, "services list handler: app: %p", app);
-    
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
-    //WISHDEBUG(LOG_CRITICAL, "Handling services.list buffer_len: %d", buffer_len);
 
     bson bs;
-    
     bson_init_buffer(&bs, buffer, buffer_len);
-
     bson_append_start_array(&bs, "data");
     
     int i;
     int c = 0;
     char index[21];
     
-    /* Service was not in the service register. */
     for (i = 0; i < WISH_MAX_SERVICES; i++) {
         if (wish_service_entry_is_valid(core, &(core->service_registry[i]))) {
             BSON_NUMSTR(index, c++);
             bson_append_start_object(&bs, index);
-            bson_append_string(&bs, "name", core->service_registry[i].service_name);
+            bson_append_string(&bs, "name", core->service_registry[i].name);
             bson_append_binary(&bs, "sid", core->service_registry[i].wsid, WISH_WSID_LEN);
             
             int j = 0;
@@ -1829,7 +1823,7 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         return;
     }
 
-    WISHDEBUG(LOG_CRITICAL, "op %s from app %s", op, app->service_name);
+    //WISHDEBUG(LOG_CRITICAL, "op %s from app %s", op, app->service_name);
     
     uint8_t *args = NULL;
     int32_t args_len = 0;
