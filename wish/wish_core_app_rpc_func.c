@@ -26,21 +26,6 @@
 #include "wish_port_config.h"
 #include "wish_relationship.h"
 
-/*
-#ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
-#define REQUEST_POOL_SIZE 10
-static struct wish_rpc_context_list_elem request_pool[REQUEST_POOL_SIZE];
-#endif
-
-wish_rpc_server_t core_app_rpc_server = { 
-    .server_name = "core/app",
-#ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
-    .rpc_ctx_pool = request_pool,
-    .rpc_ctx_pool_num_slots = REQUEST_POOL_SIZE,
-#endif
-};
-*/
-
 /* FIXME each Wish connection must have its own RCP client, so this has to be moved to ctx */
 wish_rpc_client_t core2remote_rpc_client;
 
@@ -51,18 +36,8 @@ void write_bson_error(rpc_server_req* ctx, int errno, char *errmsg);
 uint8_t nbuf[NBUFL];
 
 
-/* This is the Call-back functon invoksed by the core's "app" RPC
- * server, when identity.export is received from a Wish app 
- *
- * identity.export('342ef67c822662174e67689b8b1f1ef761c8085129561372adeb9ccf6ec30c86')
- * RPC app to core { op: 'methods',
- *   args: [],
- *   id: 3 }
- * Core to app: { ack: 3,
- *       data:
- *           {  }
- *       }
- *
+/* 
+ * Enumerate available methods in RPC
  */
 static void methods(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
@@ -87,6 +62,15 @@ static void methods(rpc_server_req* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
+/*
+ * Return core version string  
+ * 
+ * Example return values:
+ * 
+ *   v0.6.8-alpha-37-g85643-dirty
+ *   v0.6.8-alpha-37-g85643
+ *   v0.6.8
+ */
 static void version(rpc_server_req* req, uint8_t* args) {
     
     bson bs; 
@@ -98,6 +82,9 @@ static void version(rpc_server_req* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
+/*
+ * Request to send message to peer
+ */
 static void services_send(rpc_server_req* req, uint8_t* args) {
     //bson_visit("Handling services.send", args);
     
@@ -720,8 +707,7 @@ static void identity_create_handler(rpc_server_req* req, uint8_t* args) {
     int32_t alias_str_len = 0;
     bson_get_string(args, "0", &alias_str, &alias_str_len);
 
-    WISHDEBUG(LOG_DEBUG, "Core app RPC: identity_create for alias %s",
-        alias_str);
+    WISHDEBUG(LOG_DEBUG, "Core app RPC: identity_create for alias %s", alias_str);
 
     /* Create the identity */
     wish_identity_t new_id;
