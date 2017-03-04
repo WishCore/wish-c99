@@ -321,7 +321,7 @@ void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
             for (i = 0; i < WISH_MAX_SERVICES; i++) {
                 if (wish_service_entry_is_valid(core, &(service_registry[i]))) {
                     /* FIXME support for multiple protocols */
-                    if (strncmp(&(service_registry[i].protocols[0][0]), &(service_entry_ready->protocols[0][0]), WISH_PROTOCOL_NAME_MAX_LEN) != 0) {
+                    if (strncmp(service_registry[i].protocols[0].name, service_entry_ready->protocols[0].name, WISH_PROTOCOL_NAME_MAX_LEN) != 0) {
                         /* Protocols do not match */
                         continue;
                     }

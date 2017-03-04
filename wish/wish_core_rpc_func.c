@@ -30,9 +30,8 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
 
         /* FIXME protocols[0][0]??? It will only include first of
          * the protocols */
-        if (strnlen(&(service_entry->protocols[0][0]),
-                WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
-            bson_append_string(&bs, "protocol", (char*) &(service_entry->protocols[0][0]));
+        if (strnlen(service_entry->protocols[0].name, WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
+            bson_append_string(&bs, "protocol", (char*) service_entry->protocols[0].name);
         }
         bson_append_bool(&bs, "online", online);
         bson_append_finish_object(&bs);
@@ -94,9 +93,8 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
 
             /* FIXME protocols[0][0]??? It will only include first of
              * the protocols */
-            if (strnlen(&(registry[i].protocols[0][0]),
-                    WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
-                bson_append_string(&bs, "protocol", (char*) &(registry[i].protocols[0][0]));
+            if (strnlen(registry[i].protocols[0].name, WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
+                bson_append_string(&bs, "protocol", (char*) registry[i].protocols[0].name);
             }
             bson_append_bool(&bs, "online", true);
             bson_append_finish_object(&bs);
@@ -268,7 +266,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
     for (i = 0; i < WISH_MAX_SERVICES; i++) {
         if (wish_service_entry_is_valid(core, &(registry[i]))) {
             //WISHDEBUG(LOG_CRITICAL, "Service entry is valid");
-            if (strncmp(((const char*) &(registry[i].protocols[0][0])), 
+            if (strncmp(((const char*) &(registry[i].protocols[0].name)), 
                     protocol, WISH_PROTOCOL_NAME_MAX_LEN) == 0) {
                 //bson_visit("This is peer info", peer_info);
                 

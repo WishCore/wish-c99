@@ -302,7 +302,9 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
 }
 
 static void services_list_handler(rpc_server_req* req, uint8_t* args) {
-    int buffer_len = 300;
+    wish_core_t* core = req->server->context;
+    
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
     WISHDEBUG(LOG_CRITICAL, "Handling services.list buffer_len: %d", buffer_len);
 
@@ -310,10 +312,38 @@ static void services_list_handler(rpc_server_req* req, uint8_t* args) {
     
     bson_init_buffer(&bs, buffer, buffer_len);
 
-    bson_append_start_object(&bs, "data");
-    bson_append_string(&bs, "gurka", "a");
-    bson_append_finish_object(&bs);
-    bson_append_int(&bs, "ack", req->id);
+    bson_append_start_array(&bs, "data");
+    
+    int i;
+    int c = 0;
+    char index[21];
+    
+    /* Service was not in the service register. */
+    for (i = 0; i < WISH_MAX_SERVICES; i++) {
+        if (wish_service_entry_is_valid(core, &(core->service_registry[i]))) {
+            BSON_NUMSTR(index, c++);
+            bson_append_start_object(&bs, index);
+            bson_append_string(&bs, "name", core->service_registry[i].service_name);
+            bson_append_binary(&bs, "sid", core->service_registry[i].wsid, WISH_WSID_LEN);
+            
+            int j = 0;
+            int k = 0;
+            char pindex[21];
+            
+            bson_append_start_array(&bs, "protocols");
+            
+            for (j = 0; j < WISH_APP_MAX_PROTOCOLS; j++) {
+                if (strnlen(core->service_registry[i].protocols[j].name, WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
+                    BSON_NUMSTR(pindex, k++);
+                    bson_append_string(&bs, pindex, core->service_registry[i].protocols[j].name);
+                }
+            }
+            
+            bson_append_finish_array(&bs);
+            bson_append_finish_object(&bs);
+        }
+    }
+    bson_append_finish_array(&bs);
     bson_finish(&bs);
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1880,7 +1910,7 @@ void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct w
             bson_append_binary(&bs, "rsid", (uint8_t*) service_entry->wsid, WISH_WSID_LEN);
             bson_append_binary(&bs, "rhid", (uint8_t*) local_hostid, WISH_ID_LEN);
             /* FIXME support more protocols than just one */
-            bson_append_string(&bs, "protocol", &(service_entry->protocols[0][0]));   
+            bson_append_string(&bs, "protocol", service_entry->protocols[0].name);   
             bson_append_string(&bs, "type", "N");
             bson_append_bool(&bs, "online", online);
             bson_append_finish_object(&bs);
@@ -1933,7 +1963,7 @@ void wish_report_identity_to_local_services(wish_core_t* core, wish_identity_t* 
                         bson_append_binary(&bs, "rsid", (uint8_t*) service_registry[j].wsid, WISH_WSID_LEN);
                         bson_append_binary(&bs, "rhid", (uint8_t*) local_hostid, WISH_ID_LEN);
                         /* FIXME support more protocols than just one */
-                        bson_append_string(&bs, "protocol", &(service_registry[j].protocols[0][0]));
+                        bson_append_string(&bs, "protocol", service_registry[j].protocols[0].name);
                         
                         bson_append_string(&bs, "type", "N");   /* FIXME will be type:"D" someday when deleting identity? */
                         bson_append_bool(&bs, "online", online);

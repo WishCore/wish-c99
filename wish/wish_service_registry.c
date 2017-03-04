@@ -57,7 +57,7 @@ void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name,
                 if (bson_get_string(protocols_array, elem_name, 
                         &protocol_name, &protocol_name_len) == BSON_SUCCESS) {
                     WISHDEBUG(LOG_DEBUG, "Registering protocol: %s", protocol_name);
-                    strncpy((char *) &(core->service_registry[i].protocols[0][j]),
+                    strncpy((char *) &(core->service_registry[i].protocols[j].name),
                         protocol_name, WISH_PROTOCOL_NAME_MAX_LEN);
                 }
                 else {
@@ -87,7 +87,7 @@ void wish_service_register_remove(wish_core_t* core, uint8_t *wsid) {
         for (i = 0; i < WISH_MAX_SERVICES; i++) {
             if (wish_service_entry_is_valid(core, &(core->service_registry[i]))) {
                 /* FIXME support for multiple protocols */
-                if (strncmp(&(core->service_registry[i].protocols[0][0]), &(service_entry_offline->protocols[0][0]), WISH_PROTOCOL_NAME_MAX_LEN) != 0) {
+                if (strncmp(core->service_registry[i].protocols[0].name, service_entry_offline->protocols[0].name, WISH_PROTOCOL_NAME_MAX_LEN) != 0) {
                     /* Protocols do not match */
                     continue;
                 }
