@@ -26,6 +26,8 @@
 #include "wish_port_config.h"
 #include "wish_relationship.h"
 
+typedef struct wish_rpc_server_handler handler;
+
 /* FIXME each Wish connection must have its own RCP client, so this has to be moved to ctx */
 wish_rpc_client_t core2remote_rpc_client;
 
@@ -42,7 +44,7 @@ uint8_t nbuf[NBUFL];
 static void methods(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    struct wish_rpc_server_handler *h = core->core_app_rpc_server->list_head;
+    handler *h = core->core_app_rpc_server->list_head;
     
     bson bs; 
     bson_init(&bs);
@@ -1612,9 +1614,8 @@ static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
     wish_connection_t *friend_req_ctx = wish_connection_init(core, luid, ruid);
     friend_req_ctx->friend_req_connection = true;
     uint8_t *ip = db[i].transport_ip.addr;
-    WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", 
-            ip[3], ip[2], ip[1], ip[0]);
-
+    
+    WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
 
     wish_open_connection(core, friend_req_ctx, &(db[i].transport_ip), db[i].transport_port, false);
 
@@ -1733,16 +1734,16 @@ void write_bson_error(rpc_server_req* req, int errno, char *errmsg) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-struct wish_rpc_server_handler methods_handler =                { .op_str = "methods",                .handler = methods };
-struct wish_rpc_server_handler signals_handler =                { .op_str = "signals",                .handler = wish_core_signals };
-struct wish_rpc_server_handler version_handler =                { .op_str = "version",                .handler = version };
-struct wish_rpc_server_handler services_send_handler =          { .op_str = "services.send",          .handler = services_send };
-struct wish_rpc_server_handler identity_sign_handler =          { .op_str = "identity.sign",          .handler = identity_sign };
-struct wish_rpc_server_handler identity_verify_handler =        { .op_str = "identity.verify",        .handler = identity_verify };
-struct wish_rpc_server_handler identity_friend_request_list_handler =        { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list };
-struct wish_rpc_server_handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",      .handler = identity_friend_request_accept };
-struct wish_rpc_server_handler identity_friend_request_decline_handler =     { .op_str = "identity.friendRequestDecline",     .handler = identity_friend_request_decline };
-struct wish_rpc_server_handler host_config_handler =            { .op_str = "host.config",            .handler = host_config };
+handler methods_handler =                             { .op_str = "methods",                           .handler = methods };
+handler signals_handler =                             { .op_str = "signals",                           .handler = wish_core_signals };
+handler version_handler =                             { .op_str = "version",                           .handler = version };
+handler services_send_handler =                       { .op_str = "services.send",                     .handler = services_send };
+handler identity_sign_handler =                       { .op_str = "identity.sign",                     .handler = identity_sign };
+handler identity_verify_handler =                     { .op_str = "identity.verify",                   .handler = identity_verify };
+handler identity_friend_request_list_handler =        { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list };
+handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",      .handler = identity_friend_request_accept };
+handler identity_friend_request_decline_handler =     { .op_str = "identity.friendRequestDecline",     .handler = identity_friend_request_decline };
+handler host_config_handler =                         { .op_str = "host.config",                       .handler = host_config };
 
 void wish_core_app_rpc_init(wish_core_t* core) {
     core->core_app_rpc_server = wish_platform_malloc(sizeof(wish_rpc_server_t));
