@@ -240,14 +240,11 @@ size_t buffer_len) {
     wish_connection_t *new_ctx = wish_connection_init(core, my_uid, ruid);
     if (new_ctx != NULL) {
         /* FIXME the ipshould be read from * 'transports' */
-        WISHDEBUG(LOG_CRITICAL, "wld: Will start connection to: %u.%u.%u.%u:%hu\n", 
-            ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], tcp_port);
+        WISHDEBUG(LOG_CRITICAL, "LocalDiscovery: Will start connection to: %u.%u.%u.%u:%hu\n", ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], tcp_port);
 
         /* Request opening of a new wish connection, and associate the
          * new wish context with it */
 
-        /* FIXME the port here is hardcoded! It should be read from 
-         * 'transports' */
         wish_open_connection(core, new_ctx, ip, tcp_port, false);
     }
 

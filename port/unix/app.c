@@ -122,11 +122,15 @@ int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr
 
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
+    
+    // set ip
     char ip_str[20];
     snprintf(ip_str, 20, "%d.%d.%d.%d", ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3]);
-    WISHDEBUG(LOG_CRITICAL, "Remote ip is %s port %hu\n", ip_str, port);
     inet_aton(ip_str, &serv_addr.sin_addr);
+    
+    // set port
     serv_addr.sin_port = htons(port);
+    
     int ret = connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr));
     if (ret == -1) {
         if (errno == EINPROGRESS) {

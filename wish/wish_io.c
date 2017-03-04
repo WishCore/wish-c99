@@ -1643,8 +1643,6 @@ void wish_core_init(wish_core_t* core) {
     core->service_registry = wish_platform_malloc(service_registry_size);
     memset(core->service_registry, 0, service_registry_size);
     
-    WISHDEBUG(LOG_CRITICAL, "wish_core_init: service_registry p: %p size: %i", core->service_registry, service_registry_size);
-    
     wish_ldiscover_init(core);
 }
 
