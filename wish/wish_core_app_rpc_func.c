@@ -301,12 +301,23 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
     }
 }
 
+/*
+ * return list of services on this host
+ * 
+ * [
+ *   { name: 'Wish CLI',    sid: <Buffer c9 ed ... d3 fb>, protocols: [] },
+ *   { name: 'GPS', sid: <Buffer 47 50 ... 6a 73>, protocols: ['ucp'] }
+ * ]
+ */
 static void services_list_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = req->server->context;
+    wish_app_entry_t* app = req->context;
+    
+    WISHDEBUG(LOG_CRITICAL, "services list handler: app: %p", app);
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
-    WISHDEBUG(LOG_CRITICAL, "Handling services.list buffer_len: %d", buffer_len);
+    //WISHDEBUG(LOG_CRITICAL, "Handling services.list buffer_len: %d", buffer_len);
 
     bson bs;
     
@@ -1806,15 +1817,20 @@ static void wish_core_app_rpc_send(void *ctx, uint8_t *data, int len) {
 }
 
 void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LEN], uint8_t *data) {
-#if 0
-    // enable this for debug output of all the apps requests to core
-    bson_visit("wish_core_app_rpc_handle_req:", data);
-#endif
-
-    char *op_str = NULL;
+    wish_app_entry_t* app = wish_service_get_entry(core, src_wsid);
+    
+    char *op = NULL;
     int32_t op_str_len = 0;
-    bson_get_string(data, "op", &op_str, &op_str_len);
+    bson_get_string(data, "op", &op, &op_str_len);
 
+    if (app==NULL) {
+        // failed to find app, deny service
+        WISHDEBUG(LOG_CRITICAL, "DENY op %s from unknown app", op);
+        return;
+    }
+
+    WISHDEBUG(LOG_CRITICAL, "op %s from app %s", op, app->service_name);
+    
     uint8_t *args = NULL;
     int32_t args_len = 0;
     if (bson_get_array(data, "args", &args, &args_len) == BSON_FAIL) {
@@ -1828,16 +1844,6 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         ack_required = true;
     }
 
-#if 0
-    struct wish_rpc_context req = {
-        .server = core->core_app_rpc_server,
-        .send = wish_core_app_rpc_send,
-        .send_context = src_wsid,
-        .op_str = op_str,
-        .id = id,
-        .local_wsid = src_wsid,
-    };
-#endif
     struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->core_app_rpc_server);
     if (list_elem == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Core app RPC: Could not save the rpc context. Failing in wish_core_app_rpc_func.");
@@ -1847,8 +1853,9 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         rpc_ctx->server = core->core_app_rpc_server;
         rpc_ctx->send = wish_core_app_rpc_send;
         rpc_ctx->send_context = rpc_ctx;
-        memcpy(rpc_ctx->op_str, op_str, MAX_RPC_OP_LEN);
+        memcpy(rpc_ctx->op_str, op, MAX_RPC_OP_LEN);
         rpc_ctx->id = id;
+        rpc_ctx->context = app;
         memcpy(rpc_ctx->local_wsid, src_wsid, WISH_WSID_LEN);
     
         if (wish_rpc_server_handle(core->core_app_rpc_server, rpc_ctx, args)) {
