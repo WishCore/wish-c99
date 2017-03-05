@@ -34,18 +34,19 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
                 WISHDEBUG(LOG_CRITICAL, "message processor task: Could not allocate memory");
                 break;
             }
-            int load_retval = wish_load_identity(e->context->local_wuid, tmp_id);
+            
+            return_t load_retval = wish_load_identity(e->context->local_wuid, tmp_id);
             char *local_alias = my_strdup(tmp_id->alias);
-            int load_retval2 = wish_load_identity(e->context->remote_wuid, 
-                        tmp_id);
+            
+            return_t load_retval2 = wish_load_identity(e->context->remote_wuid, tmp_id);
             char *remote_alias = my_strdup(tmp_id->alias);
-            if (load_retval != 1 || load_retval2 != 1) {
+            
+            if (load_retval != ret_success || load_retval2 != ret_success) {
                 WISHDEBUG(LOG_CRITICAL, "Unexpected problem with id db!");
             }
 
             if (local_alias != NULL && remote_alias != NULL) {
-                    WISHDEBUG(LOG_CRITICAL ,"Connection established: %s > %s",
-                        local_alias, remote_alias);
+                WISHDEBUG(LOG_CRITICAL ,"Connection established: %s > %s", local_alias, remote_alias);
 
                 wish_platform_free(tmp_id);
                 wish_platform_free(local_alias);

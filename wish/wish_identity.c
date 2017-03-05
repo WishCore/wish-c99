@@ -220,8 +220,8 @@ int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len ) {
 }
 
 
-int wish_load_identity(uint8_t *uid, wish_identity_t *identity) {
-    int retval = -1;
+return_t wish_load_identity(uint8_t *uid, wish_identity_t *identity) {
+    int retval = ret_fail;
 
     if (uid == NULL) {
         return retval;
@@ -304,7 +304,7 @@ int wish_load_identity(uint8_t *uid, wish_identity_t *identity) {
 
             /* When we got this far, we are satisfied with import, the
              * rest is optional */
-            retval = 1;
+            retval = ret_success;
 
             uint8_t *transports_doc = NULL;
             int32_t transports_doc_len = 0;
@@ -521,10 +521,10 @@ int wish_has_privkey(uint8_t *uid) {
 
 int wish_load_pubkey(uint8_t *uid, uint8_t *dst_buffer) {
     wish_identity_t id;
-    int retval = wish_load_identity(uid, &id);
+    return_t retval = wish_load_identity(uid, &id);
 
-    if (retval != 1) {
-        WISHDEBUG(LOG_CRITICAL, "Identity not found");
+    if (retval != ret_success) {
+        WISHDEBUG(LOG_CRITICAL, "wish_load_pubkey: Identity not found");
         return -1;
     }
 
@@ -538,10 +538,10 @@ int wish_load_pubkey(uint8_t *uid, uint8_t *dst_buffer) {
 
 int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer) {
     wish_identity_t id;
-    int retval = wish_load_identity(uid, &id);
+    return_t retval = wish_load_identity(uid, &id);
 
-    if (retval != 1) {
-        WISHDEBUG(LOG_CRITICAL, "Identity not found");
+    if (retval != ret_success) {
+        WISHDEBUG(LOG_CRITICAL, "wish_load_privkey: Identity not found");
         return -1;
     }
 

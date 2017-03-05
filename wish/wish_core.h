@@ -8,6 +8,7 @@ extern "C" {
 
 #define WISH_MAX_SERVICES 5 /* contrast with NUM_WISH_APPS due to be removed in wish_app.h */
 
+#include "wish_return.h"
 #include "stdint.h"
 #include "stdbool.h"
     

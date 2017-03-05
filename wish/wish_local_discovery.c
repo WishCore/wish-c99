@@ -183,8 +183,8 @@ size_t buffer_len) {
     /* Save the pubkey to contact database, along with metadata.
      * But first, check if we already know this uid */
     wish_identity_t discovered_id;
-    if (wish_load_identity(ruid, &discovered_id) > 0) {
-        //WISHDEBUG(LOG_CRITICAL, "Auto-discovered uid is already in our contacts");
+    if (wish_load_identity(ruid, &discovered_id) == ret_success) {
+        //WISHDEBUG(LOG_CRITICAL, "Auto-discovered uid is already in our contacts %s", discovered_id.alias);
     } else {
         //WISHDEBUG(LOG_CRITICAL, "Ignoring auto discovery bcast for unknown uid");
         return;
@@ -316,7 +316,10 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
      * uid len + hostid len + pubkey len + room for metadata */
 
     wish_identity_t my_identity;
-    wish_load_identity(my_uid, &my_identity);
+    return_t ret = wish_load_identity(my_uid, &my_identity);
+    
+    // Local discovery will not advertise if we cant load identity
+    if (ret != ret_success) { return; }
 
     // Local discovery will not advertise if we don't have a private key
     if (!my_identity.has_privkey) { return; }
