@@ -72,6 +72,8 @@ typedef struct wish_core {
     bool config_skip_connection_acl;
     bool config_skip_service_acl;
     
+    uint8_t id[WISH_WHID_LEN];
+    
     /* TCP Server */
     uint16_t wish_server_port;
     

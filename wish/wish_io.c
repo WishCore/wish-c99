@@ -1619,6 +1619,10 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
 void wish_core_init(wish_core_t* core) {
     wish_core_config_load(core);
     
+    char id[32];
+    
+    wish_core_get_host_id(core, id);
+    
     core->time_db = NULL;
     
     core->wish_server_port = core->wish_server_port == 0 ? 37009 : core->wish_server_port;

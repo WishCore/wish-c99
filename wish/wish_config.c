@@ -1,7 +1,9 @@
 #include "wish_config.h"
+#include "wish_version.h"
 #include "wish_debug.h"
 #include "wish_fs.h"
 #include "bson.h"
+#include "string.h"
 
 #include "bson_visitor.h"
 
@@ -44,6 +46,16 @@ int wish_core_config_load(wish_core_t* core) {
     wish_fs_close(fd);
     
     bson_visit("Configuration loaded this bson", (char*) bson_data(&bs));
+    
+    bson_iterator it;
+    bson_find_from_buffer(&it, bs.data, "id");
+    
+    if ( BSON_BINDATA == bson_iterator_type(&it) && bson_iterator_bin_len(&it) == WISH_WHID_LEN ) {
+        WISHDEBUG(LOG_CRITICAL, "yes, id is: 0x%02x%02x", bson_iterator_bin_data(&it)[0], bson_iterator_bin_data(&it)[1]);
+        memcpy(core->id, bson_iterator_bin_data(&it), WISH_WHID_LEN);
+    } else {
+        WISHDEBUG(LOG_CRITICAL, "nonono");
+    }
 
     /* Load content from sandbox file */
 #if 0    
@@ -119,24 +131,14 @@ int wish_core_config_save(wish_core_t* core) {
         WISHDEBUG(LOG_CRITICAL, "could not open configuration db");
         return -1;
     }
-
-    /* FIXME Find if there is already an existing entry for this identity. If
-     * there this, delete the old entry */
-
-    /* APPEEND the new BSON document to stable storage file -  */
-    ret = wish_fs_lseek(fd, 0, WISH_FS_SEEK_END);
-    if (ret < 0) {
-        /* error */
-        WISHDEBUG(LOG_CRITICAL, "error seeking configuration");
-        return -2;
-    }
     
     int buf_len = 4*1024;
     char buf[buf_len];
     
     bson bs;
     bson_init_buffer(&bs, buf, buf_len);
-    bson_append_string(&bs, "version", "v0.1.1-bogus-dirty-g3dfa");
+    bson_append_string(&bs, "version", WISH_CORE_VERSION_STRING);
+    bson_append_binary(&bs, "id", core->id, WISH_WHID_LEN);
     bson_finish(&bs);
 
     ret = wish_fs_write(fd, bson_data(&bs), bson_size(&bs));

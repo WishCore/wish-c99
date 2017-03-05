@@ -32,5 +32,5 @@ void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
 size_t wish_core_create_hostid(wish_core_t* core, char* hostid, char* sys_id_str, size_t sys_id_str_len);
 
 
-size_t wish_core_get_local_hostid(wish_core_t* core, uint8_t *hostid_ptr);
+size_t wish_core_get_host_id(wish_core_t* core, uint8_t *hostid_ptr);
 

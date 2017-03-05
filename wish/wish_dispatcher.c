@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "mbedtls/gcm.h"
+#include "wish_config.h"
 #include "wish_io.h"
 #include "wish_debug.h"
 #include "cbson.h"
@@ -34,43 +35,31 @@ void wish_core_send_pong(wish_core_t* core, wish_connection_t* ctx) {
 
 }
 
-#define HOSTID_FILENAME "wish_hostid.raw"
 
-size_t wish_core_get_local_hostid(wish_core_t* core, uint8_t *hostid_ptr) {
+static return_t zeroes(void* src, int bytes) {
+    int i;
+    for (i=0; i< bytes; i++) {
+        char* b = (char*) src;
+        if (b[i] & 0xff) {
+            return ret_fail;
+        }
+    }
+    return ret_success;
+}
 
-    /* Try to load hostid from core config file */
-    wish_file_t config_fd = wish_fs_open(HOSTID_FILENAME);
-    if (config_fd < 0) {
-        WISHDEBUG(LOG_CRITICAL, "Error when opening hostid file");
-        return 0;
+size_t wish_core_get_host_id(wish_core_t* core, uint8_t *hostid_ptr) {
+    if ( zeroes(core->id, WISH_WHID_LEN) == ret_success ) {
+        WISHDEBUG(LOG_CRITICAL, "Creating new host id");
+        /* Create new host id file */        
+        char sys_id_input_str[WISH_WHID_LEN];
+        wish_platform_fill_random(NULL, sys_id_input_str, WISH_WHID_LEN);
+        wish_core_create_hostid(core, (char*)hostid_ptr, sys_id_input_str, WISH_WHID_LEN);
+
+        memcpy(core->id, hostid_ptr, WISH_WHID_LEN);
+        wish_core_config_save(core);
     }
-    else {
-        int io_retval = wish_fs_lseek(config_fd, 0, WISH_FS_SEEK_SET);
-        if (io_retval == -1) {
-            WISHDEBUG(LOG_CRITICAL, "Error seeking");
-            return 0;
-        }
-        //WISHDEBUG(LOG_CRITICAL, "Reading hostid");
-        int read_len = wish_fs_read(config_fd, hostid_ptr, WISH_WHID_LEN);
-        if (read_len < 0) {
-            WISHDEBUG(LOG_CRITICAL, "IO Error when reading hostid file");
-            return 0;
-        }
-        else if (read_len != WISH_WHID_LEN) {
-            WISHDEBUG(LOG_CRITICAL, "Creating new hostid file (read_len: %i)", read_len);
-            /* Create new host id file */        
-            char sys_id_input_str[WISH_WHID_LEN];
-            wish_platform_fill_random(NULL, sys_id_input_str, WISH_WHID_LEN);
-            wish_core_create_hostid(core, (char*)hostid_ptr, sys_id_input_str, WISH_WHID_LEN);
-            int write_len = wish_fs_write(config_fd, hostid_ptr, WISH_WHID_LEN);
-            if (write_len != WISH_WHID_LEN) {
-                WISHDEBUG(LOG_CRITICAL, "IO Error when writing hostid file");
-                return 0;
-            }
-        }
-        
-    }
-    wish_fs_close(config_fd);
+
+    memcpy(hostid_ptr, core->id, WISH_WHID_LEN);
     
     return WISH_WHID_LEN;
 }
@@ -106,7 +95,7 @@ void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t b
     uint8_t host_id[WISH_WHID_LEN] = { 0 };
     uint8_t *handshake_msg = buffer;
     size_t max_handshake_len = buffer_len;
-    wish_core_get_local_hostid(core, host_id);
+    wish_core_get_host_id(core, host_id);
     bson_init_doc(handshake_msg, max_handshake_len);
 
     bson_write_binary(handshake_msg, max_handshake_len, "host", 

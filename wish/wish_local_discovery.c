@@ -224,7 +224,7 @@ size_t buffer_len) {
     
     /* Obtain local hostid and compare with the rhid of the broadcast */
     uint8_t local_hostid[WISH_WHID_LEN];
-    if (wish_core_get_local_hostid(core, local_hostid) == WISH_WHID_LEN) {
+    if (wish_core_get_host_id(core, local_hostid) == WISH_WHID_LEN) {
         if (memcmp(rhid, local_hostid, WISH_WHID_LEN) == 0) {
             /* The wld broadcast has originated from this host itself! */
             return;
@@ -338,7 +338,7 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     bson_write_binary(advert_msg, advert_msg_max_len, "wuid", my_uid, WISH_ID_LEN);
 
     uint8_t host_id[WISH_WHID_LEN];
-    wish_core_get_local_hostid(core, host_id);
+    wish_core_get_host_id(core, host_id);
     bson_write_binary(advert_msg, advert_msg_max_len, "whid", host_id, WISH_ID_LEN);
 
     uint8_t pubkey[WISH_PUBKEY_LEN] = { 0 };

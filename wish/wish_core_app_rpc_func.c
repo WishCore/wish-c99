@@ -160,7 +160,7 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
      * In this case we very if the message's rhid corresponds to our local core's rhid 
      */
     uint8_t local_hostid[WISH_WHID_LEN];
-    wish_core_get_local_hostid(core, local_hostid);
+    wish_core_get_host_id(core, local_hostid);
     if (memcmp(rhid, local_hostid, WISH_WHID_LEN) == 0) {
         /* rhid matches to local core, message destined to a local service!
          * Now we must construct a frame, much like we do in the "core-to-core" 
@@ -1879,7 +1879,7 @@ void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct w
     }
     
     uint8_t local_hostid[WISH_WHID_LEN];
-    wish_core_get_local_hostid(core, local_hostid);
+    wish_core_get_host_id(core, local_hostid);
             
             
     int i = 0;
@@ -1929,7 +1929,7 @@ void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct w
  */
 void wish_report_identity_to_local_services(wish_core_t* core, wish_identity_t* identity, bool online) {
     uint8_t local_hostid[WISH_WHID_LEN];
-    wish_core_get_local_hostid(core, local_hostid);
+    wish_core_get_host_id(core, local_hostid);
     struct wish_service_entry *service_registry = wish_service_get_registry(core);
     int i = 0;
     for (i = 0; i < WISH_MAX_SERVICES; i++) {
