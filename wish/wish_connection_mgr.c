@@ -132,8 +132,8 @@ return_t wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t 
     wish_identity_t lu;
     wish_identity_t ru;
     
-    if ( ret_success == wish_load_identity(luid, &lu) 
-            && ret_success == wish_load_identity(ruid, &ru) )
+    if ( ret_success == wish_identity_load(luid, &lu) 
+            && ret_success == wish_identity_load(ruid, &ru) )
     {
         WISHDEBUG(LOG_CRITICAL, "open connection: %s > %s ", lu.alias, ru.alias);
     } else {

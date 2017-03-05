@@ -68,7 +68,7 @@ int wish_get_num_uid_entries(void);
 int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len); 
 /* This function loads the contact specified by 'uid', storing it to
  * the pointer 'contact' */
-return_t wish_load_identity(uint8_t *uid, wish_identity_t *identity);
+return_t wish_identity_load(uint8_t *uid, wish_identity_t *identity);
 
 // returns < 0 on error, == 0 is false, > 0 is true
 int wish_identity_exists(uint8_t *uid);

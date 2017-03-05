@@ -222,7 +222,7 @@ bool wish_core_check_wsid(wish_core_t* core, wish_connection_t* ctx, uint8_t* ds
 
     /* Technically, we need to have the privkey for "dst_id", else we
      * cannot be communicating */
-    if (wish_has_privkey(dst_id) && wish_load_identity(src_id, &tmp_id) == ret_success) {
+    if (wish_has_privkey(dst_id) && wish_identity_load(src_id, &tmp_id) == ret_success) {
         retval = true;
     }
     else {

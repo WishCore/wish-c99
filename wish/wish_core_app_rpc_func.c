@@ -782,7 +782,7 @@ static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
         luid = (uint8_t *)bson_iterator_bin_data(&it);
 
         wish_identity_t id_to_remove;
-        if (wish_load_identity(luid, &id_to_remove) == ret_success) {
+        if (wish_identity_load(luid, &id_to_remove) == ret_success) {
             wish_report_identity_to_local_services(core, &id_to_remove, false);
         }
         
