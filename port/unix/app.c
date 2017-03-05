@@ -772,7 +772,7 @@ int main(int argc, char** argv) {
                         wish_message_processor_notify(&ev);
                     }
                     else if (read_len == 0) {
-                        printf("Connection closed?\n");
+                        //printf("Connection closed?\n");
                         close(sockfd);
                         free(ctx->send_arg);
                         wish_core_signal_tcp_event(core, ctx, TCP_DISCONNECTED);

@@ -620,7 +620,7 @@ void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
     struct wish_rpc_context_list_elem *tmp = NULL;
     
             
-    WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up client.");
+    //WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up client.");
     wish_rpc_client_end_by_ctx(core->core_rpc_client, ctx);
 
     

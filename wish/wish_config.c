@@ -51,10 +51,7 @@ int wish_core_config_load(wish_core_t* core) {
     bson_find_from_buffer(&it, bs.data, "id");
     
     if ( BSON_BINDATA == bson_iterator_type(&it) && bson_iterator_bin_len(&it) == WISH_WHID_LEN ) {
-        WISHDEBUG(LOG_CRITICAL, "yes, id is: 0x%02x%02x", bson_iterator_bin_data(&it)[0], bson_iterator_bin_data(&it)[1]);
         memcpy(core->id, bson_iterator_bin_data(&it), WISH_WHID_LEN);
-    } else {
-        WISHDEBUG(LOG_CRITICAL, "nonono");
     }
 
     /* Load content from sandbox file */
