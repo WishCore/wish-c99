@@ -140,7 +140,7 @@ return_t wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t 
     
     wish_connection_t *new_ctx = wish_connection_init(core, luid, ruid);
     if (new_ctx != NULL) {
-        WISHDEBUG(LOG_CRITICAL, "open connection: %s > %s (%u.%u.%u.%u:%hu)", lu.alias, ru.alias, ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], port);
+        WISHDEBUG(LOG_CRITICAL, "Connection attempt: %s > %s (%u.%u.%u.%u:%hu)", lu.alias, ru.alias, ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], port);
         wish_open_connection(core, new_ctx, ip, port, false);
     }
     
