@@ -17,27 +17,20 @@
 #include "wish_relay_client.h"
 #include "wish_io.h"
 
-/* Instantiate Relay client to a server with specied IP addr and port */
-wish_relay_client_ctx_t relay_ctx = { 
-    .ip = { .addr = { RELAY_SERVER_IP0, RELAY_SERVER_IP1, 
-        RELAY_SERVER_IP2, RELAY_SERVER_IP3 } }, /* FIXME IP expressed in reverse! */ 
-    .port = RELAY_SERVER_PORT
-};
-
 void socket_set_nonblocking(int sockfd);
 
-void relay_ctrl_connected_cb(void) {
+void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
     //printf("Relay control connection established\n");
 }
 
-void relay_ctrl_connect_fail_cb(void) {
+void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
     printf("Relay control connection fails\n");
-    relay_ctx.curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
+    rctx->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
 }
 
-void relay_ctrl_disconnect_cb(void) {
+void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
     printf("Relay control connection disconnected\n");
-    relay_ctx.curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
+    rctx->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
 }
 
 
@@ -83,10 +76,10 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *rctx,
     relay_serv_addr.sin_family = AF_INET;
     char ip_str[12+3+1] = { 0 };
     sprintf(ip_str, "%i.%i.%i.%i", 
-        relay_ctx.ip.addr[0], relay_ctx.ip.addr[1], 
-        relay_ctx.ip.addr[2], relay_ctx.ip.addr[3]);
+        rctx->ip.addr[0], rctx->ip.addr[1], 
+        rctx->ip.addr[2], rctx->ip.addr[3]);
 
-    int relay_port = relay_ctx.port;
+    int relay_port = rctx->port;
     //printf("Connecting to relay server: %s:%d\n", ip_str, relay_port);
     inet_aton(ip_str, &relay_serv_addr.sin_addr);
     relay_serv_addr.sin_port = htons(relay_port);
@@ -106,7 +99,7 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *rctx,
 
 void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
     close(relay_sockfd);
-    relay_ctrl_disconnect_cb();
+    relay_ctrl_disconnect_cb(core, core->relay_ctx);
 }
 
 /**
@@ -115,7 +108,7 @@ void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
  * @return pointer to an array containing the relay contexts
  */
 wish_relay_client_ctx_t *wish_relay_get_contexts(wish_core_t* core) {
-    return &relay_ctx;
+    return core->relay_ctx;
 }
 
 

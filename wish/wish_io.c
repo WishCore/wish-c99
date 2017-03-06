@@ -183,31 +183,25 @@ bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t 
 
 
 /* Feed raw data into wish core */
-void wish_core_feed(wish_core_t* core, wish_connection_t* h, unsigned char* data, int len) {
+void wish_core_feed(wish_core_t* core, wish_connection_t* connection, unsigned char* data, int len) {
     WISHDEBUG(LOG_INFO, "Got data, len %d ", len);
     int i = 0;
     for (i = 0; i < len; i++) {
         WISHDEBUG2(LOG_TRIVIAL, "0x%hhx ", data[i]);
     }
 
-    uint16_t rb_space = ring_buffer_space(&(h->rx_ringbuf));
+    uint16_t rb_space = ring_buffer_space(&(connection->rx_ringbuf));
     if (rb_space >= len) {
         /* Save the data in the rx circular buffer */
-        ring_buffer_write(&(h->rx_ringbuf), data, len);
+        ring_buffer_write(&(connection->rx_ringbuf), data, len);
         /* Update timestamp to indicate some data was received */
-        h->latest_input_timestamp = wish_time_get_relative(core);
-   }
-    else {
+        connection->latest_input_timestamp = wish_time_get_relative(core);
+    } else {
         /* There is no space for the data... */
-        WISHDEBUG(LOG_CRITICAL, 
-            "No space in ring buffer, for message of len = %d.\
-The ringbuffer currently has %hu free bytes. Not going any further", 
-            len, rb_space);
-        wish_debug_die();
+        WISHDEBUG(LOG_CRITICAL, "No space in ring buffer, for message of len = %d. The ringbuffer currently has %hu free bytes. Not going any further", len, rb_space);
+        wish_close_connection(core, connection);
     }
-
 }
-
 
 /* Check if the connection attempt by a remote client presenting these
  * wish id's can be accepted or not */
@@ -250,7 +244,7 @@ again:
      * connection is up and running, we need to ensure that also the AES
      * GCM auth tag is received, before we start processing the payload!
      * The auth_tag's length is not accounted for in the frame length
-     * field of the wire protocol (variable h->expect), 
+     * field of the wire protocol (variable connection->expect), 
      * and therefore we need to account for it explicitly. 
      * THis will be fixed with Wish protocol level 1.
      * */
@@ -603,6 +597,18 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
          * rhid combination. */
         {
             wish_connection_t *conn = connection;
+            
+            wish_identity_t lu;
+            wish_identity_t ru;
+
+            if ( ret_success == wish_identity_load(conn->local_wuid, &lu) 
+                    && ret_success == wish_identity_load(conn->remote_wuid, &ru) )
+            {
+                WISHDEBUG(LOG_CRITICAL, "Connection attempt failed: %s > %s (%u.%u.%u.%u:%hu)",
+                        lu.alias, ru.alias, conn->rmt_ip_addr[0], conn->rmt_ip_addr[1], conn->rmt_ip_addr[2], conn->rmt_ip_addr[3], conn->remote_port);
+            }
+            
+            
             int i = 0;
             bool other_connection_found = false;
 #if 1
@@ -634,8 +640,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
 #endif
 
             if (other_connection_found) {
-                WISHDEBUG(LOG_CRITICAL, "Not sending \
-offline signal because other connection luid and ruid found!");
+                WISHDEBUG(LOG_CRITICAL, "Not sending offline signal because other connection luid and ruid found!");
             }
             else {
                 wish_send_online_offline_signal_to_apps(core, connection, false);
@@ -1589,12 +1594,10 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
         }
         int j = 0;
         for (j = 0; j < 4; j++) {
-            if (core->wish_context_pool[i].rmt_ip_addr[j] !=
-                    rmt_ip[j]) {
+            if (core->wish_context_pool[i].rmt_ip_addr[j] != rmt_ip[j]) {
                 continue;
             }
-            if (core->wish_context_pool[i].local_ip_addr[j] !=
-                    local_ip[j]) {
+            if (core->wish_context_pool[i].local_ip_addr[j] != local_ip[j]) {
                 continue;
             }
         }
@@ -1646,6 +1649,8 @@ void wish_core_init(wish_core_t* core) {
 
     core->service_registry = wish_platform_malloc(service_registry_size);
     memset(core->service_registry, 0, service_registry_size);
+    
+    wish_core_relay_client_init(core);
     
     wish_ldiscover_init(core);
 }

@@ -36,7 +36,7 @@ enum wish_relay_client_state {
 #define RELAY_CLIENT_RX_RB_LEN 64
 
 
-typedef struct {
+typedef struct wish_relay_client_ctx {
     /* The UID for which connections are to be relayed */
     uint8_t relayed_uid[32];
     /* The Relay session id given by the relay server is stored here */
@@ -58,9 +58,10 @@ typedef struct {
     /* TODO: Add here some kind of reference to the actual port-specific connection
      * object (such as file descriptor or struct espconn) so that we
      * could some day handle several relay control connections */
+    struct wish_relay_client_ctx* next;
 } wish_relay_client_ctx_t;
 
-void wish_relay_client_init(wish_core_t* core, wish_relay_client_ctx_t *rctx, uint8_t *relay_uid);
+void wish_core_relay_client_init(wish_core_t* core);
 
 /* To be implemented in port-specific code */
 void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *rctx,

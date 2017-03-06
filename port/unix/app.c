@@ -120,6 +120,10 @@ int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr
         perror("ERROR opening socket");
     }
 
+    // set ip and port to wish connection
+    memcpy(ctx->rmt_ip_addr, ip->addr, WISH_IPV4_ADDRLEN);
+    ctx->remote_port = port;
+    
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
     
@@ -440,11 +444,10 @@ void setup_wish_server(wish_core_t* core) {
 
 /* The relay control connection sockfd */
 extern int relay_sockfd;    /* Defined in relay_client.c */
-extern wish_relay_client_ctx_t relay_ctx;
 
-void relay_ctrl_connected_cb(void);
-void relay_ctrl_connect_fail_cb(void);
-void relay_ctrl_disconnect_cb(void);
+void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx);
+void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx);
+void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx);
 
 
 static void update_max_fd(int fd, int *max_fd) {
@@ -570,14 +573,14 @@ int main(int argc, char** argv) {
         }
 
         if (as_relay_client) {
-            if (relay_ctx.curr_state == WISH_RELAY_CLIENT_OPEN) {
+            if (core->relay_ctx->curr_state == WISH_RELAY_CLIENT_OPEN) {
                 FD_SET(relay_sockfd, &wfds);
                 update_max_fd(relay_sockfd, &max_fd);
             }
-            else if (relay_ctx.curr_state == WISH_RELAY_CLIENT_WAIT_RECONNECT) {
+            else if (core->relay_ctx->curr_state == WISH_RELAY_CLIENT_WAIT_RECONNECT) {
                 /* connect to relay server has failed or disconnected and we wait some time before retrying */
             }
-            else if (relay_ctx.curr_state != WISH_RELAY_CLIENT_INITIAL) {
+            else if (core->relay_ctx->curr_state != WISH_RELAY_CLIENT_INITIAL) {
                 FD_SET(relay_sockfd, &rfds);
                 update_max_fd(relay_sockfd, &max_fd);
             }
@@ -651,15 +654,16 @@ int main(int argc, char** argv) {
                     if (connect_error == 0) {
                         /* connect() succeeded, the connection is open */
                         //printf("Relay client connected\n");
-                        relay_ctrl_connected_cb();
-                        wish_relay_client_periodic(core, &relay_ctx);
+                        relay_ctrl_connected_cb(core, core->relay_ctx);
+                        wish_relay_client_periodic(core, core->relay_ctx);
                     }
                     else {
                         /* connect fails. Note that perror() or the
                          * global errno is not valid now */
-                        printf("relay control connect() failed: %s\n", 
-                            strerror(connect_error));
-                        relay_ctrl_connect_fail_cb();
+                        printf("relay control connect() failed: %s\n", strerror(connect_error));
+                        
+                        // FIXME only one relay context assumed!
+                        relay_ctrl_connect_fail_cb(core, core->relay_ctx);
                     }
                 }
 
@@ -668,12 +672,12 @@ int main(int argc, char** argv) {
                         byte at a time! */
                     int read_len = read(relay_sockfd, &byte, 1);
                     if (read_len > 0) {
-                        wish_relay_client_feed(core, &relay_ctx, &byte, 1);
-                        wish_relay_client_periodic(core, &relay_ctx);
+                        wish_relay_client_feed(core, core->relay_ctx, &byte, 1);
+                        wish_relay_client_periodic(core, core->relay_ctx);
                     }
                     else if (read_len == 0) {
                         printf("Relay control connection disconnected\n");
-                        relay_ctrl_disconnect_cb();
+                        relay_ctrl_disconnect_cb(core, core->relay_ctx);
                     }
                     else {
                         perror("relay control read()");
@@ -873,14 +877,14 @@ int main(int argc, char** argv) {
             if (time(NULL) > relay_check_timestamp + 10) {
                 relay_check_timestamp = time(NULL);
                 
-                if (relay_ctx.curr_state == WISH_RELAY_CLIENT_WAIT_RECONNECT) {
-                    relay_ctx.curr_state = WISH_RELAY_CLIENT_INITIAL;
+                if (core->relay_ctx->curr_state == WISH_RELAY_CLIENT_WAIT_RECONNECT) {
+                    core->relay_ctx->curr_state = WISH_RELAY_CLIENT_INITIAL;
                 }
                 
-                if (relay_ctx.curr_state == WISH_RELAY_CLIENT_INITIAL) {
+                if (core->relay_ctx->curr_state == WISH_RELAY_CLIENT_INITIAL) {
                     if (core->loaded_num_ids > 0) {
                         // Assume first identity in db is the one we want
-                        wish_relay_client_open(core, &relay_ctx, core->uid_list[0].uid);
+                        wish_relay_client_open(core, core->relay_ctx, core->uid_list[0].uid);
                     }
                 }
                 

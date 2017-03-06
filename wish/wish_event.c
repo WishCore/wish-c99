@@ -46,7 +46,7 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
             }
 
             if (local_alias != NULL && remote_alias != NULL) {
-                WISHDEBUG(LOG_CRITICAL ,"Connection established: %s > %s", local_alias, remote_alias);
+                WISHDEBUG(LOG_CRITICAL ,"Connection established: %s > %s (%s)", local_alias, remote_alias, e->context->via_relay ? "relayed" : "direct");
 
                 wish_platform_free(tmp_id);
                 wish_platform_free(local_alias);

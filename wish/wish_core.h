@@ -66,6 +66,7 @@ typedef struct wish_claim_t {
 struct wish_context;
 struct wish_ldiscover_t;
 struct wish_relationship_t;
+struct wish_relay_client_ctx;
 
 typedef struct wish_core {
     /* Configurations */
@@ -103,6 +104,9 @@ typedef struct wish_core {
     /* Connections */
     struct wish_context* wish_context_pool;
     wish_connection_id_t next_conn_id;
+    
+    /* Instantiate Relay client to a server with specied IP addr and port */
+    struct wish_relay_client_ctx* relay_ctx;
 
     /* Local discovery */
     bool ldiscover_allowed;

@@ -10,6 +10,22 @@
 #include "wish_relay_client.h"
 #include "wish_time.h"
 
+#include "utlist.h"
+
+void wish_core_relay_client_init(wish_core_t* core) {
+    int size = sizeof(wish_relay_client_ctx_t);
+    wish_relay_client_ctx_t* client = wish_platform_malloc(size);
+    memset(client, 0, size);
+
+    client->ip.addr[0] = RELAY_SERVER_IP0;
+    client->ip.addr[1] = RELAY_SERVER_IP1;
+    client->ip.addr[2] = RELAY_SERVER_IP2;
+    client->ip.addr[3] = RELAY_SERVER_IP3;
+    client->port = RELAY_SERVER_PORT;
+    
+    LL_APPEND(core->relay_ctx, client);
+}
+
 /* This function should be invoked regularly to process data received
  * from relay server and take actions accordingly */
 void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_ctx_t *rctx) {

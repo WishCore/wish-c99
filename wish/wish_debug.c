@@ -59,15 +59,3 @@ void wish_debug_print_array(int log_lvl, char* title, uint8_t* array, uint8_t le
     }
     WISHDEBUG(log_lvl,"");
 }
-
-/* Platform-dependent function to immediately cease all processing and
- * just wait performing only the minimum amount of activity, such as
- * watchdog feed etc. 
- * This is useful to debug problems which would othervise lead to
- * watchdog resets. */
-void wish_debug_die() {
-    while (1) {
-//        system_soft_wdt_feed();
-    }
-
-}
