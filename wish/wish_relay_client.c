@@ -12,6 +12,22 @@
 
 #include "utlist.h"
 
+static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
+    //WISHDEBUG(LOG_CRITICAL, "wish_core_relay_periodic");
+    
+    /* FIXME implementation for several relay connections */
+    wish_relay_client_ctx_t *rctx = wish_relay_get_contexts(core);
+    
+    // return if no relay client found
+    if (rctx == NULL) { return; }
+    
+    if (rctx->curr_state == WISH_RELAY_CLIENT_WAIT) {
+        /* Just check timeouts if the relay client waits for
+         * notifications from relay server */
+        wish_relay_client_periodic(core, rctx);
+    }
+}
+
 void wish_core_relay_client_init(wish_core_t* core) {
     int size = sizeof(wish_relay_client_ctx_t);
     wish_relay_client_ctx_t* client = wish_platform_malloc(size);
@@ -24,6 +40,8 @@ void wish_core_relay_client_init(wish_core_t* core) {
     client->port = RELAY_SERVER_PORT;
     
     LL_APPEND(core->relay_ctx, client);
+    
+    wish_core_time_set_interval(core, wish_core_relay_periodic, NULL, 1);
 }
 
 /* This function should be invoked regularly to process data received
@@ -144,18 +162,3 @@ int wish_relay_get_preferred_server_url(char *url_str, int url_str_max_len) {
         RELAY_SERVER_IP3, RELAY_SERVER_PORT);
     return 0;
 }
-
-/** 
- * Check timeout status on the relay contexts 
- */
-void wish_relay_check_timeout(wish_core_t* core) {
-    /* FIXME implementation for several relay connections */
-    wish_relay_client_ctx_t *rctx = wish_relay_get_contexts(core);
-    if (rctx->curr_state == WISH_RELAY_CLIENT_WAIT) {
-        /* Just check timeouts if the relay client waits for
-         * notifications from relay server */
-        wish_relay_client_periodic(core, wish_relay_get_contexts(core));
-    }
-}
-
-

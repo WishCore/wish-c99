@@ -18,8 +18,6 @@
 void wish_time_report_periodic(wish_core_t* core) {
     core->core_time++;
 
-    wish_relay_check_timeout(core);
-
     static wish_time_t check_connections_timestamp;
     if (core->core_time > (check_connections_timestamp + 60)) {
         check_connections_timestamp = core->core_time;
