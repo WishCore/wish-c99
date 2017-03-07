@@ -99,7 +99,7 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *relay,
 
 void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *relay) {
     close(relay_sockfd);
-    relay_ctrl_disconnect_cb(core, core->relay_ctx);
+    relay_ctrl_disconnect_cb(core, core->relay_db);
 }
 
 /**
@@ -108,7 +108,7 @@ void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *relay) 
  * @return pointer to an array containing the relay contexts
  */
 wish_relay_client_ctx_t *wish_relay_get_contexts(wish_core_t* core) {
-    return core->relay_ctx;
+    return core->relay_db;
 }
 
 

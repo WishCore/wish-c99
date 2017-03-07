@@ -39,7 +39,7 @@ void wish_core_relay_client_init(wish_core_t* core) {
     client->ip.addr[3] = RELAY_SERVER_IP3;
     client->port = RELAY_SERVER_PORT;
     
-    LL_APPEND(core->relay_ctx, client);
+    LL_APPEND(core->relay_db, client);
     
     wish_core_time_set_interval(core, wish_core_relay_periodic, NULL, 1);
 }

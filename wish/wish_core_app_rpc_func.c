@@ -1669,7 +1669,7 @@ static void relay_list(rpc_server_req* req, uint8_t* args) {
     
     int i = 0;
     
-    LL_FOREACH(core->relay_ctx, relay) {
+    LL_FOREACH(core->relay_db, relay) {
         char index[21];
         BSON_NUMSTR(index, i);
         
@@ -1715,7 +1715,7 @@ static void relay_add(rpc_server_req* req, uint8_t* args) {
 
     wish_parse_transport_ip_port(addr, addr_len, &relay->ip, &relay->port);
     
-    LL_APPEND(core->relay_ctx, relay);
+    LL_APPEND(core->relay_db, relay);
 
     uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
     
@@ -1754,9 +1754,9 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
     wish_relay_client_ctx_t* relay;
     wish_relay_client_ctx_t* tmp;
     
-    LL_FOREACH_SAFE(core->relay_ctx, relay, tmp) {
+    LL_FOREACH_SAFE(core->relay_db, relay, tmp) {
         if ( memcmp(&relay->ip, &ctx.ip, 4) != 0 || relay->port != ctx.port ) { continue; }
-        LL_DELETE(core->relay_ctx, relay);
+        LL_DELETE(core->relay_db, relay);
         wish_platform_free(relay);
         break;
     }

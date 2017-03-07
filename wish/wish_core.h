@@ -106,7 +106,7 @@ typedef struct wish_core {
     wish_connection_id_t next_conn_id;
     
     /* Instantiate Relay client to a server with specied IP addr and port */
-    struct wish_relay_client_ctx* relay_ctx;
+    struct wish_relay_client_ctx* relay_db;
 
     /* Local discovery */
     bool ldiscover_allowed;
