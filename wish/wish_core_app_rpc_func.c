@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "wish_rpc.h"
+#include "wish_utils.h"
 #include "wish_version.h"
 #include "wish_identity.h"
 #include "wish_event.h"
@@ -21,6 +22,10 @@
 #include "cbson.h"
 #include "bson_visitor.h"
 #include "utlist.h"
+
+//#include <netinet/in.h>
+#include <arpa/inet.h>
+#include "stdlib.h"
 
 #include "wish_debug.h"
 #include "wish_port_config.h"
@@ -1511,7 +1516,7 @@ static void wld_list_handler(rpc_server_req* req, uint8_t* args) {
 static void wld_clear_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    int buffer_len = 1400;
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
     
     wish_ldiscover_clear(core);
@@ -1548,7 +1553,7 @@ static void wld_clear_handler(rpc_server_req* req, uint8_t* args) {
 static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    int buffer_len = 1400;
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
     /* Get the uid of identity to export, the uid is argument "0" in
@@ -1632,7 +1637,7 @@ static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
 }
 
 static void host_config(rpc_server_req* req, uint8_t* args) {
-    int buffer_len = 1400;
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
     
     bson bs;
@@ -1645,6 +1650,128 @@ static void host_config(rpc_server_req* req, uint8_t* args) {
 
     if (bs.err) {
         write_bson_error(req, 305, "Failed writing bson.");
+    }
+    
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+}
+
+static void relay_list(rpc_server_req* req, uint8_t* args) {
+    wish_core_t* core = req->server->context;
+    wish_app_entry_t* app = req->context;
+
+    uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
+    
+    bson bs;
+    bson_init_buffer(&bs, buffer, WISH_PORT_RPC_BUFFER_SZ);
+    bson_append_start_array(&bs, "data");
+    
+    wish_relay_client_ctx_t* relay;
+    
+    int i = 0;
+    
+    LL_FOREACH(core->relay_ctx, relay) {
+        char index[21];
+        BSON_NUMSTR(index, i);
+        
+        char host[22];
+        
+        snprintf(host, 22, "%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+        
+        bson_append_start_object(&bs, index);
+        bson_append_string(&bs, "host", host);
+        bson_append_bool(&bs, "connected", relay->curr_state == WISH_RELAY_CLIENT_WAIT);
+        bson_append_finish_object(&bs);
+    }
+    
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
+
+    if (bs.err) {
+        wish_rpc_server_error(req, 305, "Failed writing bson.");
+        return;
+    }
+    
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+}
+
+static void relay_add(rpc_server_req* req, uint8_t* args) {
+    wish_core_t* core = req->server->context;
+    wish_app_entry_t* app = req->context;
+
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if ( BSON_STRING != bson_iterator_type(&it) ) {
+        wish_rpc_server_error(req, 306, "Could not add relay. Expecting string parameter host: 92.12.33.221:40000.");
+        return;
+    }
+    
+    const char* addr = bson_iterator_string(&it);
+    int addr_len = bson_iterator_string_len(&it); 
+    
+    int size = sizeof(wish_relay_client_ctx_t);
+    wish_relay_client_ctx_t* relay = wish_platform_malloc(size);
+    memset(relay, 0, size);
+
+    wish_parse_transport_ip_port(addr, addr_len, &relay->ip, &relay->port);
+    
+    LL_APPEND(core->relay_ctx, relay);
+
+    uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
+    
+    bson bs;
+    bson_init_buffer(&bs, buffer, WISH_PORT_RPC_BUFFER_SZ);
+    bson_append_bool(&bs, "data", true);
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
+
+    if (bs.err) {
+        wish_rpc_server_error(req, 305, "Failed writing bson.");
+        return;
+    }
+    
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+}
+
+static void relay_remove(rpc_server_req* req, uint8_t* args) {
+    wish_core_t* core = req->server->context;
+    wish_app_entry_t* app = req->context;
+
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if ( BSON_STRING != bson_iterator_type(&it) ) {
+        wish_rpc_server_error(req, 306, "Could not remove relay. Expecting string parameter host: 92.12.33.221:40000.");
+        return;
+    }
+    
+    const char* addr = bson_iterator_string(&it);
+    int addr_len = bson_iterator_string_len(&it); 
+
+    wish_relay_client_ctx_t ctx;
+    wish_parse_transport_ip_port(addr, addr_len, &ctx.ip, &ctx.port);
+    
+    wish_relay_client_ctx_t* relay;
+    wish_relay_client_ctx_t* tmp;
+    
+    LL_FOREACH_SAFE(core->relay_ctx, relay, tmp) {
+        if ( memcmp(&relay->ip, &ctx.ip, 4) != 0 || relay->port != ctx.port ) { continue; }
+        LL_DELETE(core->relay_ctx, relay);
+        wish_platform_free(relay);
+        break;
+    }
+    
+    uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
+    
+    bson bs;
+    bson_init_buffer(&bs, buffer, WISH_PORT_RPC_BUFFER_SZ);
+    bson_append_bool(&bs, "data", true);
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
+
+    if (bs.err) {
+        wish_rpc_server_error(req, 305, "Failed writing bson.");
+        return;
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1737,12 +1864,19 @@ void write_bson_error(rpc_server_req* req, int errno, char *errmsg) {
 handler methods_handler =                             { .op_str = "methods",                           .handler = methods };
 handler signals_handler =                             { .op_str = "signals",                           .handler = wish_core_signals };
 handler version_handler =                             { .op_str = "version",                           .handler = version };
+
 handler services_send_handler =                       { .op_str = "services.send",                     .handler = services_send };
+
 handler identity_sign_handler =                       { .op_str = "identity.sign",                     .handler = identity_sign };
 handler identity_verify_handler =                     { .op_str = "identity.verify",                   .handler = identity_verify };
 handler identity_friend_request_list_handler =        { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list };
 handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",      .handler = identity_friend_request_accept };
 handler identity_friend_request_decline_handler =     { .op_str = "identity.friendRequestDecline",     .handler = identity_friend_request_decline };
+
+handler relay_list_handler =                          { .op_str = "relay.list",                        .handler = relay_list };
+handler relay_add_handler =                           { .op_str = "relay.add",                         .handler = relay_add };
+handler relay_remove_handler =                        { .op_str = "relay.remove",                      .handler = relay_remove };
+
 handler host_config_handler =                         { .op_str = "host.config",                       .handler = host_config };
 
 void wish_core_app_rpc_init(wish_core_t* core) {
@@ -1777,6 +1911,10 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.list", connections_list_handler);
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.disconnect", connections_disconnect_handler);
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.checkConnections", connections_check_connections);
+
+    wish_rpc_server_register(core->core_app_rpc_server, &relay_list_handler);
+    wish_rpc_server_register(core->core_app_rpc_server, &relay_add_handler);
+    wish_rpc_server_register(core->core_app_rpc_server, &relay_remove_handler);
     
     wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.list", wld_list_handler);
     wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.clear", wld_clear_handler);

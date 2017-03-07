@@ -5,7 +5,18 @@
 #include "wish_utils.h"
 #include "wish_debug.h"
 
-int wish_parse_transport_port(char *url, size_t url_len, uint16_t *port) {
+int wish_parse_transport_ip_port(const char *url, size_t url_len, wish_ip_addr_t *ip, uint16_t *port) {
+    int ret;
+    ret = wish_parse_transport_ip(url, url_len, ip);
+    
+    if (ret != 0) { return ret; }
+    
+    wish_parse_transport_port(url, url_len, port);
+
+    return ret;
+}
+
+int wish_parse_transport_port(const char *url, size_t url_len, uint16_t *port) {
     /* FIXME implement parsing of ip address */
     int retval = 1;
     if (port == NULL) {
@@ -30,14 +41,20 @@ int wish_parse_transport_port(char *url, size_t url_len, uint16_t *port) {
 }
 
 
-int wish_parse_transport_ip(char *url, size_t url_len, wish_ip_addr_t *ip) {
+int wish_parse_transport_ip(const char *url, size_t url_len, wish_ip_addr_t *ip) {
     int retval = 1;
     const int ip_str_max_len = 4*3+3; /* t.ex. 255.255.255.255 */
     const int ip_str_min_len = 4+3;   /* t.ex. 1.1.1.1 */
     char* first_slash = strchr(url, '/');
-    char* start_of_ip_str = first_slash+2;
+    const char* start_of_ip_str;
+    if (first_slash == NULL) {
+        // maybe only ip:port ?
+        start_of_ip_str = url;
+    } else {
+        start_of_ip_str = first_slash+2;
+    }
     char* colon = strchr(start_of_ip_str, ':');
-    if (first_slash == NULL || colon == NULL) {
+    if (colon == NULL) {
         WISHDEBUG(LOG_CRITICAL, "IP addr parse error");
         return retval;
     }
@@ -61,7 +78,7 @@ int wish_parse_transport_ip(char *url, size_t url_len, wish_ip_addr_t *ip) {
 
     /* Parse out the bytes */
     const int num_bytes = 4; /* There are always 4 dots */
-    char *curr_byte_str = start_of_ip_str;
+    const char *curr_byte_str = start_of_ip_str;
     int i = 0;
     for (i = 0; i < num_bytes; i++) {
         //WISHDEBUG(LOG_CRITICAL, "curr_byte_str: %s", curr_byte_str);
