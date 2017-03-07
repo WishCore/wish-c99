@@ -36,7 +36,9 @@ static void wish_ldiscover_periodic(wish_core_t* core, void* ctx) {
 }
 
 void wish_ldiscover_init(wish_core_t* core) {
-    core->ldiscovery_db = wish_platform_malloc(sizeof(wish_ldiscover_t)*WISH_LOCAL_DISCOVERY_MAX);
+    int size = sizeof(wish_ldiscover_t)*WISH_LOCAL_DISCOVERY_MAX;
+    core->ldiscovery_db = wish_platform_malloc(size);
+    memset(core->ldiscovery_db, 0, size);
     wish_core_time_set_interval(core, &wish_ldiscover_periodic, NULL, 5);
 }
 
