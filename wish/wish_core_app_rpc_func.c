@@ -36,8 +36,6 @@ typedef struct wish_rpc_server_handler handler;
 /* FIXME each Wish connection must have its own RCP client, so this has to be moved to ctx */
 wish_rpc_client_t core2remote_rpc_client;
 
-void write_bson_error(rpc_server_req* ctx, int errno, char *errmsg);
-
 // NBUFL and nbuf are used for writing BSON array indexes
 #define NBUFL 8
 uint8_t nbuf[NBUFL];
@@ -560,7 +558,8 @@ static void identity_import_handler(rpc_server_req* req, uint8_t* args) {
     int ret = wish_save_identity_entry(&new_id);
     
     if( ret != 0 ) {
-        return write_bson_error(req, 201, "Too many identities.");
+        wish_rpc_server_error(req, 201, "Too many identities.");
+        return;
     }
 
     /* Form the reply message in 'buffer' */
@@ -800,7 +799,8 @@ static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
         bson_finish(&bs);
 
         if (bs.err != 0) {
-            return write_bson_error(req, 344, "Failed writing reponse.");
+            wish_rpc_server_error(req, 344, "Failed writing reponse.");
+            return;
         }
 
         wish_core_update_identities(core);
@@ -808,7 +808,7 @@ static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
         
         wish_core_signals_emit_string(core, "identity");
     } else {
-        write_bson_error(req, 343, "Invalid argument. Expecting 32 byte bin data.");
+        wish_rpc_server_error(req, 343, "Invalid argument. Expecting 32 byte bin data.");
     }
 }
 
@@ -825,7 +825,8 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
     bson_find_from_buffer(&it, args, "0");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
-        return write_bson_error(req, 345, "Invalid uid.");
+        wish_rpc_server_error(req, 345, "Invalid uid.");
+        return;
     }
 
     uint8_t *luid = 0;
@@ -834,7 +835,8 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
     bson_find_from_buffer(&it, args, "1");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) < 32 || bson_iterator_bin_len(&it) > 64 ) {
-        return write_bson_error(req, 345, "Invalid hash.");
+        wish_rpc_server_error(req, 345, "Invalid hash.");
+        return;
     }
     
     char hash[64];
@@ -846,7 +848,8 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
     uint8_t local_privkey[WISH_PRIVKEY_LEN];
     if (wish_load_privkey(luid, local_privkey)) {
         WISHDEBUG(LOG_CRITICAL, "Could not load privkey");
-        return write_bson_error(req, 345, "Could not load private key.");
+        wish_rpc_server_error(req, 345, "Could not load private key.");
+        return;
     }
     else {
         ed25519_sign(signature, hash, hash_len, local_privkey);
@@ -861,7 +864,8 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
     bson_finish(&bs);
 
     if(bs.err != 0) {
-        return write_bson_error(req, 344, "Failed writing reponse.");
+        wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        return;
     }
 
     wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
@@ -880,7 +884,8 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     bson_find_from_buffer(&it, args, "0");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
-        return write_bson_error(req, 345, "Invalid uid.");
+        wish_rpc_server_error(req, 345, "Invalid uid.");
+        return;
     }
 
     uint8_t *luid = 0;
@@ -889,7 +894,8 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     bson_find_from_buffer(&it, args, "1");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != 64 ) {
-        return write_bson_error(req, 346, "Invalid signature.");
+        wish_rpc_server_error(req, 346, "Invalid signature.");
+        return;
     }
     
     char signature[64];
@@ -900,7 +906,8 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     bson_find_from_buffer(&it, args, "2");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) < 32 || bson_iterator_bin_len(&it) > 64 ) {
-        return write_bson_error(req, 345, "Invalid hash.");
+        wish_rpc_server_error(req, 345, "Invalid hash.");
+        return;
     }
     
     char hash[64];
@@ -912,7 +919,8 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     uint8_t pubkey[WISH_PUBKEY_LEN];
     if (wish_load_pubkey(luid, pubkey)) {
         WISHDEBUG(LOG_CRITICAL, "Could not load pubkey");
-        return write_bson_error(req, 345, "Could not load private key.");
+        wish_rpc_server_error(req, 345, "Could not load private key.");
+        return;
     } else {
         verification = ed25519_verify(signature, hash, hash_len, pubkey) ? true : false;
     }
@@ -926,7 +934,8 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     bson_finish(&bs);
 
     if(bs.err != 0) {
-        return write_bson_error(req, 344, "Failed writing reponse.");
+        wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        return;
     }
 
     wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
@@ -1385,7 +1394,7 @@ static void connections_list_handler(rpc_server_req* req, uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        write_bson_error(req, 303, "Failed writing bson.");
+        wish_rpc_server_error(req, 303, "Failed writing bson.");
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1415,12 +1424,12 @@ static void connections_disconnect_handler(rpc_server_req* req, uint8_t* args) {
         bson_finish(&bs);
 
         if(bs.err != 0) {
-            write_bson_error(req, 344, "Failed writing reponse.");
+            wish_rpc_server_error(req, 344, "Failed writing reponse.");
         }
         
         wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     } else {
-        write_bson_error(req, 343, "Invalid argument. Int index.");
+        wish_rpc_server_error(req, 343, "Invalid argument. Int index.");
     }
 }
 
@@ -1442,7 +1451,7 @@ static void connections_check_connections(rpc_server_req* req, uint8_t* args) {
     bson_finish(&bs);
 
     if(bs.err != 0) {
-        write_bson_error(req, 344, "Failed writing reponse.");
+        wish_rpc_server_error(req, 344, "Failed writing reponse.");
     }
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
@@ -1493,7 +1502,7 @@ static void wld_list_handler(rpc_server_req* req, uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        write_bson_error(req, 303, "Failed writing bson.");
+        wish_rpc_server_error(req, 303, "Failed writing bson.");
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1527,7 +1536,7 @@ static void wld_clear_handler(rpc_server_req* req, uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        write_bson_error(req, 303, "Failed writing bson.");
+        wish_rpc_server_error(req, 303, "Failed writing bson.");
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1630,7 +1639,7 @@ static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        write_bson_error(req, 303, "Failed writing bson.");
+        wish_rpc_server_error(req, 303, "Failed writing bson.");
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1649,7 +1658,7 @@ static void host_config(rpc_server_req* req, uint8_t* args) {
     bson_finish(&bs);
 
     if (bs.err) {
-        write_bson_error(req, 305, "Failed writing bson.");
+        wish_rpc_server_error(req, 305, "Failed writing bson.");
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1839,27 +1848,6 @@ static void debug_disable(struct wish_rpc_context* req,
     }
 }
 */
-
-void write_bson_error(rpc_server_req* req, int errno, char *errmsg) {
-    int buffer_len = 400;
-    uint8_t buffer[buffer_len];
-
-    bson bs;
-    bson_init_buffer(&bs, buffer, buffer_len);
-    
-    size_t error_max_len = 100;
-    uint8_t error[error_max_len];
-    bson_init_doc(error, error_max_len);
-
-    bson_append_start_object(&bs, "data");
-    bson_append_int(&bs, "code", errno);
-    bson_append_string(&bs, "msg", errmsg);
-    bson_append_finish_object(&bs);
-
-    bson_append_int(&bs, "err", req->id);
-    
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
-}
 
 handler methods_handler =                             { .op_str = "methods",                           .handler = methods };
 handler signals_handler =                             { .op_str = "signals",                           .handler = wish_core_signals };
