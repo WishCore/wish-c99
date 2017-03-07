@@ -13,6 +13,8 @@
 
 #define RELAY_SERVER_TIMEOUT 45 /* Seconds */
 
+#define RELAY_CLIENT_RECONNECT_TIMEOUT 10 /* Seconds */
+
 #define RELAY_SESSION_ID_LEN 10
 
 enum wish_relay_client_state {
@@ -33,15 +35,14 @@ enum wish_relay_client_state {
 
 
 typedef struct wish_relay_client_ctx {
+    int sockfd;
     /* The UID for which connections are to be relayed */
     uint8_t relayed_uid[32];
     /* The Relay session id given by the relay server is stored here */
     uint8_t session_id[RELAY_SESSION_ID_LEN];
     enum wish_relay_client_state curr_state;
     /* Function used to send TCP data */
-    int (*send)(void *, unsigned char*, int);
-    /* Data to be supplied as first argument to wish_context.send */
-    void* send_arg;
+    int (*send)(int, unsigned char*, int);
     ring_buffer_t rx_ringbuf;
     uint8_t rx_ringbuf_storage[RELAY_CLIENT_RX_RB_LEN];
     /* The Relay server's IP address */
@@ -56,6 +57,11 @@ typedef struct wish_relay_client_ctx {
      * could some day handle several relay control connections */
     struct wish_relay_client_ctx* next;
 } wish_relay_client_t;
+
+
+void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay);
+void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay);
+void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_t *relay);
 
 void wish_core_relay_client_init(wish_core_t* core);
 

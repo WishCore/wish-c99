@@ -13,6 +13,48 @@
 
 #include "utlist.h"
 
+void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay) {
+    //printf("Relay control connection established\n");
+}
+
+void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay) {
+    printf("Relay control connection fails\n");
+    relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
+    
+    // Used for reconnect timeout
+    relay->last_input_timestamp = wish_time_get_relative(core);
+}
+
+void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_t *relay) {
+    printf("Relay control connection disconnected\n");
+    relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
+
+    // Used for reconnect timeout
+    relay->last_input_timestamp = wish_time_get_relative(core);
+}
+
+static void wish_relay_client_check_connections(wish_core_t* core) {
+    wish_relay_client_t* relay;
+
+    LL_FOREACH(core->relay_db, relay) {
+        switch(relay->curr_state) {
+            case WISH_RELAY_CLIENT_INITIAL:
+                if (core->loaded_num_ids > 0) {
+                    // Assume first identity in db is the one we want
+                    wish_relay_client_open(core, relay, core->uid_list[0].uid);
+                }
+                break;
+            case WISH_RELAY_CLIENT_WAIT_RECONNECT:
+                if ( wish_time_get_relative(core) > relay->last_input_timestamp + RELAY_CLIENT_RECONNECT_TIMEOUT) {
+                    relay->curr_state = WISH_RELAY_CLIENT_INITIAL;
+                }
+                break;
+            default:
+                break;
+        }
+    }                
+}
+
 static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
     //WISHDEBUG(LOG_CRITICAL, "wish_core_relay_periodic");
     
@@ -27,11 +69,15 @@ static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
          * notifications from relay server */
         wish_relay_client_periodic(core, rctx);
     }
+
+    wish_relay_client_check_connections(core);
 }
 
 void wish_core_relay_client_init(wish_core_t* core) {
     wish_relay_client_add(core, RELAY_SERVER_HOST);
     wish_core_time_set_interval(core, wish_core_relay_periodic, NULL, 1);
+    
+    wish_relay_client_check_connections(core);
 }
 
 void wish_relay_client_add(wish_core_t* core, const char* host) {
@@ -76,7 +122,7 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
             handshake_data[2] = (WISH_WIRE_VERSION << 4) | 
                 WISH_WIRE_TYPE_RELAY_CONTROL;   /* Type: 6 */
             memcpy(handshake_data + 3, relay->relayed_uid, WISH_ID_LEN);
-            relay->send(relay->send_arg, handshake_data, handshake_len);
+            relay->send(relay->sockfd, handshake_data, handshake_len);
             /* Advance state */
             relay->curr_state = WISH_RELAY_CLIENT_READ_SESSION_ID;
         }

@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "utlist.h"
 
 #include "wish_version.h"
 #include "wish_io.h"
@@ -442,14 +443,6 @@ void setup_wish_server(wish_core_t* core) {
     }
 }
 
-/* The relay control connection sockfd */
-extern int relay_sockfd;    /* Defined in relay_client.c */
-
-void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay);
-void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay);
-void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_t *relay);
-
-
 static void update_max_fd(int fd, int *max_fd) {
     if (fd >= *max_fd) {
         *max_fd = fd + 1;
@@ -573,16 +566,20 @@ int main(int argc, char** argv) {
         }
 
         if (as_relay_client) {
-            if (core->relay_db->curr_state == WISH_RELAY_CLIENT_OPEN) {
-                FD_SET(relay_sockfd, &wfds);
-                update_max_fd(relay_sockfd, &max_fd);
-            }
-            else if (core->relay_db->curr_state == WISH_RELAY_CLIENT_WAIT_RECONNECT) {
-                /* connect to relay server has failed or disconnected and we wait some time before retrying */
-            }
-            else if (core->relay_db->curr_state != WISH_RELAY_CLIENT_INITIAL) {
-                FD_SET(relay_sockfd, &rfds);
-                update_max_fd(relay_sockfd, &max_fd);
+            wish_relay_client_t* relay;
+            
+            LL_FOREACH(core->relay_db, relay) {
+                if (relay->curr_state == WISH_RELAY_CLIENT_OPEN) {
+                    FD_SET(relay->sockfd, &wfds);
+                    update_max_fd(relay->sockfd, &max_fd);
+                }
+                else if (relay->curr_state == WISH_RELAY_CLIENT_WAIT_RECONNECT) {
+                    /* connect to relay server has failed or disconnected and we wait some time before retrying */
+                }
+                else if (relay->curr_state != WISH_RELAY_CLIENT_INITIAL) {
+                    FD_SET(relay->sockfd, &rfds);
+                    update_max_fd(relay->sockfd, &max_fd);
+                }
             }
         }
 
@@ -643,44 +640,49 @@ int main(int argc, char** argv) {
             }
 
             if (as_relay_client) {
-                if (FD_ISSET(relay_sockfd, &wfds)) {
-                    int connect_error = 0;
-                    socklen_t connect_error_len = sizeof(connect_error);
-                    if (getsockopt(relay_sockfd, SOL_SOCKET, SO_ERROR, 
-                            &connect_error, &connect_error_len) == -1) {
-                        perror("Unexepected getsockopt error");
-                        exit(1);
-                    }
-                    if (connect_error == 0) {
-                        /* connect() succeeded, the connection is open */
-                        //printf("Relay client connected\n");
-                        relay_ctrl_connected_cb(core, core->relay_db);
-                        wish_relay_client_periodic(core, core->relay_db);
-                    }
-                    else {
-                        /* connect fails. Note that perror() or the
-                         * global errno is not valid now */
-                        printf("relay control connect() failed: %s\n", strerror(connect_error));
-                        
-                        // FIXME only one relay context assumed!
-                        relay_ctrl_connect_fail_cb(core, core->relay_db);
-                    }
-                }
+                wish_relay_client_t* relay;
 
-                if (FD_ISSET(relay_sockfd, &rfds)) {
-                    uint8_t byte;   /* That's right, we read just one
-                        byte at a time! */
-                    int read_len = read(relay_sockfd, &byte, 1);
-                    if (read_len > 0) {
-                        wish_relay_client_feed(core, core->relay_db, &byte, 1);
-                        wish_relay_client_periodic(core, core->relay_db);
+                LL_FOREACH(core->relay_db, relay) {
+                
+                    if (FD_ISSET(relay->sockfd, &wfds)) {
+                        int connect_error = 0;
+                        socklen_t connect_error_len = sizeof(connect_error);
+                        if (getsockopt(relay->sockfd, SOL_SOCKET, SO_ERROR, 
+                                &connect_error, &connect_error_len) == -1) {
+                            perror("Unexepected getsockopt error");
+                            exit(1);
+                        }
+                        if (connect_error == 0) {
+                            /* connect() succeeded, the connection is open */
+                            //printf("Relay client connected\n");
+                            relay_ctrl_connected_cb(core, relay);
+                            wish_relay_client_periodic(core, relay);
+                        }
+                        else {
+                            /* connect fails. Note that perror() or the
+                             * global errno is not valid now */
+                            printf("relay control connect() failed: %s\n", strerror(connect_error));
+
+                            // FIXME only one relay context assumed!
+                            relay_ctrl_connect_fail_cb(core, relay);
+                        }
                     }
-                    else if (read_len == 0) {
-                        printf("Relay control connection disconnected\n");
-                        relay_ctrl_disconnect_cb(core, core->relay_db);
-                    }
-                    else {
-                        perror("relay control read()");
+
+                    if (FD_ISSET(relay->sockfd, &rfds)) {
+                        uint8_t byte;   /* That's right, we read just one
+                            byte at a time! */
+                        int read_len = read(relay->sockfd, &byte, 1);
+                        if (read_len > 0) {
+                            wish_relay_client_feed(core, relay, &byte, 1);
+                            wish_relay_client_periodic(core, relay);
+                        }
+                        else if (read_len == 0) {
+                            printf("Relay control connection disconnected\n");
+                            relay_ctrl_disconnect_cb(core, relay);
+                        }
+                        else {
+                            perror("relay control read()");
+                        }
                     }
                 }
             }
@@ -870,26 +872,6 @@ int main(int argc, char** argv) {
             timestamp = time(NULL);
             /* Perform periodic action 10s interval
              */
-        }
-
-        if (as_relay_client) {
-            static time_t relay_check_timestamp = 0;
-            if (time(NULL) > relay_check_timestamp + 10) {
-                relay_check_timestamp = time(NULL);
-                
-                if (core->relay_db->curr_state == WISH_RELAY_CLIENT_WAIT_RECONNECT) {
-                    core->relay_db->curr_state = WISH_RELAY_CLIENT_INITIAL;
-                }
-                
-                if (core->relay_db->curr_state == WISH_RELAY_CLIENT_INITIAL) {
-                    if (core->loaded_num_ids > 0) {
-                        // Assume first identity in db is the one we want
-                        wish_relay_client_open(core, core->relay_db, core->uid_list[0].uid);
-                    }
-                }
-                
-            }
-
         }
 
         while (1) {

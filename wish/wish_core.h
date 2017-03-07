@@ -68,6 +68,9 @@ struct wish_ldiscover_t;
 struct wish_relationship_t;
 struct wish_relay_client_ctx;
 
+/**
+ * Wish Core object
+ */
 typedef struct wish_core {
     /* Configurations */
     bool config_skip_connection_acl;
