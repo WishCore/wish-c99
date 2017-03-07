@@ -155,7 +155,7 @@ typedef struct wish_context {
     /* A pointer to a the relay context, applicable only to Wish
      * contexts which are opened for accepting an incoming connection
      * via the a relay server */
-    wish_relay_client_ctx_t *rctx;
+    wish_relay_client_t *rctx;
     /** This flag must be set to true when you open a connection to a
      * peer in order to send a friend request */
     bool friend_req_connection;

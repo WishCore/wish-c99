@@ -4,6 +4,9 @@
 #include "wish_fs.h"
 #include "bson.h"
 #include "string.h"
+#include "wish_relay_client.h"
+
+#include "utlist.h"
 
 #include "bson_visitor.h"
 
@@ -47,11 +50,34 @@ int wish_core_config_load(wish_core_t* core) {
     
     bson_visit("Configuration loaded this bson", (char*) bson_data(&bs));
     
+    // read host id
     bson_iterator it;
     bson_find_from_buffer(&it, bs.data, "id");
     
     if ( BSON_BINDATA == bson_iterator_type(&it) && bson_iterator_bin_len(&it) == WISH_WHID_LEN ) {
         memcpy(core->id, bson_iterator_bin_data(&it), WISH_WHID_LEN);
+    }
+    
+    // read relay servers list
+    if ( bson_find_from_buffer(&it, bs.data, "relay") == BSON_ARRAY ) {
+
+        int si = 0;
+        char sindex[21];
+
+        while (true) {
+            BSON_NUMSTR(sindex, si++);
+            bson_iterator sit;
+
+            bson_iterator_subiterator(&it, &sit);
+            bson_type type = bson_find_fieldpath_value(sindex, &sit);
+            
+            if ( type == BSON_EOO ) { break; }
+            if ( type != BSON_STRING ) { continue; }
+            
+            const char* host = bson_iterator_string(&sit);
+            
+            wish_relay_client_add(core, host);
+        }
     }
 
     /* Load content from sandbox file */
@@ -136,6 +162,27 @@ int wish_core_config_save(wish_core_t* core) {
     bson_init_buffer(&bs, buf, buf_len);
     bson_append_string(&bs, "version", WISH_CORE_VERSION_STRING);
     bson_append_binary(&bs, "id", core->id, WISH_WHID_LEN);
+    
+    if (core->relay_db != NULL) {
+        wish_relay_client_t* relay;
+        
+        bson_append_start_array(&bs, "relay");
+            
+        int i = 0;
+        char index[21];
+        
+        LL_FOREACH(core->relay_db, relay) {
+            
+            char host[22];
+            snprintf(host, 22, "%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+            
+            BSON_NUMSTR(index, i++);
+            bson_append_string(&bs, index, host);
+        }
+        
+        bson_append_finish_array(&bs);
+    }
+    
     bson_finish(&bs);
 
     ret = wish_fs_write(fd, bson_data(&bs), bson_size(&bs));

@@ -9,11 +9,7 @@
 
 
 /* Define Relay server IP and port: */
-#define RELAY_SERVER_IP0 193
-#define RELAY_SERVER_IP1 65
-#define RELAY_SERVER_IP2 54
-#define RELAY_SERVER_IP3 131
-#define RELAY_SERVER_PORT 40000
+#define RELAY_SERVER_HOST "193.65.54.131:40000"
 
 #define RELAY_SERVER_TIMEOUT 45 /* Seconds */
 
@@ -59,24 +55,26 @@ typedef struct wish_relay_client_ctx {
      * object (such as file descriptor or struct espconn) so that we
      * could some day handle several relay control connections */
     struct wish_relay_client_ctx* next;
-} wish_relay_client_ctx_t;
+} wish_relay_client_t;
 
 void wish_core_relay_client_init(wish_core_t* core);
 
+void wish_relay_client_add(wish_core_t* core, const char* host);
+
 /* To be implemented in port-specific code */
-void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *rctx,
+void wish_relay_client_open(wish_core_t* core, wish_relay_client_t *rctx,
     uint8_t relay_uid[32]);
 
 /* To be implemented in port-specific code */
-void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *rctx);
+void wish_relay_client_close(wish_core_t* core, wish_relay_client_t *rctx);
 
 /* This function should be invoked regularly to process data received
  * from relay server and take actions accordingly */
-void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_ctx_t *rctx);
+void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *rctx);
 
 /* This function is used by the port-specific TCP socket read function
  * to feed data into the relay client */
-void wish_relay_client_feed(wish_core_t* core, wish_relay_client_ctx_t *rctx, 
+void wish_relay_client_feed(wish_core_t* core, wish_relay_client_t *rctx, 
     uint8_t *data, size_t data_len);
 
 int wish_relay_get_preferred_server_url(char *url_str, int url_str_len);
@@ -86,7 +84,7 @@ int wish_relay_get_preferred_server_url(char *url_str, int url_str_len);
  *
  * @return pointer to an array containing the relay contexts
  */
-wish_relay_client_ctx_t *wish_relay_get_contexts(wish_core_t* core);
+wish_relay_client_t *wish_relay_get_contexts(wish_core_t* core);
 
 /** 
  * Check timeout status on the relay contexts 

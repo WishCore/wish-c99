@@ -118,6 +118,8 @@ typedef struct wish_core {
     
 } wish_core_t;
 
+#include "wish_config.h"
+
 int wish_core_update_identities(wish_core_t* core);
 
 #ifdef __cplusplus

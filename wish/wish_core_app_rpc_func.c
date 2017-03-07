@@ -1674,7 +1674,7 @@ static void relay_list(rpc_server_req* req, uint8_t* args) {
     bson_init_buffer(&bs, buffer, WISH_PORT_RPC_BUFFER_SZ);
     bson_append_start_array(&bs, "data");
     
-    wish_relay_client_ctx_t* relay;
+    wish_relay_client_t* relay;
     
     int i = 0;
     
@@ -1717,15 +1717,9 @@ static void relay_add(rpc_server_req* req, uint8_t* args) {
     
     const char* addr = bson_iterator_string(&it);
     int addr_len = bson_iterator_string_len(&it); 
-    
-    int size = sizeof(wish_relay_client_ctx_t);
-    wish_relay_client_ctx_t* relay = wish_platform_malloc(size);
-    memset(relay, 0, size);
 
-    wish_parse_transport_ip_port(addr, addr_len, &relay->ip, &relay->port);
+    wish_relay_client_add(core, addr);
     
-    LL_APPEND(core->relay_db, relay);
-
     uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
     
     bson bs;
@@ -1740,6 +1734,8 @@ static void relay_add(rpc_server_req* req, uint8_t* args) {
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    
+    wish_core_config_save(core);
 }
 
 static void relay_remove(rpc_server_req* req, uint8_t* args) {
@@ -1757,17 +1753,16 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
     const char* addr = bson_iterator_string(&it);
     int addr_len = bson_iterator_string_len(&it); 
 
-    wish_relay_client_ctx_t ctx;
+    wish_relay_client_t ctx;
     wish_parse_transport_ip_port(addr, addr_len, &ctx.ip, &ctx.port);
     
-    wish_relay_client_ctx_t* relay;
-    wish_relay_client_ctx_t* tmp;
+    wish_relay_client_t* relay;
+    wish_relay_client_t* tmp;
     
     LL_FOREACH_SAFE(core->relay_db, relay, tmp) {
-        if ( memcmp(&relay->ip, &ctx.ip, 4) != 0 || relay->port != ctx.port ) { continue; }
+        if ( memcmp(&relay->ip.addr, &ctx.ip.addr, 4) != 0 || relay->port != ctx.port ) { continue; }
         LL_DELETE(core->relay_db, relay);
         wish_platform_free(relay);
-        break;
     }
     
     uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];

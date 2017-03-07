@@ -9,6 +9,7 @@
 
 #include "wish_relay_client.h"
 #include "wish_time.h"
+#include "wish_utils.h"
 
 #include "utlist.h"
 
@@ -16,7 +17,7 @@ static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
     //WISHDEBUG(LOG_CRITICAL, "wish_core_relay_periodic");
     
     /* FIXME implementation for several relay connections */
-    wish_relay_client_ctx_t *rctx = wish_relay_get_contexts(core);
+    wish_relay_client_t *rctx = wish_relay_get_contexts(core);
     
     // return if no relay client found
     if (rctx == NULL) { return; }
@@ -29,24 +30,38 @@ static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
 }
 
 void wish_core_relay_client_init(wish_core_t* core) {
-    int size = sizeof(wish_relay_client_ctx_t);
-    wish_relay_client_ctx_t* client = wish_platform_malloc(size);
-    memset(client, 0, size);
-
-    client->ip.addr[0] = RELAY_SERVER_IP0;
-    client->ip.addr[1] = RELAY_SERVER_IP1;
-    client->ip.addr[2] = RELAY_SERVER_IP2;
-    client->ip.addr[3] = RELAY_SERVER_IP3;
-    client->port = RELAY_SERVER_PORT;
-    
-    LL_APPEND(core->relay_db, client);
-    
+    wish_relay_client_add(core, RELAY_SERVER_HOST);
     wish_core_time_set_interval(core, wish_core_relay_periodic, NULL, 1);
+}
+
+void wish_relay_client_add(wish_core_t* core, const char* host) {
+    int size = sizeof(wish_relay_client_t);
+    wish_relay_client_t* relay = wish_platform_malloc(size);
+    memset(relay, 0, size);
+
+    wish_parse_transport_ip_port(host, 22, &relay->ip, &relay->port);
+
+    wish_relay_client_t* elt;
+    
+    bool found = false;
+    LL_FOREACH(core->relay_db, elt) {
+        if ( memcmp(&elt->ip.addr, &relay->ip.addr, 4) == 0 && elt->port == relay->port ) {
+            // already in list, bailing
+            found = true;
+            break;
+        }
+    }
+    
+    if (!found) {
+        LL_APPEND(core->relay_db, relay);
+    } else {
+        wish_platform_free(relay);
+    }
 }
 
 /* This function should be invoked regularly to process data received
  * from relay server and take actions accordingly */
-void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_ctx_t *relay) {
+void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
     switch (relay->curr_state) {
     case WISH_RELAY_CLIENT_OPEN:
         /* Establishing a Relay control connection:
@@ -150,15 +165,13 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_ctx_t *rela
 
 }
 
-void wish_relay_client_feed(wish_core_t* core, wish_relay_client_ctx_t *relay, uint8_t *data, size_t data_len) {
+void wish_relay_client_feed(wish_core_t* core, wish_relay_client_t *relay, uint8_t *data, size_t data_len) {
     ring_buffer_write(&(relay->rx_ringbuf), data, data_len);
     relay->last_input_timestamp = wish_time_get_relative(core);
 }
 
 
 int wish_relay_get_preferred_server_url(char *url_str, int url_str_max_len) {
-    wish_platform_sprintf(url_str, "wish://%d.%d.%d.%d:%d", 
-        RELAY_SERVER_IP0, RELAY_SERVER_IP1, RELAY_SERVER_IP2,
-        RELAY_SERVER_IP3, RELAY_SERVER_PORT);
+    wish_platform_sprintf(url_str, "wish://" RELAY_SERVER_HOST);
     return 0;
 }

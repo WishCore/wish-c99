@@ -19,16 +19,16 @@
 
 void socket_set_nonblocking(int sockfd);
 
-void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_ctx_t *relay) {
+void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay) {
     //printf("Relay control connection established\n");
 }
 
-void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_ctx_t *relay) {
+void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay) {
     printf("Relay control connection fails\n");
     relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
 }
 
-void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_ctx_t *relay) {
+void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_t *relay) {
     printf("Relay control connection disconnected\n");
     relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
 }
@@ -51,7 +51,7 @@ int relay_send(void *send_arg, unsigned char* buffer, int len) {
  * support many relay server connections! */
 int relay_sockfd;
 
-void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *relay, 
+void wish_relay_client_open(wish_core_t* core, wish_relay_client_t *relay, 
         uint8_t relay_uid[WISH_ID_LEN]) {
     /* FIXME this has to be split into port-specific and generic
      * components. For example, setting up the RB, next state, expect
@@ -97,7 +97,7 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *relay,
     }
 }
 
-void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *relay) {
+void wish_relay_client_close(wish_core_t* core, wish_relay_client_t *relay) {
     close(relay_sockfd);
     relay_ctrl_disconnect_cb(core, core->relay_db);
 }
@@ -107,7 +107,7 @@ void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *relay) 
  *
  * @return pointer to an array containing the relay contexts
  */
-wish_relay_client_ctx_t *wish_relay_get_contexts(wish_core_t* core) {
+wish_relay_client_t *wish_relay_get_contexts(wish_core_t* core) {
     return core->relay_db;
 }
 
