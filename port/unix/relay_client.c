@@ -19,18 +19,18 @@
 
 void socket_set_nonblocking(int sockfd);
 
-void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
+void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_ctx_t *relay) {
     //printf("Relay control connection established\n");
 }
 
-void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
+void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_ctx_t *relay) {
     printf("Relay control connection fails\n");
-    rctx->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
+    relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
 }
 
-void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
+void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_ctx_t *relay) {
     printf("Relay control connection disconnected\n");
-    rctx->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
+    relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
 }
 
 
@@ -51,15 +51,15 @@ int relay_send(void *send_arg, unsigned char* buffer, int len) {
  * support many relay server connections! */
 int relay_sockfd;
 
-void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *rctx, 
+void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *relay, 
         uint8_t relay_uid[WISH_ID_LEN]) {
     /* FIXME this has to be split into port-specific and generic
      * components. For example, setting up the RB, next state, expect
      * byte, copying of id is generic to all ports */
-    rctx->curr_state = WISH_RELAY_CLIENT_OPEN;
-    ring_buffer_init(&(rctx->rx_ringbuf), rctx->rx_ringbuf_storage, 
+    relay->curr_state = WISH_RELAY_CLIENT_OPEN;
+    ring_buffer_init(&(relay->rx_ringbuf), relay->rx_ringbuf_storage, 
         RELAY_CLIENT_RX_RB_LEN);
-    memcpy(rctx->relayed_uid, relay_uid, WISH_ID_LEN);
+    memcpy(relay->relayed_uid, relay_uid, WISH_ID_LEN);
 
     /* Linux/Unix-specific from now on */ 
 
@@ -76,10 +76,10 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *rctx,
     relay_serv_addr.sin_family = AF_INET;
     char ip_str[12+3+1] = { 0 };
     sprintf(ip_str, "%i.%i.%i.%i", 
-        rctx->ip.addr[0], rctx->ip.addr[1], 
-        rctx->ip.addr[2], rctx->ip.addr[3]);
+        relay->ip.addr[0], relay->ip.addr[1], 
+        relay->ip.addr[2], relay->ip.addr[3]);
 
-    int relay_port = rctx->port;
+    int relay_port = relay->port;
     //printf("Connecting to relay server: %s:%d\n", ip_str, relay_port);
     inet_aton(ip_str, &relay_serv_addr.sin_addr);
     relay_serv_addr.sin_port = htons(relay_port);
@@ -87,17 +87,17 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_ctx_t *rctx,
             sizeof(relay_serv_addr)) == -1) {
         if (errno == EINPROGRESS) {
             //printf("Started connecting to relay server\n");
-            rctx->send = relay_send;
-            rctx->send_arg = &relay_sockfd;
+            relay->send = relay_send;
+            relay->send_arg = &relay_sockfd;
         }
         else {
             perror("relay server connect()");
-            rctx->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
+            relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
         }
     }
 }
 
-void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *rctx) {
+void wish_relay_client_close(wish_core_t* core, wish_relay_client_ctx_t *relay) {
     close(relay_sockfd);
     relay_ctrl_disconnect_cb(core, core->relay_ctx);
 }

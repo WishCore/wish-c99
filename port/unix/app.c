@@ -445,9 +445,9 @@ void setup_wish_server(wish_core_t* core) {
 /* The relay control connection sockfd */
 extern int relay_sockfd;    /* Defined in relay_client.c */
 
-void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx);
-void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx);
-void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_ctx_t *rctx);
+void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_ctx_t *relay);
+void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_ctx_t *relay);
+void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_ctx_t *relay);
 
 
 static void update_max_fd(int fd, int *max_fd) {
