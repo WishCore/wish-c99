@@ -393,8 +393,7 @@ int wish_identity_exists(uint8_t *uid) {
 }
 
 
-int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc,
-        size_t identity_bson_doc_max_len) {
+int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc, size_t identity_bson_doc_max_len) {
     int retval = -1;
 
     if (uid == NULL) {

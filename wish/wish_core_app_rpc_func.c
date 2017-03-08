@@ -23,6 +23,8 @@
 #include "bson_visitor.h"
 #include "utlist.h"
 
+#include "mbedtls/sha256.h"
+
 //#include <netinet/in.h>
 #include <arpa/inet.h>
 #include "stdlib.h"
@@ -362,12 +364,9 @@ static void services_list_handler(rpc_server_req* req, uint8_t* args) {
  *
  */
 static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
-    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
-    uint8_t buffer[buffer_len];
-
-    WISHDEBUG(LOG_DEBUG, "Core app RPC: identity_export");
-    bson_init_doc(buffer, buffer_len);
-
+    wish_core_t* core = req->server->context;
+    wish_app_entry_t* app = req->context;
+    
     /* Get the uid of identity to export, the uid is argument "0" in
      * args */
     uint8_t *arg_uid = 0;
@@ -400,38 +399,90 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
-    size_t id_bson_doc_max_len = sizeof (wish_identity_t) + 100;
-    uint8_t id_bson_doc_unfiltered[id_bson_doc_max_len];
-    int ret = wish_load_identity_bson(arg_uid, id_bson_doc_unfiltered, id_bson_doc_max_len);
-
-    //bson_visit("Here's the source document while exporting...:", id_bson_doc_unfiltered);
+    wish_identity_t id;
     
-    if (ret == 1) {
-        uint8_t id_bson_doc[id_bson_doc_max_len];
-        if (bson_filter_out_elem("privkey", id_bson_doc_unfiltered, id_bson_doc) == BSON_FAIL) {
-            // FIXME This implementation is not easy to read. Also it exposes 
-            //       everything except privkey, instead of exporting specific 
-            //       elements. Rewrite using new bson lib.
-            
-            /* Encode the BSON id doc as elemet in 'data' array */
-            if (bson_write_binary(buffer, buffer_len, "data", id_bson_doc_unfiltered, bson_get_doc_len(id_bson_doc_unfiltered)) != BSON_SUCCESS) {
-                WISHDEBUG(LOG_CRITICAL, "Failed to encode identity as binary");
-                wish_rpc_server_error(req, 341, "Failed to encode identity as binary A");
-                return;
-            }
-        } else {
-            /* Encode the BSON id doc as elemet in 'data' array */
-            if (bson_write_binary(buffer, buffer_len, "data", id_bson_doc, bson_get_doc_len(id_bson_doc)) != BSON_SUCCESS) {
-                WISHDEBUG(LOG_CRITICAL, "Failed to encode identity as binary");
-                wish_rpc_server_error(req, 342, "Failed to encode identity as binary B");
-                return;
-            }
-        }
-        
-        wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
-    } else {
+    if ( ret_success != wish_identity_load(arg_uid, &id) ) {
         wish_rpc_server_error(req, 343, "Failed to load identity.");
+        return;
     }
+    
+    bson bs;
+    bson_init_size(&bs, 256);
+    bson_append_string(&bs, "alias", id.alias);
+    bson_append_binary(&bs, "uid", id.uid, WISH_UID_LEN);
+    bson_append_binary(&bs, "pubkey", id.pubkey, WISH_PUBKEY_LEN);
+
+
+    wish_relay_client_t* relay;
+
+    int i = 0;
+
+    if (core->relay_db != NULL) {
+        bson_append_start_array(&bs, "transports");
+
+        LL_FOREACH(core->relay_db, relay) {
+            char index[21];
+            BSON_NUMSTR(index, i++);
+            char host[29];
+            snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+
+            bson_append_string(&bs, index, host);
+        }
+
+        bson_append_finish_array(&bs);
+    }
+
+    bson_append_finish_object(&bs);
+    
+    if (bs.err) {
+        wish_rpc_server_error(req, 349, "Export document bson too large.");
+        bson_destroy(&bs);
+        return;
+    }
+
+    //bson_visit("Export brand new:", bs.data);
+    //WISHDEBUG(LOG_CRITICAL, "size %i", bs.dataSize);
+    
+    mbedtls_sha256_context sha256;
+    mbedtls_sha256_init(&sha256);
+    mbedtls_sha256_starts(&sha256, 0); 
+    mbedtls_sha256_update(&sha256, bson_data(&bs), bson_size(&bs)); 
+    int hash_len = 32;
+    uint8_t hash[hash_len];
+    mbedtls_sha256_finish(&sha256, hash);
+    mbedtls_sha256_free(&sha256);
+    
+    
+    uint8_t signature[ED25519_SIGNATURE_LEN];
+    uint8_t privkey[WISH_PRIVKEY_LEN];
+    
+    if (wish_load_privkey(id.uid, privkey)) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load privkey for signing export %s", id.alias);
+        wish_rpc_server_error(req, 345, "Could not sign exported document.");
+        bson_destroy(&bs);
+        return;
+    } else {
+        ed25519_sign(signature, hash, hash_len, privkey);
+    }
+
+    
+    bson b;
+    bson_init_size(&b, WISH_PORT_RPC_BUFFER_SZ);
+    bson_append_start_object(&b, "data");
+    bson_append_start_array(&b, "signatures");
+    bson_append_start_object(&b, "0");
+    bson_append_string(&b, "algo", "sha256-ed25519");
+    bson_append_binary(&b, "uid", id.uid, WISH_UID_LEN);
+    bson_append_binary(&b, "sign", signature, ED25519_SIGNATURE_LEN);
+    bson_append_finish_array(&b);
+    bson_append_finish_object(&b);
+    bson_append_binary(&b, "cert", bson_data(&bs), bson_size(&bs));
+    bson_append_finish_object(&b);
+    bson_finish(&b);
+
+    wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
+    bson_destroy(&b);
+    bson_destroy(&bs);
 }
 
 /* This is the Call-back functon invoksed by the core's "app" RPC
@@ -1910,10 +1961,12 @@ void wish_core_app_rpc_init(wish_core_t* core) {
 }
 
 static void wish_core_app_rpc_send(void *ctx, uint8_t *data, int len) {
-    struct wish_rpc_context *req = (struct wish_rpc_context*) ctx;
+    rpc_server_req* req = (rpc_server_req*) ctx;
 
     uint8_t* wsid = req->local_wsid;
     wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    bson_visit("wish_core_app_rpc_send:", data);
     
     send_core_to_app(core, wsid, data, len);
 }

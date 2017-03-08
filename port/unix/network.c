@@ -1,5 +1,5 @@
 /*
- * Mist C99 Linux-specific networking helper code
+ * Wish C99 Linux-specific networking helper code
  */
 
 #include <stdint.h>
