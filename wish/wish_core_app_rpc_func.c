@@ -1446,6 +1446,7 @@ static void connections_list_handler(rpc_server_req* req, uint8_t* args) {
     
     if (bs.err) {
         wish_rpc_server_error(req, 303, "Failed writing bson.");
+        return;
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1476,6 +1477,7 @@ static void connections_disconnect_handler(rpc_server_req* req, uint8_t* args) {
 
         if(bs.err != 0) {
             wish_rpc_server_error(req, 344, "Failed writing reponse.");
+            return;
         }
         
         wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1503,6 +1505,7 @@ static void connections_check_connections(rpc_server_req* req, uint8_t* args) {
 
     if(bs.err != 0) {
         wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        return;
     }
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
@@ -1554,6 +1557,35 @@ static void wld_list_handler(rpc_server_req* req, uint8_t* args) {
     
     if (bs.err) {
         wish_rpc_server_error(req, 303, "Failed writing bson.");
+        return;
+    }
+    
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+}
+
+/**
+ * Wish Local Discovery
+ *
+ * App to core: { op: "wld.announce", args: [], id: 5 }
+ * Response core to App:
+ *  { ack: 5, data: true }
+ */
+static void wld_announce_handler(rpc_server_req* req, uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+
+    wish_ldiscover_announce_all(core);
+    
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
+    uint8_t buffer[buffer_len];
+
+    bson bs;
+    bson_init_buffer(&bs, buffer, buffer_len);
+    bson_append_bool(&bs, "data", true);
+    bson_finish(&bs);
+    
+    if (bs.err) {
+        wish_rpc_server_error(req, 303, "Failed writing bson.");
+        return;
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1952,6 +1984,7 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     
     wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.list", wld_list_handler);
     wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.clear", wld_clear_handler);
+    wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.announce", wld_announce_handler);
     wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.friendRequest", wld_friend_request_handler);
     
     wish_rpc_server_register(core->core_app_rpc_server, &host_config_handler);
@@ -1966,7 +1999,7 @@ static void wish_core_app_rpc_send(void *ctx, uint8_t *data, int len) {
     uint8_t* wsid = req->local_wsid;
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    bson_visit("wish_core_app_rpc_send:", data);
+    //bson_visit("wish_core_app_rpc_send:", data);
     
     send_core_to_app(core, wsid, data, len);
 }

@@ -28,6 +28,9 @@ typedef struct wish_ldiscover_t {
 
 void wish_ldiscover_init(wish_core_t* core);
 
+/** Make announcements for all identities */
+void wish_ldiscover_announce_all(wish_core_t* core);
+
 /* Start accepting local discovery messages */
 void wish_ldiscover_enable_recv(wish_core_t* core);
 

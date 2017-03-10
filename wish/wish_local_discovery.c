@@ -20,6 +20,7 @@
 #include "wish_connection_mgr.h"
 #include "wish_identity.h"
 #include "wish_dispatcher.h"
+#include "wish_core_signals.h"
 #include "wish_time.h"
 #include "wish_io.h"
 
@@ -27,11 +28,8 @@ static void wish_ldiscover_periodic(wish_core_t* core, void* ctx) {
     //WISHDEBUG(LOG_CRITICAL, "Do some discovering...", ctx);
     
     //if (advertize_own_uid && core->loaded_num_ids > 0) {
-    if (core->loaded_num_ids > 0) {
-        int c;
-        for (c=0; c<core->loaded_num_ids; c++) {
-            wish_ldiscover_advertize(core, core->uid_list[c].uid);
-        }
+    if (core->ldiscover_allowed) {
+        wish_ldiscover_announce_all(core);
     }
 }
 
@@ -40,6 +38,15 @@ void wish_ldiscover_init(wish_core_t* core) {
     core->ldiscovery_db = wish_platform_malloc(size);
     memset(core->ldiscovery_db, 0, size);
     wish_core_time_set_interval(core, &wish_ldiscover_periodic, NULL, 5);
+}
+
+void wish_ldiscover_announce_all(wish_core_t* core) {
+    if (core->loaded_num_ids > 0) {
+        int c;
+        for (c=0; c<core->loaded_num_ids; c++) {
+            wish_ldiscover_advertize(core, core->uid_list[c].uid);
+        }
+    }
 }
 
 /* Start local discovery */
@@ -150,6 +157,18 @@ size_t buffer_len) {
         if (core->ldiscovery_db[i].occupied && current_time - core->ldiscovery_db[i].timestamp > 30) {
             core->ldiscovery_db[i].occupied = false;
             WISHDEBUG(LOG_CRITICAL, "LocalDiscovery dropped timed out entry.");
+            
+            int buffer_len = 300;
+            uint8_t buffer[buffer_len];
+
+            bson bs;
+            bson_init_buffer(&bs, buffer, buffer_len);
+            bson_append_start_array(&bs, "data");
+            bson_append_string(&bs, "0", "localDiscovery");
+            bson_append_finish_array(&bs);
+            bson_finish(&bs);
+            
+            wish_core_signals_emit(core, &bs);
         }
         
         if (core->ldiscovery_db[i].occupied) {
@@ -180,6 +199,18 @@ size_t buffer_len) {
         /* FIXME the port is hardcoded, should be read from transports */
         core->ldiscovery_db[free].transport_port = tcp_port;
         WISHDEBUG(LOG_DEBUG, "Inserted Local Discovered peer at index %d", free);
+        
+        int buffer_len = 300;
+        uint8_t buffer[buffer_len];
+
+        bson bs;
+        bson_init_buffer(&bs, buffer, buffer_len);
+        bson_append_start_array(&bs, "data");
+        bson_append_string(&bs, "0", "localDiscovery");
+        bson_append_finish_array(&bs);
+        bson_finish(&bs);
+
+        wish_core_signals_emit(core, &bs);
     }
     
     /* Save the pubkey to contact database, along with metadata.

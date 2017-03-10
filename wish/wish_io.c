@@ -206,24 +206,29 @@ void wish_core_feed(wish_core_t* core, wish_connection_t* connection, unsigned c
 /* Check if the connection attempt by a remote client presenting these
  * wish id's can be accepted or not */
 bool wish_core_check_wsid(wish_core_t* core, wish_connection_t* ctx, uint8_t* dst_id, uint8_t* src_id) {
-    bool retval = false;
-
     /* Whitelist/ACL processing? */
-
 
     /* Load the source id from our DB.  */
     wish_identity_t tmp_id;
+    
+    if ( wish_identity_load(src_id, &tmp_id) != ret_success ) {
+        WISHDEBUG(LOG_CRITICAL, "We don't know to guy trying to connect to us.");
+        return false;
+    }
+    
+    if ( wish_identity_load(dst_id, &tmp_id) != ret_success ) {
+        WISHDEBUG(LOG_CRITICAL, "We know who is trying to connect to us, but not the one he wants to connect to. (Did we delete an identity?)");
+        return false;
+    }
 
     /* Technically, we need to have the privkey for "dst_id", else we
      * cannot be communicating */
-    if (wish_has_privkey(dst_id) && wish_identity_load(src_id, &tmp_id) == ret_success) {
-        retval = true;
-    }
-    else {
-        retval = false;
+    if (!wish_has_privkey(dst_id)) {
+        WISHDEBUG(LOG_CRITICAL, "We know both parties of the connection but we don't have the private key to open the connection.");
+        return false;
     }
 
-   return retval;
+    return true;
 }
 
 /* This defines the length of connection initialisation string send by
@@ -377,11 +382,9 @@ again:
                     uint8_t* src_id = &(buf[3+WISH_ID_LEN]);
 
                     if (wish_core_check_wsid(core, connection, dst_id, src_id) == false) {
-                        WISHDEBUG(LOG_CRITICAL, "Refusing connection (no privkey)");
                         wish_close_connection(core, connection);
                         break;
-                    }
-                    else {
+                    } else {
                         wish_debug_print_array(LOG_DEBUG, "UIDs are known", src_id, WISH_ID_LEN);
                         wish_debug_print_array(LOG_DEBUG, "remote: ", dst_id, WISH_ID_LEN);
                     }
@@ -1621,6 +1624,8 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
  */
 void wish_core_init(wish_core_t* core) {
     wish_core_config_load(core);
+    
+    core->ldiscover_allowed = true;
     
     char id[32];
     
