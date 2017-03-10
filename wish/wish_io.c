@@ -15,6 +15,7 @@
 #include "wish_relationship.h"
 #include "core_service_ipc.h"
 #include "wish_local_discovery.h"
+#include "wish_acl.h"
 #include "ed25519.h"
 #include "cbson.h"
 #include "bson.h"
@@ -1692,6 +1693,8 @@ void wish_core_init(wish_core_t* core) {
     wish_core_relay_client_init(core);
     
     wish_ldiscover_init(core);
+    
+    wish_acl_init(core);
 }
 
 
