@@ -31,7 +31,7 @@
 
 
 wish_connection_t* wish_core_get_connection_pool(wish_core_t* core) {
-    return core->wish_context_pool;
+    return core->connection_pool;
 }
 
 /* Start an instance of wish communication */
@@ -41,7 +41,7 @@ wish_connection_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, 
 
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        connection = &(core->wish_context_pool[i]);
+        connection = &(core->connection_pool[i]);
         if (connection->context_state == WISH_CONTEXT_FREE) {
             /* We have found a context we can take into use */
             connection->context_state = WISH_CONTEXT_IN_MAKING;
@@ -84,8 +84,8 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (core->wish_context_pool[i].connection_id == id) {
-            connection = &(core->wish_context_pool[i]);
+        if (core->connection_pool[i].connection_id == id) {
+            connection = &(core->connection_pool[i]);
             break;
         }
     }
@@ -105,19 +105,19 @@ wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
+        if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) {
             /* If the wish context is not in use, we can safely skip it */
             //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
             continue;
         }
 
-        if (memcmp(core->wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(core->wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) 
+        if (memcmp(core->connection_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].remote_wuid, ruid, WISH_ID_LEN) 
                     == 0) {
-                if (memcmp(core->wish_context_pool[i].remote_hostid, rhid, 
+                if (memcmp(core->connection_pool[i].remote_hostid, rhid, 
                         WISH_WHID_LEN) == 0) {
 
-                    connection = &(core->wish_context_pool[i]);
+                    connection = &(core->connection_pool[i]);
                     break;
                 }
                 else {
@@ -142,16 +142,16 @@ bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t 
     int i = 0;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
+        if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) {
             /* If the wish context is not in use, we can safely skip it */
             //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
             continue;
         }
 
-        if (memcmp(core->wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(core->wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+        if (memcmp(core->connection_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
                 bool retval = false;
-                switch (core->wish_context_pool[i].context_state) {
+                switch (core->connection_pool[i].context_state) {
                 case WISH_CONTEXT_CONNECTED:
                     retval = true;
                     break;
@@ -616,7 +616,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             bool other_connection_found = false;
 #if 1
             for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-                wish_connection_t *other_conn = &(core->wish_context_pool[i]);
+                wish_connection_t *other_conn = &(core->connection_pool[i]);
                 if (conn == other_conn) {
                     /* Don't examine our current wish context, the one
                      * that was just disconnected  */
@@ -1623,18 +1623,18 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
 
     int i = 0; 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (core->wish_context_pool[i].local_port != local_port) {
+        if (core->connection_pool[i].local_port != local_port) {
             continue;
         }
-        if (core->wish_context_pool[i].remote_port != rmt_port) {
+        if (core->connection_pool[i].remote_port != rmt_port) {
             continue;
         }
         int j = 0;
         for (j = 0; j < 4; j++) {
-            if (core->wish_context_pool[i].rmt_ip_addr[j] != rmt_ip[j]) {
+            if (core->connection_pool[i].rmt_ip_addr[j] != rmt_ip[j]) {
                 continue;
             }
-            if (core->wish_context_pool[i].local_ip_addr[j] != local_ip[j]) {
+            if (core->connection_pool[i].local_ip_addr[j] != local_ip[j]) {
                 continue;
             }
         }
@@ -1649,7 +1649,7 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
         WISHDEBUG(LOG_CRITICAL, "Could not find the Wish context!");
         return NULL;
     }
-    return &(core->wish_context_pool[i]);
+    return &(core->connection_pool[i]);
 }
 
 /* 
@@ -1703,14 +1703,14 @@ int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t *ctx) {
 void wish_close_all_connections(wish_core_t* core) {
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        switch (core->wish_context_pool[i].context_state) {
+        switch (core->connection_pool[i].context_state) {
         case WISH_CONTEXT_FREE:
             continue;
             break;
         case WISH_CONTEXT_IN_MAKING:
             /* FALLTHROUGH */
         case WISH_CONTEXT_CONNECTED:
-            wish_close_connection(core, &(core->wish_context_pool[i]));
+            wish_close_connection(core, &(core->connection_pool[i]));
             break;
         case WISH_CONTEXT_CLOSING:
             WISHDEBUG(LOG_CRITICAL, "Not closing connection which is already closing");

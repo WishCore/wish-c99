@@ -13,8 +13,8 @@
 #include "string.h"
 
 void wish_connections_init(wish_core_t* core) {
-    core->wish_context_pool = wish_platform_malloc(sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
-    memset(core->wish_context_pool, 0, sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
+    core->connection_pool = wish_platform_malloc(sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
+    memset(core->connection_pool, 0, sizeof(wish_connection_t)*WISH_CONTEXT_POOL_SZ);
     core->next_conn_id = 1;
     
     wish_core_time_set_interval(core, &check_connection_liveliness, NULL, 1);
@@ -85,7 +85,7 @@ void check_connection_liveliness(wish_core_t* core, void* ctx) {
     //WISHDEBUG(LOG_CRITICAL, "check_connection_liveliness");
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        wish_connection_t* connection = &(core->wish_context_pool[i]);
+        wish_connection_t* connection = &(core->connection_pool[i]);
         switch (connection->context_state) {
         case WISH_CONTEXT_CONNECTED:
             /* We have found a connected context we must examine */

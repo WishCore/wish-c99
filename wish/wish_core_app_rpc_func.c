@@ -1091,15 +1091,15 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
     wish_connection_t* wish_connection = NULL;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
+        if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) {
             continue;
         }
 
-        if (memcmp(core->wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(core->wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+        if (memcmp(core->connection_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
-                WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->wish_context_pool[i].context_state, core->wish_context_pool[i].curr_protocol_state);
-                wish_connection = &core->wish_context_pool[i];
+                WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
+                wish_connection = &core->connection_pool[i];
                 break;
             }
             else {
@@ -1224,15 +1224,15 @@ static void identity_friend_request_decline(rpc_server_req* req, uint8_t* args) 
     wish_connection_t* wish_connection = NULL;
 
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (core->wish_context_pool[i].context_state == WISH_CONTEXT_FREE) {
+        if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) {
             continue;
         }
 
-        if (memcmp(core->wish_context_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(core->wish_context_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+        if (memcmp(core->connection_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
-                WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->wish_context_pool[i].context_state, core->wish_context_pool[i].curr_protocol_state);
-                wish_connection = &core->wish_context_pool[i];
+                WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
+                wish_connection = &core->connection_pool[i];
                 break;
             }
             else {

@@ -105,7 +105,7 @@ typedef struct wish_core {
     wish_timer_db_t* time_db;
 
     /* Connections */
-    struct wish_context* wish_context_pool;
+    struct wish_context* connection_pool;
     wish_connection_id_t next_conn_id;
     
     /* Instantiate Relay client to a server with specied IP addr and port */
