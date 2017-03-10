@@ -3,7 +3,18 @@
 void wish_core_signals(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
 
-    wish_core_signals_emit_string(core, "ok");
+    int buffer_len = 300;
+    uint8_t buffer[buffer_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, buffer, buffer_len);
+    bson_append_start_array(&bs, "data");
+    bson_append_string(&bs, "0", "ok");
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
+
+    wish_rpc_server_emit(req, bson_data(&bs), bson_size(&bs));
+    //wish_core_signals_emit_string(core, "ok");
 }
 
 void wish_core_signals_emit(wish_core_t* core, bson* signal) {
