@@ -35,7 +35,7 @@ wish_connection_t* wish_core_get_connection_pool(wish_core_t* core) {
 }
 
 /* Start an instance of wish communication */
-wish_connection_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, uint8_t *remote_wuid) {
+wish_connection_t* wish_connection_init(wish_core_t* core, uint8_t *luid, uint8_t *ruid) {
 
     wish_connection_t* connection;
 
@@ -63,8 +63,8 @@ wish_connection_t* wish_connection_init(wish_core_t* core, uint8_t *local_wuid, 
     /* Associate a connection id to the connection */
     connection->connection_id = core->next_conn_id++;
 
-    memcpy(connection->local_wuid, local_wuid, WISH_ID_LEN);
-    memcpy(connection->remote_wuid, remote_wuid, WISH_ID_LEN);
+    memcpy(connection->luid, luid, WISH_ID_LEN);
+    memcpy(connection->ruid, ruid, WISH_ID_LEN);
     
     connection->rx_ringbuf.max_len = RX_RINGBUF_LEN;
     connection->rx_ringbuf.data = connection->rx_ringbuf_backing;
@@ -111,10 +111,10 @@ wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t
             continue;
         }
 
-        if (memcmp(core->connection_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(core->connection_pool[i].remote_wuid, ruid, WISH_ID_LEN) 
+        if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) 
                     == 0) {
-                if (memcmp(core->connection_pool[i].remote_hostid, rhid, 
+                if (memcmp(core->connection_pool[i].rhid, rhid, 
                         WISH_WHID_LEN) == 0) {
 
                     connection = &(core->connection_pool[i]);
@@ -148,8 +148,8 @@ bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t 
             continue;
         }
 
-        if (memcmp(core->connection_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(core->connection_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+        if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 bool retval = false;
                 switch (core->connection_pool[i].context_state) {
                 case WISH_CONTEXT_CONNECTED:
@@ -389,8 +389,8 @@ again:
                         wish_debug_print_array(LOG_DEBUG, "remote: ", dst_id, WISH_ID_LEN);
                     }
 
-                    memcpy(connection->local_wuid, dst_id, WISH_ID_LEN);
-                    memcpy(connection->remote_wuid, src_id, WISH_ID_LEN);
+                    memcpy(connection->luid, dst_id, WISH_ID_LEN);
+                    memcpy(connection->ruid, src_id, WISH_ID_LEN);
 
                     /* 4. Initiate DHE key exchange */
                     connection->server_dhm_ctx = (mbedtls_dhm_context*)
@@ -469,7 +469,7 @@ again:
                 msg[2] = (WISH_WIRE_VERSION << 4) | 
                     WISH_WIRE_TYPE_RELAY_SESSION;
                 /* Copy the relay session id */
-                memcpy(msg + 3, connection->rctx->session_id, RELAY_SESSION_ID_LEN);
+                memcpy(msg + 3, connection->relay->session_id, RELAY_SESSION_ID_LEN);
 
                 connection->send(connection->send_arg, msg, msg_len);
                 connection->curr_transport_state = TRANSPORT_STATE_SERVER_WAIT_INITIAL;
@@ -511,9 +511,9 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             /* Protocol version and function */
             buffer[2] = (WISH_WIRE_VERSION << 4) | (WISH_WIRE_TYPE_NORMAL); 
             /* Now copy the destination id */
-            memcpy(buffer+3, connection->remote_wuid, WISH_ID_LEN);
+            memcpy(buffer+3, connection->ruid, WISH_ID_LEN);
             /* then copy the source id */
-            memcpy(buffer+3+WISH_ID_LEN, connection->local_wuid, WISH_ID_LEN);
+            memcpy(buffer+3+WISH_ID_LEN, connection->luid, WISH_ID_LEN);
             connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
             connection->curr_protocol_state = PROTO_STATE_DH;
 
@@ -543,7 +543,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
 
             bson bs;
             bson_init_buffer(&bs, doc, doc_len);
-            bson_append_binary(&bs, "ruid", connection->remote_wuid, WISH_ID_LEN);
+            bson_append_binary(&bs, "ruid", connection->ruid, WISH_ID_LEN);
             int req_id_len = 7;
             uint8_t req_id[req_id_len];
             wish_platform_fill_random(NULL, req_id, req_id_len);
@@ -558,7 +558,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             size_t my_cert_max_len = 300;
             uint8_t my_identity[my_cert_max_len];
             
-            if (wish_load_identity_bson(connection->local_wuid, my_identity, my_cert_max_len) < 0) {
+            if (wish_load_identity_bson(connection->luid, my_identity, my_cert_max_len) < 0) {
                 WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
                 break;
             }
@@ -604,11 +604,11 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             wish_identity_t lu;
             wish_identity_t ru;
 
-            if ( ret_success == wish_identity_load(conn->local_wuid, &lu) 
-                    && ret_success == wish_identity_load(conn->remote_wuid, &ru) )
+            if ( ret_success == wish_identity_load(conn->luid, &lu) 
+                    && ret_success == wish_identity_load(conn->ruid, &ru) )
             {
                 WISHDEBUG(LOG_CRITICAL, "Connection attempt failed: %s > %s (%u.%u.%u.%u:%hu)",
-                        lu.alias, ru.alias, conn->rmt_ip_addr[0], conn->rmt_ip_addr[1], conn->rmt_ip_addr[2], conn->rmt_ip_addr[3], conn->remote_port);
+                        lu.alias, ru.alias, conn->remote_ip_addr[0], conn->remote_ip_addr[1], conn->remote_ip_addr[2], conn->remote_ip_addr[3], conn->remote_port);
             }
             
             
@@ -625,10 +625,10 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
                 else {
                     /* FIXME can this be refactored to use the
                      * "lookup-by-luid-ruid-rhid" function instead? */
-                    if (memcmp(other_conn->local_wuid, conn->local_wuid,
+                    if (memcmp(other_conn->luid, conn->luid,
                             WISH_ID_LEN) == 0) {
-                        if (memcmp(other_conn->remote_wuid,
-                                conn->remote_wuid, WISH_ID_LEN) == 0) {
+                        if (memcmp(other_conn->ruid,
+                                conn->ruid, WISH_ID_LEN) == 0) {
                             if (other_conn->context_state ==
                                     WISH_CONTEXT_CONNECTED) {
                                 /* Found other connection, do
@@ -896,7 +896,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
         {
             uint8_t signature[ED25519_SIGNATURE_LEN];
             uint8_t local_privkey[WISH_PRIVKEY_LEN];
-            if (wish_load_privkey(connection->local_wuid, local_privkey)) {
+            if (wish_load_privkey(connection->luid, local_privkey)) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load privkey");
                 wish_close_connection(core, connection);
                 break;
@@ -930,7 +930,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             }
             
             uint8_t remote_pubkey[WISH_PUBKEY_LEN] = { 0 };
-            if (wish_load_pubkey(connection->remote_wuid, remote_pubkey)) {
+            if (wish_load_pubkey(connection->ruid, remote_pubkey)) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load remote pubkey");
                 wish_close_connection(core, connection);
                 break;
@@ -1069,7 +1069,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
              * First, send the server hash signature to client */
             uint8_t signature[ED25519_SIGNATURE_LEN];
             uint8_t local_privkey[WISH_PRIVKEY_LEN];
-            if (wish_load_privkey(connection->local_wuid, local_privkey)) {
+            if (wish_load_privkey(connection->luid, local_privkey)) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load privkey");
                 wish_close_connection(core, connection);
                 break;
@@ -1104,7 +1104,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             }
             
             uint8_t remote_pubkey[WISH_PUBKEY_LEN] = { 0 };
-            if (wish_load_pubkey(connection->remote_wuid, remote_pubkey)) {
+            if (wish_load_pubkey(connection->ruid, remote_pubkey)) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load remote pubkey");
                 wish_close_connection(core, connection);
                 break;
@@ -1186,7 +1186,7 @@ wish send handshake");
                 return;
             }
             if (host_id_len == WISH_WHID_LEN) {
-                memcpy(connection->remote_hostid, host_id, WISH_WHID_LEN);
+                memcpy(connection->rhid, host_id, WISH_WHID_LEN);
             }
             else {
                 WISHDEBUG(LOG_CRITICAL, "Bad hostid length in client handshake");
@@ -1263,11 +1263,11 @@ wish send handshake");
             /* Save the recipient UID of the friend request as luid for the
              * context. This information will be used later when exporting
              * the cert */
-            memcpy(connection->local_wuid, recepient_uid, WISH_ID_LEN);
-            memcpy(connection->remote_wuid, new_id->uid, WISH_ID_LEN);
+            memcpy(connection->luid, recepient_uid, WISH_ID_LEN);
+            memcpy(connection->ruid, new_id->uid, WISH_ID_LEN);
             
-            WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", connection->local_wuid[0], connection->local_wuid[1], connection->local_wuid[2], connection->local_wuid[3]);
-            WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", connection->remote_wuid[0], connection->remote_wuid[1], connection->remote_wuid[2], connection->remote_wuid[3]);
+            WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
+            WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
 
             struct wish_event evt = {
                 .event_type = WISH_EVENT_FRIEND_REQUEST, 
@@ -1298,7 +1298,7 @@ wish send handshake");
             size_t my_cert_max_len = 512;
             uint8_t my_identity[my_cert_max_len];
             
-            if (wish_load_identity_bson(connection->local_wuid, my_identity, my_cert_max_len) < 0) {
+            if (wish_load_identity_bson(connection->luid, my_identity, my_cert_max_len) < 0) {
                 WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
             }
             WISHDEBUG(LOG_CRITICAL, "len = %d", bson_get_doc_len(my_identity));
@@ -1380,8 +1380,8 @@ wish send handshake");
             bson_append_start_array(&bs, "data");
             bson_append_string(&bs, "0", "friendRequesteeDeclined");
             bson_append_start_object(&bs, "1");
-            bson_append_binary(&bs, "luid", connection->local_wuid, WISH_UID_LEN);
-            bson_append_binary(&bs, "ruid", connection->remote_wuid, WISH_UID_LEN);
+            bson_append_binary(&bs, "luid", connection->luid, WISH_UID_LEN);
+            bson_append_binary(&bs, "ruid", connection->ruid, WISH_UID_LEN);
             bson_append_finish_object(&bs);
             bson_append_finish_array(&bs);
             bson_finish(&bs);
@@ -1442,8 +1442,8 @@ wish send handshake");
         bson_append_start_array(&bs, "data");
         bson_append_string(&bs, "0", "friendRequesteeAccepted");
         bson_append_start_object(&bs, "1");
-        bson_append_binary(&bs, "luid", connection->local_wuid, WISH_UID_LEN);
-        bson_append_binary(&bs, "ruid", connection->remote_wuid, WISH_UID_LEN);
+        bson_append_binary(&bs, "luid", connection->luid, WISH_UID_LEN);
+        bson_append_binary(&bs, "ruid", connection->ruid, WISH_UID_LEN);
         bson_append_finish_object(&bs);
         bson_append_finish_array(&bs);
         bson_finish(&bs);
@@ -1631,7 +1631,7 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
         }
         int j = 0;
         for (j = 0; j < 4; j++) {
-            if (core->connection_pool[i].rmt_ip_addr[j] != rmt_ip[j]) {
+            if (core->connection_pool[i].remote_ip_addr[j] != rmt_ip[j]) {
                 continue;
             }
             if (core->connection_pool[i].local_ip_addr[j] != local_ip[j]) {

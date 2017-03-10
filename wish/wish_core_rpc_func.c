@@ -231,9 +231,9 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
     int32_t peer_info_max_len = 310;
     uint8_t peer_info[peer_info_max_len];
     bson_init_doc(peer_info, peer_info_max_len);
-    bson_write_binary(peer_info, peer_info_max_len, "luid", ctx->local_wuid, WISH_ID_LEN);
-    bson_write_binary(peer_info, peer_info_max_len, "ruid", ctx->remote_wuid, WISH_ID_LEN);
-    bson_write_binary(peer_info, peer_info_max_len, "rhid", ctx->remote_hostid, WISH_WHID_LEN);
+    bson_write_binary(peer_info, peer_info_max_len, "luid", ctx->luid, WISH_ID_LEN);
+    bson_write_binary(peer_info, peer_info_max_len, "ruid", ctx->ruid, WISH_ID_LEN);
+    bson_write_binary(peer_info, peer_info_max_len, "rhid", ctx->rhid, WISH_WHID_LEN);
     bson_write_binary(peer_info, peer_info_max_len, "rsid", rsid, WISH_WSID_LEN);
     bson_write_string(peer_info, peer_info_max_len, "protocol", protocol);
     bson_write_string(peer_info, peer_info_max_len, "type", "N");
@@ -327,9 +327,9 @@ static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arra
 
     wish_connection_t* ctx = rpc_ctx->ctx;
     
-    bson_write_binary(peer_doc, peer_doc_max_len, "luid", ctx->local_wuid, WISH_ID_LEN);
-    bson_write_binary(peer_doc, peer_doc_max_len, "ruid", ctx->remote_wuid, WISH_ID_LEN);
-    bson_write_binary(peer_doc, peer_doc_max_len, "rhid", ctx->remote_hostid, WISH_WHID_LEN);
+    bson_write_binary(peer_doc, peer_doc_max_len, "luid", ctx->luid, WISH_ID_LEN);
+    bson_write_binary(peer_doc, peer_doc_max_len, "ruid", ctx->ruid, WISH_ID_LEN);
+    bson_write_binary(peer_doc, peer_doc_max_len, "rhid", ctx->rhid, WISH_WHID_LEN);
     bson_write_binary(peer_doc, peer_doc_max_len, "rsid", rsid, WISH_WSID_LEN);
     bson_write_string(peer_doc, peer_doc_max_len, "protocol", protocol);
 
@@ -542,9 +542,9 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
 
         bson_init_doc(peer_info, peer_info_max_len);
         /* luid, ruid and rhid come from the wish context */
-        bson_write_binary(peer_info, peer_info_max_len, "luid", ctx->local_wuid, WISH_ID_LEN);
-        bson_write_binary(peer_info, peer_info_max_len, "ruid", ctx->remote_wuid, WISH_ID_LEN);
-        bson_write_binary(peer_info, peer_info_max_len, "rhid", ctx->remote_hostid, WISH_WHID_LEN);
+        bson_write_binary(peer_info, peer_info_max_len, "luid", ctx->luid, WISH_ID_LEN);
+        bson_write_binary(peer_info, peer_info_max_len, "ruid", ctx->ruid, WISH_ID_LEN);
+        bson_write_binary(peer_info, peer_info_max_len, "rhid", ctx->rhid, WISH_WHID_LEN);
         /* rsid and protocol are from the rsid list of the context */
         if (bson_write_binary(peer_info, peer_info_max_len,
                 "rsid", service->rsid, WISH_WSID_LEN) == BSON_FAIL) {

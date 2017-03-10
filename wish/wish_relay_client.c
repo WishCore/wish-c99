@@ -177,7 +177,7 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
                     WISHDEBUG(LOG_CRITICAL, "Cannot accept new connections at this time. Please try again later!");
                     break;
                 }
-                new_ctx->rctx = relay;
+                new_ctx->relay = relay;
                 new_ctx->via_relay = true;
 
                 /* FIXME Implement some kind of abstraction for IP

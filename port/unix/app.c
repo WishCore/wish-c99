@@ -122,7 +122,7 @@ int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr
     }
 
     // set ip and port to wish connection
-    memcpy(ctx->rmt_ip_addr, ip->addr, WISH_IPV4_ADDRLEN);
+    memcpy(ctx->remote_ip_addr, ip->addr, WISH_IPV4_ADDRLEN);
     ctx->remote_port = port;
     
     struct sockaddr_in serv_addr;

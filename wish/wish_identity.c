@@ -709,11 +709,11 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
             //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
             continue;
         }
-        if (memcmp(wish_context_pool[i].local_wuid, uid, WISH_ID_LEN) == 0) {
+        if (memcmp(wish_context_pool[i].luid, uid, WISH_ID_LEN) == 0) {
             WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is luid of a connection");
             wish_close_connection(core, &wish_context_pool[i]);
         }
-        else if (memcmp(wish_context_pool[i].remote_wuid, uid, WISH_ID_LEN) == 0) {
+        else if (memcmp(wish_context_pool[i].ruid, uid, WISH_ID_LEN) == 0) {
             WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is ruid of a connection");
             wish_close_connection(core, &wish_context_pool[i]); 
         }

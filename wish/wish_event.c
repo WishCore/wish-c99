@@ -35,10 +35,10 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
                 break;
             }
             
-            return_t load_retval = wish_identity_load(e->context->local_wuid, tmp_id);
+            return_t load_retval = wish_identity_load(e->context->luid, tmp_id);
             char *local_alias = my_strdup(tmp_id->alias);
             
-            return_t load_retval2 = wish_identity_load(e->context->remote_wuid, tmp_id);
+            return_t load_retval2 = wish_identity_load(e->context->ruid, tmp_id);
             char *remote_alias = my_strdup(tmp_id->alias);
             
             if (load_retval != ret_success || load_retval2 != ret_success) {

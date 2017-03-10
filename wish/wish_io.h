@@ -114,9 +114,9 @@ typedef struct wish_context {
     enum transport_state curr_transport_state;
     enum protocol_state curr_protocol_state;
     int expect_bytes;
-    uint8_t remote_wuid[WISH_ID_LEN];
-    uint8_t local_wuid[WISH_ID_LEN];
-    uint8_t remote_hostid[WISH_WHID_LEN];
+    uint8_t luid[WISH_ID_LEN];
+    uint8_t ruid[WISH_ID_LEN];
+    uint8_t rhid[WISH_WHID_LEN];
     unsigned char aes_gcm_key_in[AES_GCM_KEY_LEN];
     unsigned char aes_gcm_key_out[AES_GCM_KEY_LEN];
     unsigned char aes_gcm_iv_in[AES_GCM_IV_LEN]; /* The current initialisation vector */
@@ -130,7 +130,7 @@ typedef struct wish_context {
     uint16_t local_port;    /* Local TCP socket port num */
     uint16_t remote_port;   /* Remote TCP socket port num */
     uint8_t local_ip_addr[4];     /* Our IP address (Is this needed?) */
-    uint8_t rmt_ip_addr[4];     /* remote party's IP address */
+    uint8_t remote_ip_addr[4];     /* remote party's IP address */
     ring_buffer_t rx_ringbuf;
     uint8_t rx_ringbuf_backing[RX_RINGBUF_LEN];
     /* Client hash and server hash are saved here because of convenience
@@ -155,7 +155,7 @@ typedef struct wish_context {
     /* A pointer to a the relay context, applicable only to Wish
      * contexts which are opened for accepting an incoming connection
      * via the a relay server */
-    wish_relay_client_t *rctx;
+    wish_relay_client_t *relay;
     /** This flag must be set to true when you open a connection to a
      * peer in order to send a friend request */
     bool friend_req_connection;

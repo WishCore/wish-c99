@@ -134,7 +134,7 @@ void wish_core_process_handshake(wish_core_t* core, wish_connection_t* ctx, uint
         return;
     }
     if (host_id_len == WISH_WHID_LEN) {
-        memcpy(ctx->remote_hostid, host_id, WISH_WHID_LEN);
+        memcpy(ctx->rhid, host_id, WISH_WHID_LEN);
     }
     else {
         WISHDEBUG(LOG_CRITICAL, "Bad hostid length");

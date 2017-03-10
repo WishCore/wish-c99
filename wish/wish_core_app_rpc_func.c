@@ -1095,8 +1095,8 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
             continue;
         }
 
-        if (memcmp(core->connection_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(core->connection_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+        if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
                 WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
                 wish_connection = &core->connection_pool[i];
@@ -1228,8 +1228,8 @@ static void identity_friend_request_decline(rpc_server_req* req, uint8_t* args) 
             continue;
         }
 
-        if (memcmp(core->connection_pool[i].local_wuid, luid, WISH_ID_LEN) == 0) {
-            if (memcmp(core->connection_pool[i].remote_wuid, ruid, WISH_ID_LEN) == 0) {
+        if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
                 WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
                 wish_connection = &core->connection_pool[i];
@@ -1422,9 +1422,9 @@ static void connections_list_handler(rpc_server_req* req, uint8_t* args) {
             //bson_append_start_object(&bs, nbuf);
             bson_append_start_object(&bs, (char *)nbuf);
             bson_append_int(&bs, "cid", i);
-            bson_append_binary(&bs, "luid", db[i].local_wuid, WISH_ID_LEN);
-            bson_append_binary(&bs, "ruid", db[i].remote_wuid, WISH_ID_LEN);
-            bson_append_binary(&bs, "rhid", db[i].remote_hostid, WISH_ID_LEN);
+            bson_append_binary(&bs, "luid", db[i].luid, WISH_ID_LEN);
+            bson_append_binary(&bs, "ruid", db[i].ruid, WISH_ID_LEN);
+            bson_append_binary(&bs, "rhid", db[i].rhid, WISH_ID_LEN);
             //bson_append_bool(&bs, "online", true);
             bson_append_bool(&bs, "outgoing", db[i].outgoing);
             //bson_append_bool(&bs, "relay", db[i].via_relay);
