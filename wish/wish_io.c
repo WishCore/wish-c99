@@ -1371,6 +1371,23 @@ wish send handshake");
         
         if ( BSON_BOOL == type ) {
             WISHDEBUG(LOG_CRITICAL, "Friend request was declined.");
+            
+            int buf_len = 1024;
+            char buf[1024];
+            
+            bson bs;
+            bson_init_buffer(&bs, buf, buf_len);
+            bson_append_start_array(&bs, "data");
+            bson_append_string(&bs, "0", "friendRequesteeDeclined");
+            bson_append_start_object(&bs, "1");
+            bson_append_binary(&bs, "luid", connection->local_wuid, WISH_UID_LEN);
+            bson_append_binary(&bs, "ruid", connection->remote_wuid, WISH_UID_LEN);
+            bson_append_finish_object(&bs);
+            bson_append_finish_array(&bs);
+            bson_finish(&bs);
+            
+            wish_core_signals_emit(core, &bs);            
+            
             wish_close_connection(core, connection);
             break;
         }
@@ -1415,6 +1432,23 @@ wish send handshake");
         if(!found) {
             wish_save_identity_entry(&new_friend_id);
         }
+
+
+        int buf_len = 1024;
+        char buf[1024];
+
+        bson bs;
+        bson_init_buffer(&bs, buf, buf_len);
+        bson_append_start_array(&bs, "data");
+        bson_append_string(&bs, "0", "friendRequesteeAccepted");
+        bson_append_start_object(&bs, "1");
+        bson_append_binary(&bs, "luid", connection->local_wuid, WISH_UID_LEN);
+        bson_append_binary(&bs, "ruid", connection->remote_wuid, WISH_UID_LEN);
+        bson_append_finish_object(&bs);
+        bson_append_finish_array(&bs);
+        bson_finish(&bs);
+
+        wish_core_signals_emit(core, &bs);            
         
 
         /* Hang up the connection. A re-connection will happen via local
