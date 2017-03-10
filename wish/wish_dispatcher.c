@@ -271,7 +271,7 @@ void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         bson_init_doc(ready_signal, ready_signal_max_len);
         bson_write_string(ready_signal, ready_signal_max_len, "type", "signal");
         bson_write_string(ready_signal, ready_signal_max_len, "signal", "ready");
-        send_core_to_app(core, src_wsid, ready_signal, ready_signal_max_len);
+        send_core_to_app(core, src_wsid, ready_signal, bson_get_doc_len(ready_signal));
     }
     else if (bson_get_boolean(data, "ready", &app_ready) == BSON_SUCCESS) {
         /* Detected a 'ready' signal from the service. App sends 'ready: true' when it is ready to start accepting frames from other peers. */
