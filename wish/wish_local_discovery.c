@@ -168,7 +168,7 @@ size_t buffer_len) {
             bson_append_finish_array(&bs);
             bson_finish(&bs);
             
-            wish_core_signals_emit(core, &bs);
+            //wish_core_signals_emit(core, &bs);
         }
         
         if (core->ldiscovery_db[i].occupied) {
@@ -200,6 +200,7 @@ size_t buffer_len) {
         core->ldiscovery_db[free].transport_port = tcp_port;
         WISHDEBUG(LOG_DEBUG, "Inserted Local Discovered peer at index %d", free);
         
+        /*
         int buffer_len = 300;
         uint8_t buffer[buffer_len];
 
@@ -211,6 +212,7 @@ size_t buffer_len) {
         bson_finish(&bs);
 
         wish_core_signals_emit(core, &bs);
+        */
     }
     
     /* Save the pubkey to contact database, along with metadata.

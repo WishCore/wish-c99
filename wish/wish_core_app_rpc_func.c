@@ -53,7 +53,7 @@ uint8_t nbuf[NBUFL];
 static void methods(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    handler *h = core->core_app_rpc_server->list_head;
+    handler *h = core->app_api->list_head;
     
     bson bs; 
     bson_init(&bs);
@@ -1961,58 +1961,58 @@ handler relay_remove_handler =                        { .op_str = "relay.remove"
 handler host_config_handler =                         { .op_str = "host.config",                       .handler = host_config };
 
 void wish_core_app_rpc_init(wish_core_t* core) {
-    core->core_app_rpc_server = wish_platform_malloc(sizeof(wish_rpc_server_t));
-    memset(core->core_app_rpc_server, 0, sizeof(wish_rpc_server_t));
-    core->core_app_rpc_server->request_list_head = NULL;
-    core->core_app_rpc_server->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
-    memset(core->core_app_rpc_server->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
-    core->core_app_rpc_server->rpc_ctx_pool_num_slots = 10;
-    strncpy(core->core_app_rpc_server->server_name, "core-from-app", 16);
-    core->core_app_rpc_server->context = core;
+    core->app_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
+    memset(core->app_api, 0, sizeof(wish_rpc_server_t));
+    core->app_api->request_list_head = NULL;
+    core->app_api->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
+    memset(core->app_api->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
+    core->app_api->rpc_ctx_pool_num_slots = 10;
+    strncpy(core->app_api->server_name, "core-from-app", 16);
+    core->app_api->context = core;
     
-    wish_rpc_server_register(core->core_app_rpc_server, &methods_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &signals_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &version_handler);
+    wish_rpc_server_register(core->app_api, &methods_handler);
+    wish_rpc_server_register(core->app_api, &signals_handler);
+    wish_rpc_server_register(core->app_api, &version_handler);
     
-    wish_rpc_server_register(core->core_app_rpc_server, &services_send_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "services.list", services_list_handler);
+    wish_rpc_server_register(core->app_api, &services_send_handler);
+    wish_rpc_server_add_handler(core->app_api, "services.list", services_list_handler);
     
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "identity.list", identity_list_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "identity.export", identity_export_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "identity.import", identity_import_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "identity.create", identity_create_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "identity.get", identity_get_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "identity.remove", identity_remove_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &identity_sign_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &identity_verify_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_list_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_accept_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_decline_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &directory_find_handler);
+    wish_rpc_server_add_handler(core->app_api, "identity.list", identity_list_handler);
+    wish_rpc_server_add_handler(core->app_api, "identity.export", identity_export_handler);
+    wish_rpc_server_add_handler(core->app_api, "identity.import", identity_import_handler);
+    wish_rpc_server_add_handler(core->app_api, "identity.create", identity_create_handler);
+    wish_rpc_server_add_handler(core->app_api, "identity.get", identity_get_handler);
+    wish_rpc_server_add_handler(core->app_api, "identity.remove", identity_remove_handler);
+    wish_rpc_server_register(core->app_api, &identity_sign_handler);
+    wish_rpc_server_register(core->app_api, &identity_verify_handler);
+    wish_rpc_server_register(core->app_api, &identity_friend_request_list_handler);
+    wish_rpc_server_register(core->app_api, &identity_friend_request_accept_handler);
+    wish_rpc_server_register(core->app_api, &identity_friend_request_decline_handler);
+    wish_rpc_server_register(core->app_api, &directory_find_handler);
     
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.list", connections_list_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.disconnect", connections_disconnect_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.checkConnections", connections_check_connections);
+    wish_rpc_server_add_handler(core->app_api, "connections.list", connections_list_handler);
+    wish_rpc_server_add_handler(core->app_api, "connections.disconnect", connections_disconnect_handler);
+    wish_rpc_server_add_handler(core->app_api, "connections.checkConnections", connections_check_connections);
 
-    wish_rpc_server_register(core->core_app_rpc_server, &api_acl_check_h);
-    wish_rpc_server_register(core->core_app_rpc_server, &api_acl_allow_h);
-    wish_rpc_server_register(core->core_app_rpc_server, &api_acl_remove_allow_h);
-    wish_rpc_server_register(core->core_app_rpc_server, &api_acl_add_user_roles_h);
-    wish_rpc_server_register(core->core_app_rpc_server, &api_acl_remove_user_roles_h);
-    wish_rpc_server_register(core->core_app_rpc_server, &api_acl_user_roles_h);
-    wish_rpc_server_register(core->core_app_rpc_server, &api_acl_what_resources_h);
-    wish_rpc_server_register(core->core_app_rpc_server, &api_acl_allowed_permissions_h);
+    wish_rpc_server_register(core->app_api, &api_acl_check_h);
+    wish_rpc_server_register(core->app_api, &api_acl_allow_h);
+    wish_rpc_server_register(core->app_api, &api_acl_remove_allow_h);
+    wish_rpc_server_register(core->app_api, &api_acl_add_user_roles_h);
+    wish_rpc_server_register(core->app_api, &api_acl_remove_user_roles_h);
+    wish_rpc_server_register(core->app_api, &api_acl_user_roles_h);
+    wish_rpc_server_register(core->app_api, &api_acl_what_resources_h);
+    wish_rpc_server_register(core->app_api, &api_acl_allowed_permissions_h);
 
-    wish_rpc_server_register(core->core_app_rpc_server, &relay_list_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &relay_add_handler);
-    wish_rpc_server_register(core->core_app_rpc_server, &relay_remove_handler);
+    wish_rpc_server_register(core->app_api, &relay_list_handler);
+    wish_rpc_server_register(core->app_api, &relay_add_handler);
+    wish_rpc_server_register(core->app_api, &relay_remove_handler);
     
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.list", wld_list_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.clear", wld_clear_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.announce", wld_announce_handler);
-    wish_rpc_server_add_handler(core->core_app_rpc_server, "wld.friendRequest", wld_friend_request_handler);
+    wish_rpc_server_add_handler(core->app_api, "wld.list", wld_list_handler);
+    wish_rpc_server_add_handler(core->app_api, "wld.clear", wld_clear_handler);
+    wish_rpc_server_add_handler(core->app_api, "wld.announce", wld_announce_handler);
+    wish_rpc_server_add_handler(core->app_api, "wld.friendRequest", wld_friend_request_handler);
     
-    wish_rpc_server_register(core->core_app_rpc_server, &host_config_handler);
+    wish_rpc_server_register(core->app_api, &host_config_handler);
     
     //wish_rpc_server_add_handler(core->core_app_rpc_server, "debug.enable", debug_enable);
     //wish_rpc_server_add_handler(core->core_app_rpc_server, "debug.disable", debug_disable);
@@ -2057,13 +2057,13 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         ack_required = true;
     }
 
-    struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->core_app_rpc_server);
+    struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->app_api);
     if (list_elem == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Core app RPC: Could not save the rpc context. Failing in wish_core_app_rpc_func.");
         return;
     } else {
         struct wish_rpc_context *rpc_ctx = &(list_elem->request_ctx);
-        rpc_ctx->server = core->core_app_rpc_server;
+        rpc_ctx->server = core->app_api;
         rpc_ctx->send = wish_core_app_rpc_send;
         rpc_ctx->send_context = rpc_ctx;
         memcpy(rpc_ctx->op_str, op, MAX_RPC_OP_LEN);
@@ -2071,7 +2071,7 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         rpc_ctx->context = app;
         memcpy(rpc_ctx->local_wsid, src_wsid, WISH_WSID_LEN);
     
-        if (wish_rpc_server_handle(core->core_app_rpc_server, rpc_ctx, args)) {
+        if (wish_rpc_server_handle(core->app_api, rpc_ctx, args)) {
             WISHDEBUG(LOG_DEBUG, "RPC server fail: wish_core_app_rpc_func");
         }
     }
@@ -2080,7 +2080,7 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
 void wish_core_app_rpc_cleanup_requests(wish_core_t* core, uint8_t *wsid) {
     struct wish_rpc_context_list_elem *list_elem = NULL;
     struct wish_rpc_context_list_elem *tmp = NULL;
-    LL_FOREACH_SAFE(core->core_app_rpc_server->request_list_head, list_elem, tmp) {
+    LL_FOREACH_SAFE(core->app_api->request_list_head, list_elem, tmp) {
         if (memcmp(list_elem->request_ctx.local_wsid, wsid, WISH_WSID_LEN)) {
             WISHDEBUG(LOG_CRITICAL, "App rpc server clean up: request op %s", list_elem->request_ctx.op_str);
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
@@ -2089,7 +2089,7 @@ void wish_core_app_rpc_cleanup_requests(wish_core_t* core, uint8_t *wsid) {
 #error not implemented
             //wish_platform_free....
 #endif
-            LL_DELETE(core->core_app_rpc_server->request_list_head, list_elem);
+            LL_DELETE(core->app_api->request_list_head, list_elem);
         }
     }
 }

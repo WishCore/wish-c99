@@ -94,8 +94,8 @@ typedef struct wish_core {
     struct wish_rpc_context_list_elem request_pool[REQUEST_POOL_SIZE];
     #endif
 
-    wish_rpc_server_t* core_rpc_server;
-    wish_rpc_server_t* core_app_rpc_server;
+    wish_rpc_server_t* core_api;
+    wish_rpc_server_t* app_api;
     
     /* Services */
     struct wish_service_entry* service_registry;
