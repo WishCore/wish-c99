@@ -60,7 +60,7 @@ void wish_api_acl_add_user_roles(rpc_server_req* req, uint8_t* args) {
     
     bson_find(&it, &bs, "1");
     if (bson_iterator_type(&it) != BSON_STRING || bson_iterator_string_len(&it) >= ROLE_NAME_LEN) {
-        wish_rpc_server_error(req, 501, "Expected sole to be String(<64).");
+        wish_rpc_server_error(req, 501, "Expected role to be String(<64).");
         return;
     }
     

@@ -355,7 +355,14 @@ static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arra
 }
 
 
+static void core_directory(rpc_server_req* req, uint8_t* args) {
+    wish_rpc_server_error(req, 500, "Not implemented.");
+}
 
+
+typedef struct wish_rpc_server_handler handler;
+
+handler core_directory_h =                             { .op_str = "directory",                           .handler = core_directory };
 
 
 void wish_core_init_rpc(wish_core_t* core) {
@@ -372,6 +379,7 @@ void wish_core_init_rpc(wish_core_t* core) {
     
     wish_rpc_server_add_handler(core->core_rpc_server, "peers", peers_op_handler);
     wish_rpc_server_add_handler(core->core_rpc_server, "send", send_op_handler);
+    wish_rpc_server_register(core->core_rpc_server, &core_directory_h);
 }
 
 void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {

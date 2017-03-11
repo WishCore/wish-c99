@@ -12,7 +12,10 @@
 #include "wish_io.h"
 #include "wish_core_app_rpc_func.h"
 #include "wish_core.h"
+
 #include "wish_acl.h"
+#include "wish_directory.h"
+
 #include "wish_service_registry.h"
 #include "core_service_ipc.h"
 #include "wish_local_discovery.h"
@@ -1940,6 +1943,8 @@ handler identity_friend_request_list_handler =        { .op_str = "identity.frie
 handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",      .handler = identity_friend_request_accept };
 handler identity_friend_request_decline_handler =     { .op_str = "identity.friendRequestDecline",     .handler = identity_friend_request_decline };
 
+handler directory_find_handler =                      { .op_str = "directory.find",                    .handler = wish_api_directory_find };
+
 handler api_acl_check_h =                                 { .op_str = "acl.check",                         .handler = wish_api_acl_check };
 handler api_acl_allow_h =                                 { .op_str = "acl.allow",                         .handler = wish_api_acl_allow };
 handler api_acl_remove_allow_h =                          { .op_str = "acl.removeAllow",                   .handler = wish_api_acl_remove_allow };
@@ -1983,6 +1988,7 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_list_handler);
     wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_accept_handler);
     wish_rpc_server_register(core->core_app_rpc_server, &identity_friend_request_decline_handler);
+    wish_rpc_server_register(core->core_app_rpc_server, &directory_find_handler);
     
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.list", connections_list_handler);
     wish_rpc_server_add_handler(core->core_app_rpc_server, "connections.disconnect", connections_disconnect_handler);

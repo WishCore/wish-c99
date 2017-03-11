@@ -68,6 +68,7 @@ struct wish_ldiscover_t;
 struct wish_relationship_t;
 struct wish_relay_client_ctx;
 struct wish_acl;
+struct wish_directory;
 
 /**
  * Wish Core object
@@ -122,6 +123,9 @@ typedef struct wish_core {
     
     /* Access control */
     struct wish_acl* acl;
+    
+    /* Wish Directory */
+    struct wish_directory* directory;
 } wish_core_t;
 
 #include "wish_config.h"
