@@ -221,3 +221,13 @@ int wish_relay_get_preferred_server_url(char *url_str, int url_str_max_len) {
     wish_platform_sprintf(url_str, "wish://" RELAY_SERVER_HOST);
     return 0;
 }
+
+/**
+ * Get relay contexts. 
+ *
+ * @return pointer to an array containing the relay contexts
+ */
+wish_relay_client_t *wish_relay_get_contexts(wish_core_t* core) {
+    return core->relay_db;
+}
+
