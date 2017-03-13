@@ -2095,7 +2095,7 @@ void wish_core_app_rpc_cleanup_requests(wish_core_t* core, uint8_t *wsid) {
 }
 
 void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct wish_service_entry *service_entry, bool online) {
-    WISHDEBUG(LOG_DEBUG, "In update locals");
+    WISHDEBUG(LOG_CRITICAL, "In update locals");
     if (memcmp(dst_wsid, service_entry->wsid, WISH_ID_LEN) == 0) {
         /* Don't send any peer online/offline messages regarding service itself */
         return;
@@ -2140,6 +2140,7 @@ void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct w
                 WISHDEBUG(LOG_CRITICAL, "BSON error when creating peer message: %i %s len %i", bs.err, bs.errstr, bs.dataSize);
             }
             else {
+                WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_func: wish_send_peer_update_locals: online");
                 send_core_to_app(core, dst_wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
             }
         }
@@ -2194,7 +2195,7 @@ void wish_report_identity_to_local_services(wish_core_t* core, wish_identity_t* 
                             WISHDEBUG(LOG_CRITICAL, "BSON error when creating peer message: %i %s len %i", bs.err, bs.errstr, bs.dataSize);
                         }
                         else {
-                            //WISHDEBUG(LOG_CRITICAL, "Sending peer message to app %s:", service_registry[i].service_name);
+                            WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_func: Sending online message to app %s:", service_registry[i].name);
                             //bson_visit("Sending peer message to app:", buffer);
                             send_core_to_app(core, service_registry[i].wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
                         }
