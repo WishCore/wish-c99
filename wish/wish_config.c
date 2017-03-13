@@ -58,6 +58,7 @@ int wish_core_config_load(wish_core_t* core) {
         memcpy(core->id, bson_iterator_bin_data(&it), WISH_WHID_LEN);
     }
     
+    
     // read relay servers list
     if ( bson_find_from_buffer(&it, bs.data, "relay") == BSON_ARRAY ) {
 
