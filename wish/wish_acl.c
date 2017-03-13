@@ -51,7 +51,7 @@ void wish_api_acl_add_user_roles(rpc_server_req* req, uint8_t* args) {
     bson_init_with_data(&bs, args);
     
     bson_find(&it, &bs, "0");
-    if (bson_iterator_type(&it) != BSON_BINDATA && bson_iterator_bin_len(&it) != WISH_UID_LEN) {
+    if (bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_UID_LEN) {
         wish_rpc_server_error(req, 501, "Expected luid to be Buffer(32).");
         return;
     }
@@ -59,8 +59,8 @@ void wish_api_acl_add_user_roles(rpc_server_req* req, uint8_t* args) {
     const char* uid = bson_iterator_bin_data(&it);
     
     bson_find(&it, &bs, "1");
-    if (bson_iterator_type(&it) != BSON_STRING && bson_iterator_string_len(&it) < ROLE_NAME_LEN) {
-        wish_rpc_server_error(req, 501, "Expected sole to be String(<64).");
+    if (bson_iterator_type(&it) != BSON_STRING || bson_iterator_string_len(&it) >= ROLE_NAME_LEN) {
+        wish_rpc_server_error(req, 501, "Expected role to be String(<64).");
         return;
     }
     

@@ -39,13 +39,15 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
 
         bson_finish(&bs);
 
-        wish_rpc_server_emit_broadcast(core->core_rpc_server, "peers", bson_data(&bs), bson_size(&bs));
+        WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update: %s", online ? "online" : "offline");
+        //wish_rpc_server_emit_broadcast(core->core_api, "peers", bson_data(&bs), bson_size(&bs));
     }
 }
 
 static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_array) {
     WISHDEBUG(LOG_DEBUG, "Handling peers request!");
     wish_core_t* core = (wish_core_t*) rpc_ctx->server->context;
+    wish_connection_t* connection = (wish_connection_t*) rpc_ctx->ctx;
 
     int buffer_len = 300;
     uint8_t buffer[buffer_len];
@@ -83,8 +85,12 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
     int i;
     for(i=0; i < WISH_MAX_SERVICES; i++) {
         if (wish_service_entry_is_valid(core, &registry[i])) {
+            memset(buffer, 0, buffer_len);
+            
             bson bs;
             bson_init_buffer(&bs, buffer, buffer_len);
+            bson_append_start_object(&bs, "res");
+            bson_append_int(&bs, "sig", rpc_ctx->id);
             bson_append_start_object(&bs, "data");
             bson_append_bool(&bs, "N", true);
             bson_append_string(&bs, "type", "N");
@@ -99,13 +105,14 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
             bson_append_bool(&bs, "online", true);
             bson_append_finish_object(&bs);
             bson_append_finish_object(&bs);
+            bson_append_finish_object(&bs);
             
             bson_finish(&bs);
 
             //bson_visit("sending peers response:", (uint8_t*)bson_data(&bs));
-            
-            //wish_core_send_message(rpc_ctx->ctx, res_doc, bson_get_doc_len(res_doc));
-            wish_rpc_server_emit(rpc_ctx, (char*)bson_data(&bs), bson_size(&bs));
+
+            WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_op_handler: online", core->id[0], core->id[1]);
+            wish_core_send_message(core, connection, (char*)bson_data(&bs), bson_size(&bs));
         }
     }
 }
@@ -144,11 +151,11 @@ static void wish_core_add_remote_service(wish_connection_t *ctx,
 /** Client callback function for 'peers' RPC request send by core RPC
  * client to a remote core */
 void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t payload_len) {
-    wish_connection_t *ctx = context;
+    wish_connection_t *connection = context;
     wish_core_t* core = req->client->context;
     
-    
-    WISHDEBUG(LOG_DEBUG, "Peer CB: payload len: %d", bson_get_doc_len(payload));
+    //WISHDEBUG(LOG_CRITICAL, "Peer CB: payload len: %d (core id: 0x%02x%02x)", bson_get_doc_len(payload), core->id[0], core->id[1]);
+    //bson_visit("peers_callback:", payload);
 
     /* When obtaining a peer response from the remote core,
      * go through the list of our local wish apps (services), and see
@@ -231,9 +238,9 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
     int32_t peer_info_max_len = 310;
     uint8_t peer_info[peer_info_max_len];
     bson_init_doc(peer_info, peer_info_max_len);
-    bson_write_binary(peer_info, peer_info_max_len, "luid", ctx->luid, WISH_ID_LEN);
-    bson_write_binary(peer_info, peer_info_max_len, "ruid", ctx->ruid, WISH_ID_LEN);
-    bson_write_binary(peer_info, peer_info_max_len, "rhid", ctx->rhid, WISH_WHID_LEN);
+    bson_write_binary(peer_info, peer_info_max_len, "luid", connection->luid, WISH_ID_LEN);
+    bson_write_binary(peer_info, peer_info_max_len, "ruid", connection->ruid, WISH_ID_LEN);
+    bson_write_binary(peer_info, peer_info_max_len, "rhid", connection->rhid, WISH_WHID_LEN);
     bson_write_binary(peer_info, peer_info_max_len, "rsid", rsid, WISH_WSID_LEN);
     bson_write_string(peer_info, peer_info_max_len, "protocol", protocol);
     bson_write_string(peer_info, peer_info_max_len, "type", "N");
@@ -242,7 +249,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
      * from before). This is information needs to be saved here so that
      * we can send online/offline messages to a service in case the
      * service reconnects or connection is lost */
-    wish_core_add_remote_service(ctx, rsid, protocol);
+    wish_core_add_remote_service(connection, rsid, protocol);
  
     if (bson_write_boolean(peer_info, peer_info_max_len,
             "online", online) == BSON_FAIL) {
@@ -259,18 +266,40 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
         WISHDEBUG(LOG_CRITICAL, "App registry is null");
         return;
     }
-    else {
-        WISHDEBUG(LOG_DEBUG, "Registry seems valid");
-    }
+
     int i = 0;
+    
+    WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: got %s peer: %02x%02x", core->id[0], core->id[1], protocol, rsid[0], rsid[1]);
+    
+    //bson_visit("message going to all apps", core_to_app);
+    
     for (i = 0; i < WISH_MAX_SERVICES; i++) {
         if (wish_service_entry_is_valid(core, &(registry[i]))) {
             //WISHDEBUG(LOG_CRITICAL, "Service entry is valid");
             if (strncmp(((const char*) &(registry[i].protocols[0].name)), 
                     protocol, WISH_PROTOCOL_NAME_MAX_LEN) == 0) {
-                //bson_visit("This is peer info", peer_info);
+                WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_callback: %s", core->id[0], core->id[1], online ? "online" : "offline");
                 
-                send_core_to_app(core, registry[i].wsid, core_to_app, bson_get_doc_len(core_to_app));
+                int l = 356;
+                char buf[l];
+                
+                bson b;
+                bson_init_buffer(&b, buf, l);
+                bson_append_string(&b, "type", "peer");
+                bson_append_start_object(&b, "peer");
+                bson_append_binary(&b, "luid", connection->luid, WISH_UID_LEN);
+                bson_append_binary(&b, "ruid", connection->ruid, WISH_UID_LEN);
+                bson_append_binary(&b, "rhid", connection->rhid, WISH_UID_LEN);
+                bson_append_binary(&b, "rsid", rsid, WISH_WSID_LEN);
+                bson_append_string(&b, "protocol", protocol);
+                bson_append_bool(&b, "online", online);
+                bson_append_finish_object(&b);
+                bson_finish(&b);
+                
+                send_core_to_app(core, registry[i].wsid, (char*)bson_data(&b), bson_size(&b));
+                
+                // This seems to corrupt the frames to the app
+                //send_core_to_app(core, registry[i].wsid, core_to_app, bson_get_doc_len(core_to_app));
             }
         }
     }
@@ -355,23 +384,31 @@ static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arra
 }
 
 
+static void core_directory(rpc_server_req* req, uint8_t* args) {
+    wish_rpc_server_error(req, 500, "Not implemented.");
+}
 
+
+typedef struct wish_rpc_server_handler handler;
+
+handler core_directory_h =                             { .op_str = "directory",                           .handler = core_directory };
 
 
 void wish_core_init_rpc(wish_core_t* core) {
-    core->core_rpc_server = wish_platform_malloc(sizeof(wish_rpc_server_t));
-    memset(core->core_rpc_server, 0, sizeof(wish_rpc_server_t));
+    core->core_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
+    memset(core->core_api, 0, sizeof(wish_rpc_server_t));
     
-    core->core_rpc_server->request_list_head = NULL;
-    core->core_rpc_server->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
-    memset(core->core_rpc_server->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
-    core->core_rpc_server->rpc_ctx_pool_num_slots = 10;
+    core->core_api->request_list_head = NULL;
+    core->core_api->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
+    memset(core->core_api->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
+    core->core_api->rpc_ctx_pool_num_slots = 10;
     
-    strncpy(core->core_rpc_server->server_name, "core-to-core", 13);
-    core->core_rpc_server->context = core;
+    strncpy(core->core_api->server_name, "core-to-core", 13);
+    core->core_api->context = core;
     
-    wish_rpc_server_add_handler(core->core_rpc_server, "peers", peers_op_handler);
-    wish_rpc_server_add_handler(core->core_rpc_server, "send", send_op_handler);
+    wish_rpc_server_add_handler(core->core_api, "peers", peers_op_handler);
+    wish_rpc_server_add_handler(core->core_api, "send", send_op_handler);
+    wish_rpc_server_register(core->core_api, &core_directory_h);
 }
 
 void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
@@ -403,7 +440,7 @@ void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
 /* Feed to core's RPC server. You should feed the document which is as the
  * element 'req' 
  */
-void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *ctx, uint8_t *data, size_t len) {
+void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connection, uint8_t *data, size_t len) {
 
     char *op_str = NULL;
     int32_t op_str_len = 0;
@@ -434,29 +471,29 @@ void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *ctx, uin
 
 #if 0
     struct wish_rpc_context rpc_ctx = { 
-        .server = core->core_rpc_server,
+        .server = core->core_api,
         .send = wish_core_connection_send,
-        .send_context = ctx,
+        .send_context = connection,
         .op_str = op_str,
         .id = id,
-        .ctx = ctx,
+        .ctx = connection,
     };
 #endif
-    struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->core_rpc_server);
+    struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->core_api);
     if (list_elem == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Could not save the rpc context. Failing in wish_core_rpc_func.");
         return;
     } else {
         struct wish_rpc_context *rpc_ctx = &(list_elem->request_ctx);
-        rpc_ctx->server = core->core_rpc_server;
+        rpc_ctx->server = core->core_api;
         rpc_ctx->send = wish_core_connection_send;
-        rpc_ctx->send_context = ctx;
+        rpc_ctx->send_context = connection;
         memset(rpc_ctx->op_str, 0, MAX_RPC_OP_LEN);
         strncpy(rpc_ctx->op_str, op_str, op_str_len);
         rpc_ctx->id = id;
-        rpc_ctx->ctx = ctx;
+        rpc_ctx->ctx = connection;
     
-        if (wish_rpc_server_handle(core->core_rpc_server, rpc_ctx, args)) {
+        if (wish_rpc_server_handle(core->core_api, rpc_ctx, args)) {
             WISHDEBUG(LOG_CRITICAL, "RPC server fail: wish_core_rpc_func");
         }
     }
@@ -595,10 +632,8 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
         for (i = 0; i < WISH_MAX_SERVICES; i++) {
             if (wish_service_entry_is_valid(core, &(registry[i]))) {
                 //bson_visit("This is peer info", peer_info);
-                //WISHDEBUG(LOG_CRITICAL, "Calling send_core_to_app, len %d",
-                //    bson_get_doc_len(core_to_app));
-                send_core_to_app(core, registry[i].wsid,
-                        core_to_app, bson_get_doc_len(core_to_app));
+                WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_online_offline_signal_to_apps: (len %d)", bson_get_doc_len(core_to_app));
+                //send_core_to_app(core, registry[i].wsid, core_to_app, bson_get_doc_len(core_to_app));
             }
         }
 
@@ -624,10 +659,10 @@ void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
     wish_rpc_client_end_by_ctx(core->core_rpc_client, ctx);
 
     
-    LL_FOREACH_SAFE(core->core_rpc_server->request_list_head, list_elem, tmp) {
+    LL_FOREACH_SAFE(core->core_api->request_list_head, list_elem, tmp) {
         if (list_elem->request_ctx.ctx == (void*) ctx) {
             WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", list_elem->request_ctx.op_str);
-            LL_DELETE(core->core_rpc_server->request_list_head, list_elem);
+            LL_DELETE(core->core_api->request_list_head, list_elem);
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
             memset(&(list_elem->request_ctx), 0, sizeof(rpc_server_req));
 #else

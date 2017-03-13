@@ -131,18 +131,25 @@ void send_core_to_app_via_tcp(wish_core_t* core, uint8_t wsid[WISH_ID_LEN], uint
     for (i = 0; i < NUM_APP_CONNECTIONS; i++) {
         if (memcmp(apps[i].wsid, wsid, WISH_ID_LEN) == 0) {
             /* Found our app connection */
-
+            
             uint16_t frame_len =  ((len & 0xff) << 8) | (len >> 8);
-            ssize_t write_ret = write(app_fds[i], (uint8_t *) &frame_len, 2);
-            if (write_ret != 2) {
-                printf("App connection: Write error!");
-            }
-            write_ret = write(app_fds[i], data, len);
-            if (write_ret != len) {
-                printf("App connection: Write error!");
-            }
-        }
+            
+            char* p = (char*)&frame_len;
+            //printf("Found app connection, going to send %lu bytes, setting frame len to 0x%02x%02x\n", len, p[0] & 0xff, p[1] & 0xff);
 
+            char buf_c[65535];
+            char* buf = buf_c;
+            
+            memcpy(buf, p, 2);
+            memcpy(buf+2, data, len);
+            
+            ssize_t write_ret = send(app_fds[i], buf, 2+len, MSG_NOSIGNAL);
+            if (write_ret != 2+len) {
+                printf("App connection: Write error! (c) Wanted %i got %li\n", 2, write_ret);
+                return;
+            }
+            return;
+        }
     }
 }
 

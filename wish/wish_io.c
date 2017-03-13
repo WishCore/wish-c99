@@ -480,7 +480,7 @@ again:
         case TRANSPORT_STATE_INITIAL:
         /* impossible */
         default:
-            WISHDEBUG(LOG_CRITICAL, "Impossible transport state reached\n\r");
+            WISHDEBUG(LOG_CRITICAL, "Impossible transport state reached");
         break;
     }
 
@@ -499,7 +499,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
     WISHDEBUG(LOG_DEBUG, "TCP Event for connection id %d", connection->connection_id);
     switch (ev) {
     case TCP_CONNECTED:
-        WISHDEBUG(LOG_DEBUG, "Event TCP_CONNECTED\n\r");
+        WISHDEBUG(LOG_DEBUG, "Event TCP_CONNECTED");
 
         connection->outgoing = true;
         
@@ -591,10 +591,10 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
         }
         break;
     case TCP_CLIENT_DISCONNECTED:
-        WISHDEBUG(LOG_DEBUG, "Event TCP_CLIENT_DISCONNECTED\n\r");
+        WISHDEBUG(LOG_DEBUG, "Event TCP_CLIENT_DISCONNECTED");
         /* FALLTHROUGH */
     case TCP_DISCONNECTED:
-        WISHDEBUG(LOG_DEBUG, "Event TCP_DISCONNECTED\n\r");
+        WISHDEBUG(LOG_DEBUG, "Event TCP_DISCONNECTED");
 
         /* Send offline signal to local services, but only if
          * there are no other connections active to the same luid, ruid,
@@ -983,7 +983,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
         break;
     case PROTO_STATE_WISH_RUNNING:
         {
-            WISHDEBUG(LOG_WIRE, "processing message of length %d\n\r", len);
+            WISHDEBUG(LOG_WIRE, "processing message of length %d", len);
 
             /* Length of part of incoming payload containing cipher text */
             int ciphertxt_len = len - AES_GCM_AUTH_TAG_LEN;
@@ -1461,7 +1461,7 @@ wish send handshake");
     case PROTO_STATE_INITIAL:
         WISHDEBUG(LOG_CRITICAL, "PROTO_STATE_INITIAL: id %d", connection->connection_id);
     default:
-        WISHDEBUG(LOG_CRITICAL, "illegal protocol state reached, connection id %d\n\r", connection->connection_id);
+        WISHDEBUG(LOG_CRITICAL, "illegal protocol state reached, connection id %d", connection->connection_id);
         break;
     }
 
@@ -1517,7 +1517,7 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, uin
     }
 
 #if 0
-    WISHDEBUG(LOG_TRIVIAL, "Auth tag:\n\r");
+    WISHDEBUG(LOG_TRIVIAL, "Auth tag:");
     int i = 0;
     for (i = 0; i < AES_GCM_AUTH_TAG_LEN; i++) {
         WISHDEBUG2(LOG_TRIVIAL, "0x%x ", (frame+2+payload_len)[i]);
@@ -1569,17 +1569,17 @@ size_t plaintxt_len) {
     int i = 0;
 
     /* Print out iv */
-    WISHDEBUG(LOG_TRIVIAL, "\n\riv: ");
+    WISHDEBUG(LOG_TRIVIAL, "iv: ");
     for (i = 0; i < AES_GCM_IV_LEN; i++) {
         WISHDEBUG2(LOG_TRIVIAL, "0x%x ", ctx->aes_gcm_iv_in[i]);
     }
-    WISHDEBUG(LOG_TRIVIAL, "\n\rciphertext len=%d: ", ciphertxt_len);
+    WISHDEBUG(LOG_TRIVIAL, "ciphertext len=%d: ", ciphertxt_len);
 
     /* Print out ciphertext */
     for (i = 0; i < ciphertxt_len; i++) {
         WISHDEBUG2(LOG_TRIVIAL, "0x%x ", payload[i]);
     }
-    WISHDEBUG(LOG_TRIVIAL"\n\rauth tag: ");
+    WISHDEBUG(LOG_TRIVIAL, "auth tag: ");
 #endif
 
     /* The locally calculated auth tag is stored here - for later

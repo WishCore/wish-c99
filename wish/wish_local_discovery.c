@@ -168,7 +168,7 @@ size_t buffer_len) {
             bson_append_finish_array(&bs);
             bson_finish(&bs);
             
-            wish_core_signals_emit(core, &bs);
+            //wish_core_signals_emit(core, &bs);
         }
         
         if (core->ldiscovery_db[i].occupied) {
@@ -210,7 +210,7 @@ size_t buffer_len) {
         bson_append_finish_array(&bs);
         bson_finish(&bs);
 
-        wish_core_signals_emit(core, &bs);
+        //wish_core_signals_emit(core, &bs);
     }
     
     /* Save the pubkey to contact database, along with metadata.

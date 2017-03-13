@@ -68,6 +68,7 @@ struct wish_ldiscover_t;
 struct wish_relationship_t;
 struct wish_relay_client_ctx;
 struct wish_acl;
+struct wish_directory;
 
 /**
  * Wish Core object
@@ -93,8 +94,8 @@ typedef struct wish_core {
     struct wish_rpc_context_list_elem request_pool[REQUEST_POOL_SIZE];
     #endif
 
-    wish_rpc_server_t* core_rpc_server;
-    wish_rpc_server_t* core_app_rpc_server;
+    wish_rpc_server_t* core_api;
+    wish_rpc_server_t* app_api;
     
     /* Services */
     struct wish_service_entry* service_registry;
@@ -122,6 +123,9 @@ typedef struct wish_core {
     
     /* Access control */
     struct wish_acl* acl;
+    
+    /* Wish Directory */
+    struct wish_directory* directory;
 } wish_core_t;
 
 #include "wish_config.h"

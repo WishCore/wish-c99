@@ -18,7 +18,7 @@ void wish_core_signals(rpc_server_req* req, uint8_t* args) {
 }
 
 void wish_core_signals_emit(wish_core_t* core, bson* signal) {
-    wish_rpc_server_emit_broadcast(core->core_app_rpc_server, "signals", bson_data(signal), bson_size(signal));
+    wish_rpc_server_emit_broadcast(core->app_api, "signals", bson_data(signal), bson_size(signal));
 }
 
 void wish_core_signals_emit_string(wish_core_t* core, char* string) {
@@ -32,6 +32,6 @@ void wish_core_signals_emit_string(wish_core_t* core, char* string) {
     bson_append_finish_array(&bs);
     bson_finish(&bs);
     
-    wish_rpc_server_emit_broadcast(core->core_app_rpc_server, "signals", bson_data(&bs), bson_size(&bs));
+    wish_rpc_server_emit_broadcast(core->app_api, "signals", bson_data(&bs), bson_size(&bs));
 }
 
