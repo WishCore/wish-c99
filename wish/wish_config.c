@@ -59,6 +59,7 @@ int wish_core_config_load(wish_core_t* core) {
         WISHDEBUG(LOG_CRITICAL, "Failed reading hostid!");
     }
     
+    
     // read relay servers list
     if ( bson_find_from_buffer(&it, bs.data, "relay") == BSON_ARRAY ) {
 

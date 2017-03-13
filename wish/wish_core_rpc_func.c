@@ -40,7 +40,7 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
         bson_finish(&bs);
 
         WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update: %s", online ? "online" : "offline");
-        //wish_rpc_server_emit_broadcast(core->core_api, "peers", bson_data(&bs), bson_size(&bs));
+        wish_rpc_server_emit_broadcast(core->core_api, "peers", bson_data(&bs), bson_size(&bs));
     }
 }
 
@@ -633,7 +633,7 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
             if (wish_service_entry_is_valid(core, &(registry[i]))) {
                 //bson_visit("This is peer info", peer_info);
                 WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_online_offline_signal_to_apps: (len %d)", bson_get_doc_len(core_to_app));
-                //send_core_to_app(core, registry[i].wsid, core_to_app, bson_get_doc_len(core_to_app));
+                send_core_to_app(core, registry[i].wsid, core_to_app, bson_get_doc_len(core_to_app));
             }
         }
 

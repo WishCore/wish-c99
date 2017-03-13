@@ -57,6 +57,7 @@ size_t wish_core_get_host_id(wish_core_t* core, uint8_t *hostid_ptr) {
 
         memcpy(core->id, hostid_ptr, WISH_WHID_LEN);
         wish_core_config_save(core);
+        WISHDEBUG(LOG_CRITICAL, "New host id: %02x %02x %02x", hostid_ptr[0], hostid_ptr[1], hostid_ptr[2]);
     }
 
     memcpy(hostid_ptr, core->id, WISH_WHID_LEN);
