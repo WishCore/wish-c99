@@ -1758,7 +1758,7 @@ static void relay_list(rpc_server_req* req, uint8_t* args) {
     bson_init_buffer(&bs, buffer, WISH_PORT_RPC_BUFFER_SZ);
     bson_append_start_array(&bs, "data");
     
-    wish_relay_client_t* relay;
+    wish_relay_client_t* relay = NULL;
     
     int i = 0;
     
