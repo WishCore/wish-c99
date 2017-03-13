@@ -79,13 +79,6 @@ void wish_relay_client_close(wish_core_t* core, wish_relay_client_t *relay) {
     relay_ctrl_disconnect_cb(core, core->relay_db);
 }
 
-/**
- * Get relay contexts. 
- *
- * @return pointer to an array containing the relay contexts
- */
-wish_relay_client_t *wish_relay_get_contexts(wish_core_t* core) {
-    return core->relay_db;
-}
+
 
 
