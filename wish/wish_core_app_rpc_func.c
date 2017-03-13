@@ -1866,8 +1866,6 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
 
     if (bs.err) {
         wish_rpc_server_error(req, 305, "Failed writing bson.");
-=======
->>>>>>> 15bc95af6f78d90381082129b288b30ef5a0be9d
         return;
     }
     
