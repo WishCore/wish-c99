@@ -864,6 +864,7 @@ static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
         wish_core_signals_emit_string(core, "identity");
     } else {
         wish_rpc_server_error(req, 343, "Invalid argument. Expecting 32 byte bin data.");
+        return;
     }
 }
 
@@ -1624,6 +1625,7 @@ static void wld_clear_handler(rpc_server_req* req, uint8_t* args) {
     
     if (bs.err) {
         wish_rpc_server_error(req, 303, "Failed writing bson.");
+        return;
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1727,6 +1729,7 @@ static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
     
     if (bs.err) {
         wish_rpc_server_error(req, 303, "Failed writing bson.");
+        return;
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1746,6 +1749,7 @@ static void host_config(rpc_server_req* req, uint8_t* args) {
 
     if (bs.err) {
         wish_rpc_server_error(req, 305, "Failed writing bson.");
+        return;
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -1862,6 +1866,8 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
 
     if (bs.err) {
         wish_rpc_server_error(req, 305, "Failed writing bson.");
+=======
+>>>>>>> 15bc95af6f78d90381082129b288b30ef5a0be9d
         return;
     }
     
@@ -1930,6 +1936,7 @@ static void debug_disable(struct wish_rpc_context* req,
     }
 }
 */
+
 
 handler methods_handler =                             { .op_str = "methods",                           .handler = methods };
 handler signals_handler =                             { .op_str = "signals",                           .handler = wish_core_signals };
