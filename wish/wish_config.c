@@ -17,8 +17,7 @@ int wish_core_config_load(wish_core_t* core) {
         return -1;
     }
     wish_fs_lseek(fd, 0, WISH_FS_SEEK_SET);
-    
-    
+
     int size = 0;
     
     /* First, read in the next mapping id */
@@ -56,6 +55,8 @@ int wish_core_config_load(wish_core_t* core) {
     
     if ( BSON_BINDATA == bson_iterator_type(&it) && bson_iterator_bin_len(&it) == WISH_WHID_LEN ) {
         memcpy(core->id, bson_iterator_bin_data(&it), WISH_WHID_LEN);
+    } else {
+        WISHDEBUG(LOG_CRITICAL, "Failed reading hostid!");
     }
     
     
@@ -149,13 +150,14 @@ int wish_core_config_load(wish_core_t* core) {
 int wish_core_config_save(wish_core_t* core) {
     wish_file_t fd;
     int32_t ret = 0;
+    wish_fs_remove(WISH_CORE_CONFIG_DB_NAME);
     fd = wish_fs_open(WISH_CORE_CONFIG_DB_NAME);
     if (fd < 0) {
         /* error */
         WISHDEBUG(LOG_CRITICAL, "could not open configuration db");
         return -1;
     }
-    
+
     int buf_len = 4*1024;
     char buf[buf_len];
     
@@ -163,7 +165,7 @@ int wish_core_config_save(wish_core_t* core) {
     bson_init_buffer(&bs, buf, buf_len);
     bson_append_string(&bs, "version", WISH_CORE_VERSION_STRING);
     bson_append_binary(&bs, "id", core->id, WISH_WHID_LEN);
-    
+
     if (core->relay_db != NULL) {
         wish_relay_client_t* relay;
         
@@ -187,7 +189,9 @@ int wish_core_config_save(wish_core_t* core) {
     bson_finish(&bs);
 
     ret = wish_fs_write(fd, bson_data(&bs), bson_size(&bs));
-    
+
+    //bson_visit("Configuration saved this bson", (char*) bson_data(&bs));
+
     bson_destroy(&bs);
     
     if (ret <= 0) {
