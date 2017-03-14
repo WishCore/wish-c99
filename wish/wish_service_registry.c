@@ -98,7 +98,7 @@ void wish_service_register_remove(wish_core_t* core, uint8_t *wsid) {
         /* Delete the entry from service registry */
         memset(service_entry_offline, 0, sizeof (struct wish_service_entry));
         /* Clean up RPC requests which might have been left behind by the app */
-        wish_core_app_rpc_cleanup_requests(core, wsid);
+        wish_core_app_rpc_cleanup_requests(core, service_entry_offline);
     } else {
         WISHDEBUG(LOG_CRITICAL, "Error: Could not find a service entry with the specified wsid");
     }
