@@ -154,9 +154,6 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
     wish_connection_t *connection = context;
     wish_core_t* core = req->client->context;
     
-    //WISHDEBUG(LOG_CRITICAL, "Peer CB: payload len: %d (core id: 0x%02x%02x)", bson_get_doc_len(payload), core->id[0], core->id[1]);
-    //bson_visit("peers_callback:", payload);
-
     /* When obtaining a peer response from the remote core,
      * go through the list of our local wish apps (services), and see
      * which of the protocols match the peer message's protocol field.
@@ -166,8 +163,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
 
     uint8_t *outer_data_doc = NULL;
     int32_t outer_data_doc_len = 0;
-    if (bson_get_document(payload, "data", &outer_data_doc,
-            &outer_data_doc_len) == BSON_FAIL) {
+    if (bson_get_document(payload, "data", &outer_data_doc, &outer_data_doc_len) == BSON_FAIL) {
         WISHDEBUG(LOG_CRITICAL, "No outer 'data' document");
         return;
     }
@@ -181,8 +177,7 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
     
     uint8_t *inner_data_doc = NULL;
     int32_t inner_data_doc_len = 0;
-    if (bson_get_document(outer_data_doc, "data", &inner_data_doc,
-            &inner_data_doc_len) == BSON_FAIL) {
+    if (bson_get_document(outer_data_doc, "data", &inner_data_doc, &inner_data_doc_len) == BSON_FAIL) {
         WISHDEBUG(LOG_CRITICAL, "No inner 'data' document");
         return;
     }
@@ -213,51 +208,35 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
         }
     }
 
-    //WISHDEBUG(LOG_CRITICAL, "peer information regarding a peer with protocol %s!", protocol);
-    //bson_visit("peers_callback: peer information regarding a peer with protocol!", payload);
-
-    /* Build Core-to-App message indicating the new peer */
-
-    /* FIXME this should be refactored with 
-     * wish_send_online_offline_signal_to_apps()
-     */
-    int32_t core_to_app_max_len = 356;
-    uint8_t core_to_app[core_to_app_max_len];
-    bson_init_doc(core_to_app, core_to_app_max_len);
-    
-    /*
-    if (online) {
-        WISHDEBUG(LOG_CRITICAL, "Building upstream online message in peers cb");
-    }
-    else {
-        WISHDEBUG(LOG_CRITICAL, "Building upstream offline message in peers cb");
-    }
-    */
-    
-    bson_write_string(core_to_app, core_to_app_max_len, "type", "peer");
-    int32_t peer_info_max_len = 310;
-    uint8_t peer_info[peer_info_max_len];
-    bson_init_doc(peer_info, peer_info_max_len);
-    bson_write_binary(peer_info, peer_info_max_len, "luid", connection->luid, WISH_ID_LEN);
-    bson_write_binary(peer_info, peer_info_max_len, "ruid", connection->ruid, WISH_ID_LEN);
-    bson_write_binary(peer_info, peer_info_max_len, "rhid", connection->rhid, WISH_WHID_LEN);
-    bson_write_binary(peer_info, peer_info_max_len, "rsid", rsid, WISH_WSID_LEN);
-    bson_write_string(peer_info, peer_info_max_len, "protocol", protocol);
-    bson_write_string(peer_info, peer_info_max_len, "type", "N");
-
     /* Add information about the new peer (but check first if we knew it
      * from before). This is information needs to be saved here so that
      * we can send online/offline messages to a service in case the
      * service reconnects or connection is lost */
     wish_core_add_remote_service(connection, rsid, protocol);
- 
-    if (bson_write_boolean(peer_info, peer_info_max_len,
-            "online", online) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not encode online boolean");
+
+    
+    /* Build Core-to-App message indicating the new peer */
+    int l = 356;
+    char buf[l];
+
+    bson b;
+    bson_init_buffer(&b, buf, l);
+    bson_append_string(&b, "type", "peer");
+    bson_append_start_object(&b, "peer");
+    bson_append_binary(&b, "luid", connection->luid, WISH_UID_LEN);
+    bson_append_binary(&b, "ruid", connection->ruid, WISH_UID_LEN);
+    bson_append_binary(&b, "rhid", connection->rhid, WISH_UID_LEN);
+    bson_append_binary(&b, "rsid", rsid, WISH_WSID_LEN);
+    bson_append_string(&b, "protocol", protocol);
+    bson_append_bool(&b, "online", online);
+    bson_append_finish_object(&b);
+    bson_finish(&b);
+
+    if (b.err) {
+        WISHDEBUG(LOG_CRITICAL, "bs.err in peers_callback: %s", b.errstr);
         return;
     }
-    bson_write_embedded_doc_or_array(core_to_app, core_to_app_max_len,
-        "peer", peer_info, BSON_KEY_DOCUMENT);
+    
 
     /* Send the peer information to all the services of this core, which
      * have the specified protocol */
@@ -269,37 +248,13 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
 
     int i = 0;
     
-    WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: got %s peer: %02x%02x", core->id[0], core->id[1], protocol, rsid[0], rsid[1]);
-    
-    //bson_visit("message going to all apps", core_to_app);
-    
     for (i = 0; i < WISH_MAX_SERVICES; i++) {
         if (wish_service_entry_is_valid(core, &(registry[i]))) {
             //WISHDEBUG(LOG_CRITICAL, "Service entry is valid");
-            if (strncmp(((const char*) &(registry[i].protocols[0].name)), 
-                    protocol, WISH_PROTOCOL_NAME_MAX_LEN) == 0) {
+            if (strncmp(((const char*) &(registry[i].protocols[0].name)), protocol, WISH_PROTOCOL_NAME_MAX_LEN) == 0) {
                 WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_callback: %s", core->id[0], core->id[1], online ? "online" : "offline");
                 
-                int l = 356;
-                char buf[l];
-                
-                bson b;
-                bson_init_buffer(&b, buf, l);
-                bson_append_string(&b, "type", "peer");
-                bson_append_start_object(&b, "peer");
-                bson_append_binary(&b, "luid", connection->luid, WISH_UID_LEN);
-                bson_append_binary(&b, "ruid", connection->ruid, WISH_UID_LEN);
-                bson_append_binary(&b, "rhid", connection->rhid, WISH_UID_LEN);
-                bson_append_binary(&b, "rsid", rsid, WISH_WSID_LEN);
-                bson_append_string(&b, "protocol", protocol);
-                bson_append_bool(&b, "online", online);
-                bson_append_finish_object(&b);
-                bson_finish(&b);
-                
                 send_core_to_app(core, registry[i].wsid, (char*)bson_data(&b), bson_size(&b));
-                
-                // This seems to corrupt the frames to the app
-                //send_core_to_app(core, registry[i].wsid, core_to_app, bson_get_doc_len(core_to_app));
             }
         }
     }
@@ -571,8 +526,7 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
         }
         */
         
-        bson_write_string(core_to_app, core_to_app_max_len,
-            "type", "peer");
+        bson_write_string(core_to_app, core_to_app_max_len, "type", "peer");
         int32_t peer_info_max_len = 256;
         uint8_t peer_info[peer_info_max_len];
 

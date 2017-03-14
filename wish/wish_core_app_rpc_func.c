@@ -2039,7 +2039,10 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
     
     char *op = NULL;
     int32_t op_str_len = 0;
-    bson_get_string(data, "op", &op, &op_str_len);
+    if (bson_get_string(data, "op", &op, &op_str_len) == BSON_FAIL) {
+        bson_visit("There was no 'op'", data);
+        return;
+    }
 
     if (app==NULL) {
         // failed to find app, deny service
@@ -2176,13 +2179,13 @@ void wish_report_identity_to_local_services(wish_core_t* core, wish_identity_t* 
             for (j = 0; j < WISH_MAX_SERVICES; j++) {
                 if (wish_service_entry_is_valid(core, &(service_registry[j]))) {
                     if (memcmp(service_registry[i].wsid, service_registry[j].wsid, WISH_WSID_LEN) != 0) {
+                        
                         bson bs;
                         int buffer_len = 2 * WISH_ID_LEN + WISH_WSID_LEN + WISH_WHID_LEN + WISH_PROTOCOL_NAME_MAX_LEN + 200;
                         uint8_t buffer[buffer_len];
                         bson_init_buffer(&bs, buffer, buffer_len);
 
                         bson_append_string(&bs, "type", "peer");
-                        
                         bson_append_start_object(&bs, "peer");
                         bson_append_binary(&bs, "luid", (uint8_t*) identity->uid, WISH_ID_LEN);
                         bson_append_binary(&bs, "ruid", (uint8_t*) identity->uid, WISH_ID_LEN);
@@ -2190,12 +2193,12 @@ void wish_report_identity_to_local_services(wish_core_t* core, wish_identity_t* 
                         bson_append_binary(&bs, "rhid", (uint8_t*) local_hostid, WISH_ID_LEN);
                         /* FIXME support more protocols than just one */
                         bson_append_string(&bs, "protocol", service_registry[j].protocols[0].name);
-                        
                         bson_append_string(&bs, "type", "N");   /* FIXME will be type:"D" someday when deleting identity? */
                         bson_append_bool(&bs, "online", online);
                         bson_append_finish_object(&bs);
 
                         bson_finish(&bs);
+                        
                         if (bs.err) {
                             WISHDEBUG(LOG_CRITICAL, "BSON error when creating peer message: %i %s len %i", bs.err, bs.errstr, bs.dataSize);
                         }
