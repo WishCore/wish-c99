@@ -548,8 +548,12 @@ int main(int argc, char** argv) {
         fd_set rfds;
         /* The filedescriptor to be polled for writing */
         fd_set wfds;
+        /* The filedescriptor monitored for exceptions */
+        fd_set exceptfds;
+        
         FD_ZERO(&rfds);
         FD_ZERO(&wfds);
+        FD_ZERO(&exceptfds);
 
         /* This variable holds the largest socket fd + 1. It must be
          * updated every time new fd is added to either of the sets */
@@ -619,8 +623,6 @@ int main(int argc, char** argv) {
         struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 100000;
-        
-        fd_set exceptfds;
         
         for (i = 0; i < max_fd; i++) {
             if (FD_ISSET(i, &rfds)) {
@@ -702,6 +704,7 @@ int main(int argc, char** argv) {
                     /* Find a vacant app connection "slot" */
                     for (i = 0; i < NUM_APP_CONNECTIONS; i++) {
                         if (app_states[i] == APP_CONNECTION_INITIAL) {
+                            // App socketfd: newsockfd
                             app_fds[i] = newsockfd;
                             app_states[i] = APP_CONNECTION_CONNECTED;
                             break;
