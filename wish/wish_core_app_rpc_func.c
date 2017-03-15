@@ -2085,11 +2085,12 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
     }
 }
 
-void wish_core_app_rpc_cleanup_requests(wish_core_t* core, uint8_t *wsid) {
+void wish_core_app_rpc_cleanup_requests(wish_core_t* core, struct wish_service_entry *service_entry_offline) {
+    WISHDEBUG(LOG_CRITICAL, "App rpc server clean up starting");
     struct wish_rpc_context_list_elem *list_elem = NULL;
     struct wish_rpc_context_list_elem *tmp = NULL;
     LL_FOREACH_SAFE(core->app_api->request_list_head, list_elem, tmp) {
-        if (memcmp(list_elem->request_ctx.local_wsid, wsid, WISH_WSID_LEN)) {
+        if (list_elem->request_ctx.context == service_entry_offline) {
             WISHDEBUG(LOG_CRITICAL, "App rpc server clean up: request op %s", list_elem->request_ctx.op_str);
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
             memset(&(list_elem->request_ctx), 0, sizeof(rpc_server_req));
