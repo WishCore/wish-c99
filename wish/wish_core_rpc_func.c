@@ -430,34 +430,21 @@ void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connecti
         ack_needed = false;
     }
 
-    const int buffer_len = 256;
-    uint8_t buffer[buffer_len];
-
-#if 0
-    struct wish_rpc_context rpc_ctx = { 
-        .server = core->core_api,
-        .send = wish_core_connection_send,
-        .send_context = connection,
-        .op_str = op_str,
-        .id = id,
-        .ctx = connection,
-    };
-#endif
     struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->core_api);
     if (list_elem == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Could not save the rpc context. Failing in wish_core_rpc_func.");
         return;
     } else {
-        struct wish_rpc_context *rpc_ctx = &(list_elem->request_ctx);
-        rpc_ctx->server = core->core_api;
-        rpc_ctx->send = wish_core_connection_send;
-        rpc_ctx->send_context = connection;
-        memset(rpc_ctx->op_str, 0, MAX_RPC_OP_LEN);
-        strncpy(rpc_ctx->op_str, op_str, op_str_len);
-        rpc_ctx->id = id;
-        rpc_ctx->ctx = connection;
+        rpc_server_req *req = &(list_elem->request_ctx);
+        req->server = core->core_api;
+        req->send = wish_core_connection_send;
+        req->send_context = connection;
+        memset(req->op_str, 0, MAX_RPC_OP_LEN);
+        strncpy(req->op_str, op_str, op_str_len);
+        req->id = id;
+        req->ctx = connection;
     
-        if (wish_rpc_server_handle(core->core_api, rpc_ctx, args)) {
+        if (wish_rpc_server_handle(core->core_api, req, args)) {
             WISHDEBUG(LOG_CRITICAL, "RPC server fail: wish_core_rpc_func");
         }
     }
