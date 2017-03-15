@@ -395,7 +395,7 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     memcpy(advert_with_magic + 2, advert_msg, bson_get_doc_len(advert_msg));
     size_t advert_with_magic_len = 2 + bson_get_doc_len(advert_msg);
     
-    bson_visit("Advertisement message going out from core:", advert_msg);
+    //bson_visit("Advertisement message going out from core:", advert_msg);
     
     wish_send_advertizement(core, advert_with_magic, advert_with_magic_len);
 }
