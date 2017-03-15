@@ -1557,6 +1557,9 @@ static void wld_list_handler(rpc_server_req* req, uint8_t* args) {
             bson_append_binary(&bs, "ruid", db[i].ruid, WISH_ID_LEN);
             bson_append_binary(&bs, "rhid", db[i].rhid, WISH_ID_LEN);
             bson_append_binary(&bs, "pubkey", db[i].pubkey, WISH_PUBKEY_LEN);
+            if (db[i].claim) {
+                bson_append_bool(&bs, "claim", true);
+            }
             bson_append_finish_object(&bs);
             p++;
         }

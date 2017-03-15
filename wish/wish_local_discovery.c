@@ -120,6 +120,9 @@ size_t buffer_len) {
         return;
     }
 
+    bool claim = false;
+    bson_get_boolean(msg, "claim", &claim);
+
     /** The port number of the remote wish core will be saved here */
     uint16_t tcp_port = 0;
 
@@ -158,17 +161,8 @@ size_t buffer_len) {
             core->ldiscovery_db[i].occupied = false;
             WISHDEBUG(LOG_CRITICAL, "LocalDiscovery dropped timed out entry.");
             
-            int buffer_len = 300;
-            uint8_t buffer[buffer_len];
-
-            bson bs;
-            bson_init_buffer(&bs, buffer, buffer_len);
-            bson_append_start_array(&bs, "data");
-            bson_append_string(&bs, "0", "localDiscovery");
-            bson_append_finish_array(&bs);
-            bson_finish(&bs);
-            
-            wish_core_signals_emit(core, &bs);
+            wish_core_signals_emit_string(core, "localDiscovery");
+            continue;
         }
         
         if (core->ldiscovery_db[i].occupied) {
@@ -178,6 +172,18 @@ size_t buffer_len) {
                 //WISHDEBUG(LOG_CRITICAL, "Found entry. Updating timestamp");
                 found = true;
                 core->ldiscovery_db[i].timestamp = current_time;
+                
+                bool changed = false;
+                
+                if (core->ldiscovery_db[i].claim != claim) {
+                    // claim state changed
+                    changed = true;
+                }
+                
+                if (changed) {
+                    wish_core_signals_emit_string(core, "localDiscovery");
+                }
+                
                 break;
             }
         } else {
@@ -191,6 +197,7 @@ size_t buffer_len) {
         memcpy(&core->ldiscovery_db[free].rhid, rhid, WISH_ID_LEN);
         memcpy(&core->ldiscovery_db[free].pubkey, pubkey_ptr, WISH_PUBKEY_LEN);
         strncpy((char*) &core->ldiscovery_db[free].alias, alias, WISH_MAX_ALIAS_LEN);
+        core->ldiscovery_db[free].claim = claim;
         /* FIXME ip address length here is hardcoded and assumed to be
          * IPv4 */
         /* FIXME the ip address is read from where the broadcast is
@@ -200,17 +207,7 @@ size_t buffer_len) {
         core->ldiscovery_db[free].transport_port = tcp_port;
         WISHDEBUG(LOG_DEBUG, "Inserted Local Discovered peer at index %d", free);
         
-        int buffer_len = 300;
-        uint8_t buffer[buffer_len];
-
-        bson bs;
-        bson_init_buffer(&bs, buffer, buffer_len);
-        bson_append_start_array(&bs, "data");
-        bson_append_string(&bs, "0", "localDiscovery");
-        bson_append_finish_array(&bs);
-        bson_finish(&bs);
-
-        wish_core_signals_emit(core, &bs);
+        wish_core_signals_emit_string(core, "localDiscovery");
     }
     
     /* Save the pubkey to contact database, along with metadata.
@@ -384,6 +381,10 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     bson_write_binary(advert_msg, advert_msg_max_len, "pubkey", pubkey, WISH_PUBKEY_LEN);
     bson_write_embedded_doc_or_array(advert_msg, advert_msg_max_len, "transports", transports_array, BSON_KEY_ARRAY);
     bson_write_string(advert_msg, advert_msg_max_len, "alias", my_identity.alias);
+    
+    if (core->config_skip_connection_acl) {
+        bson_write_boolean(advert_msg, advert_msg_max_len, "claim", true);
+    }
 
     /* Send away the advert message, but first add the magic bytes in
      * front of the message */
@@ -394,7 +395,7 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     memcpy(advert_with_magic + 2, advert_msg, bson_get_doc_len(advert_msg));
     size_t advert_with_magic_len = 2 + bson_get_doc_len(advert_msg);
     
-    //bson_visit("Advertisement message going out from core:", advert_msg);
+    bson_visit("Advertisement message going out from core:", advert_msg);
     
     wish_send_advertizement(core, advert_with_magic, advert_with_magic_len);
 }

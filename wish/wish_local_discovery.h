@@ -20,6 +20,7 @@ typedef struct wish_ldiscover_t {
     uint8_t rhid[WISH_ID_LEN];
     uint8_t pubkey[WISH_PUBKEY_LEN];
     uint8_t alias[WISH_MAX_ALIAS_LEN];
+    bool claim;
     uint32_t timestamp;
     /* FIXME support support multiple transports, and IPv6, and..  */
     wish_ip_addr_t transport_ip;

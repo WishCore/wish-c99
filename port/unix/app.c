@@ -191,9 +191,11 @@ static void print_usage(char *executable_name) {
 
 /* -b Start the "server" part, and start broadcastsing local discovery
  * adverts */
-bool advertize_own_uid = false;
+bool advertize_own_uid = true;
+/* -i Start core in insecure state */
+bool skip_connection_acl = false;
 /* -l Start to listen to adverts, and connect when advert is received */
-bool listen_to_adverts = false;
+bool listen_to_adverts = true;
 
 /* -c <addr> Start as a client, connecting to a specified addr */
 bool as_client = false;
@@ -205,7 +207,7 @@ char* remote_id_alias = NULL;
 wish_identity_t remote_identity;
 
 /* -s Accept incoming connections  */
-bool as_server = false;
+bool as_server = true;
 
 /* -p The Wish TCP port to listen to (when -l or -s is given), or the port
  * to connect to when -c */
@@ -214,12 +216,12 @@ uint16_t port = 0;
 /* -r <relay_host> Start a relay client session to relay host for
  * accepting connections relayed by the relay host */
 struct in_addr relay_server_addr;
-bool as_relay_client = false;
+bool as_relay_client = true;
 
 #ifdef WITH_APP_TCP_SERVER
 /* -a <app_port> The port number of the "Application" TCP port */
-bool as_app_server = false;
-uint16_t app_port = 0;
+bool as_app_server = true;
+uint16_t app_port = 9094;
 extern int app_serverfd; /* Defined in app_server.c */
 extern int app_fds[];
 extern enum app_state app_states[];
@@ -230,11 +232,15 @@ extern enum app_state app_states[];
  * variables accordingly */
 static void process_cmdline_opts(int argc, char** argv) {
     int opt = 0;
-    while ((opt = getopt(argc, argv, "hblc:C:R:sp:ra:")) != -1) {
+    while ((opt = getopt(argc, argv, "hbilc:C:R:sp:ra:")) != -1) {
         switch (opt) {
         case 'b':
             printf("Would start as advertizer\n");
             advertize_own_uid = true;
+            break;
+        case 'i':
+            printf("Skip connection acl (Core is Claimable)\n");
+            skip_connection_acl = true;
             break;
         case 'l':
             printf("Would start as ad listener\n");
@@ -512,11 +518,14 @@ int main(int argc, char** argv) {
         as_relay_client = true;
         app_port = 9094;
         as_app_server = true;
+        skip_connection_acl = false;
     }
 
     /* Iniailise Wish core (RPC servers) */
     wish_core_init(core);
 
+    core->config_skip_connection_acl = skip_connection_acl;
+    
     wish_core_update_identities(core);
     
     if (as_server) {
