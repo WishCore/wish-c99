@@ -352,7 +352,7 @@ static void services_list_handler(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-/* This is the Call-back functon invoksed by the core's "app" RPC
+/* This is the Call-back function invoked by the core's "app" RPC
  * server, when identity.export is received from a Wish app 
  *
  * identity.export('342ef67c822662174e67689b8b1f1ef761c8085129561372adeb9ccf6ec30c86')
@@ -489,7 +489,7 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
-/* This is the Call-back functon invoksed by the core's "app" RPC
+/* This is the Call-back function invoked by the core's "app" RPC
  * server, when identity.import is received from a Wish app 
  *
  *
@@ -646,7 +646,7 @@ static void identity_import_handler(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
 }
 
-/* This is the Call-back functon invoksed by the core's "app" RPC
+/* This is the Call-back function invoked by the core's "app" RPC
  * server, when identity.list is received from a Wish app 
  *
  *  identity.list()
