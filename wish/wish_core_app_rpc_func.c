@@ -2078,16 +2078,16 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
         WISHDEBUG(LOG_CRITICAL, "Core app RPC: Could not save the rpc context. Failing in wish_core_app_rpc_func.");
         return;
     } else {
-        struct wish_rpc_context *rpc_ctx = &(list_elem->request_ctx);
-        rpc_ctx->server = core->app_api;
-        rpc_ctx->send = wish_core_app_rpc_send;
-        rpc_ctx->send_context = rpc_ctx;
-        memcpy(rpc_ctx->op_str, op, MAX_RPC_OP_LEN);
-        rpc_ctx->id = id;
-        rpc_ctx->context = app;
-        memcpy(rpc_ctx->local_wsid, src_wsid, WISH_WSID_LEN);
+        rpc_server_req* req = &(list_elem->request_ctx);
+        req->server = core->app_api;
+        req->send = wish_core_app_rpc_send;
+        req->send_context = req;
+        memcpy(req->op_str, op, MAX_RPC_OP_LEN);
+        req->id = id;
+        req->context = app;
+        memcpy(req->local_wsid, src_wsid, WISH_WSID_LEN);
     
-        if (wish_rpc_server_handle(core->app_api, rpc_ctx, args)) {
+        if (wish_rpc_server_handle(core->app_api, req, args)) {
             WISHDEBUG(LOG_DEBUG, "RPC server fail: wish_core_app_rpc_func");
         }
     }
