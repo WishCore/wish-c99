@@ -20,27 +20,31 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
     int buffer_len = 300;
     uint8_t buffer[buffer_len];
     if (wish_service_entry_is_valid(core, service_entry)) {
-        bson bs;
-        bson_init_buffer(&bs, buffer, buffer_len);
-        bson_append_start_object(&bs, "data");
-        bson_append_bool(&bs, "N", true);
-        bson_append_string(&bs, "type", "N");
-        bson_append_start_object(&bs, "data");
-        bson_append_binary(&bs, "rsid", service_entry->wsid, WISH_WSID_LEN);
-
-        /* FIXME protocols[0][0]??? It will only include first of
-         * the protocols */
+        
         if (strnlen(service_entry->protocols[0].name, WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
+            bson bs;
+            bson_init_buffer(&bs, buffer, buffer_len);
+            bson_append_start_object(&bs, "data");
+            bson_append_bool(&bs, "N", true);
+            bson_append_string(&bs, "type", "N");
+            bson_append_start_object(&bs, "data");
+            bson_append_binary(&bs, "rsid", service_entry->wsid, WISH_WSID_LEN);
+
+            /* FIXME protocols[0][0]??? It will only include first of
+             * the protocols */
             bson_append_string(&bs, "protocol", (char*) service_entry->protocols[0].name);
+            bson_append_bool(&bs, "online", online);
+            bson_append_finish_object(&bs);
+            bson_append_finish_object(&bs);
+
+            bson_finish(&bs);
+
+            WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update: %s", online ? "online" : "offline");
+            wish_rpc_server_emit_broadcast(core->core_api, "peers", bson_data(&bs), bson_size(&bs));
+        } else {
+            // no protocol, no peer
+            WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update, no protocol no peer: %s", service_entry->name);
         }
-        bson_append_bool(&bs, "online", online);
-        bson_append_finish_object(&bs);
-        bson_append_finish_object(&bs);
-
-        bson_finish(&bs);
-
-        WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update: %s", online ? "online" : "offline");
-        wish_rpc_server_emit_broadcast(core->core_api, "peers", bson_data(&bs), bson_size(&bs));
     }
 }
 
@@ -85,34 +89,39 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
     int i;
     for(i=0; i < WISH_MAX_SERVICES; i++) {
         if (wish_service_entry_is_valid(core, &registry[i])) {
-            memset(buffer, 0, buffer_len);
-            
-            bson bs;
-            bson_init_buffer(&bs, buffer, buffer_len);
-            bson_append_start_object(&bs, "res");
-            bson_append_int(&bs, "sig", rpc_ctx->id);
-            bson_append_start_object(&bs, "data");
-            bson_append_bool(&bs, "N", true);
-            bson_append_string(&bs, "type", "N");
-            bson_append_start_object(&bs, "data");
-            bson_append_binary(&bs, "rsid", registry[i].wsid, WISH_WSID_LEN);
-
-            /* FIXME protocols[0][0]??? It will only include first of
-             * the protocols */
             if (strnlen(registry[i].protocols[0].name, WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
+                
+                memset(buffer, 0, buffer_len);
+
+                bson bs;
+                bson_init_buffer(&bs, buffer, buffer_len);
+                bson_append_start_object(&bs, "res");
+                bson_append_int(&bs, "sig", rpc_ctx->id);
+                bson_append_start_object(&bs, "data");
+                bson_append_bool(&bs, "N", true);
+                bson_append_string(&bs, "type", "N");
+                bson_append_start_object(&bs, "data");
+                bson_append_binary(&bs, "rsid", registry[i].wsid, WISH_WSID_LEN);
+
+                /* FIXME protocols[0][0]??? It will only include first of
+                 * the protocols */
                 bson_append_string(&bs, "protocol", (char*) registry[i].protocols[0].name);
+                
+                bson_append_bool(&bs, "online", true);
+                bson_append_finish_object(&bs);
+                bson_append_finish_object(&bs);
+                bson_append_finish_object(&bs);
+
+                bson_finish(&bs);
+
+                //bson_visit("sending peers response:", (uint8_t*)bson_data(&bs));
+
+                WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_op_handler: online", core->id[0], core->id[1]);
+                wish_core_send_message(core, connection, (char*)bson_data(&bs), bson_size(&bs));
+            } else {
+                // no protocol, no peer
+                WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update, no protocol no peer: %s", registry[i].name);
             }
-            bson_append_bool(&bs, "online", true);
-            bson_append_finish_object(&bs);
-            bson_append_finish_object(&bs);
-            bson_append_finish_object(&bs);
-            
-            bson_finish(&bs);
-
-            //bson_visit("sending peers response:", (uint8_t*)bson_data(&bs));
-
-            WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_op_handler: online", core->id[0], core->id[1]);
-            wish_core_send_message(core, connection, (char*)bson_data(&bs), bson_size(&bs));
         }
     }
 }
@@ -512,6 +521,12 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
     /* Generate and send sparate peer status update messages for each
      * remote service associated with the wish context */
     LL_FOREACH_SAFE(ctx->rsid_list_head, service, tmp) {
+        
+        if ( strnlen(service->protocol, 5) == 0 ) {
+            // no protocol, no peer
+            continue;
+        }
+        
         /* Build Core-to-App message indicating the severed link */
         int32_t core_to_app_max_len = 288;
         uint8_t core_to_app[core_to_app_max_len];
