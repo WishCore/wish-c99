@@ -398,11 +398,6 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
-    if (strcmp(export_type_str, "binary") != 0) {
-        WISHDEBUG(LOG_CRITICAL, "Illegal export type");
-        return;
-    }
-
     wish_identity_t id;
     
     if ( ret_success != wish_identity_load(arg_uid, &id) ) {
@@ -446,45 +441,55 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
 
     //bson_visit("Export brand new:", bs.data);
     //WISHDEBUG(LOG_CRITICAL, "size %i", bs.dataSize);
-    
-    mbedtls_sha256_context sha256;
-    mbedtls_sha256_init(&sha256);
-    mbedtls_sha256_starts(&sha256, 0); 
-    mbedtls_sha256_update(&sha256, bson_data(&bs), bson_size(&bs)); 
-    int hash_len = 32;
-    uint8_t hash[hash_len];
-    mbedtls_sha256_finish(&sha256, hash);
-    mbedtls_sha256_free(&sha256);
-    
-    
-    uint8_t signature[ED25519_SIGNATURE_LEN];
-    uint8_t privkey[WISH_PRIVKEY_LEN];
-    
-    if (wish_load_privkey(id.uid, privkey)) {
-        WISHDEBUG(LOG_CRITICAL, "Could not load privkey for signing export %s", id.alias);
-        wish_rpc_server_error(req, 345, "Could not sign exported document.");
-        bson_destroy(&bs);
-        return;
-    } else {
-        ed25519_sign(signature, hash, hash_len, privkey);
-    }
 
-    
     bson b;
     bson_init_size(&b, WISH_PORT_RPC_BUFFER_SZ);
-    bson_append_start_object(&b, "data");
-    bson_append_start_array(&b, "signatures");
-    bson_append_start_object(&b, "0");
-    bson_append_string(&b, "algo", "sha256-ed25519");
-    bson_append_binary(&b, "uid", id.uid, WISH_UID_LEN);
-    bson_append_binary(&b, "sign", signature, ED25519_SIGNATURE_LEN);
-    bson_append_finish_array(&b);
-    bson_append_finish_object(&b);
-    bson_append_binary(&b, "cert", bson_data(&bs), bson_size(&bs));
-    bson_append_finish_object(&b);
+    
+    if (strcmp(export_type_str, "signed") == 0) {
+        mbedtls_sha256_context sha256;
+        mbedtls_sha256_init(&sha256);
+        mbedtls_sha256_starts(&sha256, 0); 
+        mbedtls_sha256_update(&sha256, bson_data(&bs), bson_size(&bs)); 
+        int hash_len = 32;
+        uint8_t hash[hash_len];
+        mbedtls_sha256_finish(&sha256, hash);
+        mbedtls_sha256_free(&sha256);
+
+
+        uint8_t signature[ED25519_SIGNATURE_LEN];
+        uint8_t privkey[WISH_PRIVKEY_LEN];
+
+        if (wish_load_privkey(id.uid, privkey)) {
+            WISHDEBUG(LOG_CRITICAL, "Could not load privkey for signing export %s", id.alias);
+            wish_rpc_server_error(req, 345, "Could not sign exported document.");
+            bson_destroy(&bs);
+            return;
+        } else {
+            ed25519_sign(signature, hash, hash_len, privkey);
+        }
+        
+        bson_append_start_object(&b, "data");
+        bson_append_start_array(&b, "signatures");
+        bson_append_start_object(&b, "0");
+        bson_append_string(&b, "algo", "sha256-ed25519");
+        bson_append_binary(&b, "uid", id.uid, WISH_UID_LEN);
+        bson_append_binary(&b, "sign", signature, ED25519_SIGNATURE_LEN);
+        bson_append_finish_array(&b);
+        bson_append_finish_object(&b);
+        bson_append_binary(&b, "cert", bson_data(&bs), bson_size(&bs));
+        bson_append_finish_object(&b);
+    } else if (strcmp(export_type_str, "binary") == 0) {
+        bson_append_binary(&b, "data", bson_data(&bs), bson_size(&bs));
+    } else {
+        wish_rpc_server_error(req, 8, "Export type not binary/signed.");
+        goto cleanup;
+    }
+    
     bson_finish(&b);
 
     wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
+    
+cleanup:    
     bson_destroy(&b);
     bson_destroy(&bs);
 }
