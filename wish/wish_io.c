@@ -1186,6 +1186,28 @@ wish send handshake");
                 WISHDEBUG(LOG_CRITICAL, "We could not get the host field from client handshake");
                 return;
             }
+
+            uint8_t *transports_doc = NULL;
+            int32_t transports_doc_len = 0;
+            if (bson_get_array(plaintxt, "transports", &transports_doc, &transports_doc_len) == BSON_SUCCESS) {
+                char *url = NULL;
+                int32_t url_len = 0;
+                char index[21];
+                int i = 0;
+                
+                for (i=0; i<10; i++) {
+                    BSON_NUMSTR(index, i);
+
+                    if (bson_get_string(transports_doc, index, &url, &url_len) == BSON_FAIL) {
+                        continue;
+                    }
+                    
+                    WISHDEBUG(LOG_CRITICAL, "Transport reported on connection %s", url);
+                }
+            } else {
+                // no transport reported by remote peer
+            }
+            
             if (host_id_len == WISH_WHID_LEN) {
                 memcpy(connection->rhid, host_id, WISH_WHID_LEN);
             }

@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include "utlist.h"
 #include "mbedtls/gcm.h"
 #include "wish_config.h"
 #include "wish_io.h"
@@ -7,6 +8,7 @@
 #include "cbson.h"
 #include <string.h>
 #include "wish_dispatcher.h"
+#include "wish_connection_mgr.h"
 #include "wish_platform.h"
 #include "wish_event.h"
 #include "wish_core_rpc_func.h"
@@ -93,27 +95,43 @@ size_t wish_core_create_hostid(wish_core_t* core, char* hostid, char* sys_id_str
 }
 
 void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t buffer_len) {
+    
     uint8_t host_id[WISH_WHID_LEN] = { 0 };
-    uint8_t *handshake_msg = buffer;
-    size_t max_handshake_len = buffer_len;
+    char host_part[WISH_MAX_TRANSPORT_LEN];
+    char transport_url[WISH_MAX_TRANSPORT_LEN];
+    
     wish_core_get_host_id(core, host_id);
-    bson_init_doc(handshake_msg, max_handshake_len);
 
-    bson_write_binary(handshake_msg, max_handshake_len, "host", 
-        host_id, WISH_WHID_LEN);
-    /* FIXME Create a list of transports - but this is not currently in
-     * use */
-#if 0   /* if 0, creation of transports array is disabled */
-    const int transports_array_max_len = 240;
-    uint8_t transports_array[transports_array_max_len];
-    bson_init_doc(transports_array, transports_array_max_len);
-    char wish_url[200];
-    wish_platform_sprintf(wish_url, "wish://%d.%d.%d.%d:%d", 0, 0, 0, 0,37008);
-    bson_write_string(transports_array, transports_array_max_len,
-        "0", wish_url);
-    bson_write_embedded_doc_or_array(handshake_msg, max_handshake_len,
-        "transports", transports_array, BSON_KEY_ARRAY);
-#endif
+    bson bs;
+    bson_init_buffer(&bs, buffer, buffer_len);
+    bson_append_binary(&bs, "host", host_id, WISH_WHID_LEN);
+    bson_append_start_array(&bs, "transports");
+    
+    
+    // FIXME wish_get_host_ip_str cannot report failure, so we cannot test
+    wish_get_host_ip_str(core, host_part, WISH_MAX_TRANSPORT_LEN);
+    wish_platform_sprintf(transport_url, "wish://%s:%d", host_part, wish_get_host_port(core));
+    
+    bson_append_string(&bs, "0", transport_url);
+
+    wish_relay_client_t* relay = NULL;
+    
+    int i = 1;
+    
+    LL_FOREACH(core->relay_db, relay) {
+        char index[21];
+        BSON_NUMSTR(index, i++);
+        
+        char host[29];
+        
+        snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+        host[28] = '\0';
+        
+        bson_append_string(&bs, index, host);
+    }
+    
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
 }
 
 /* Submit a BSON handshake message (extracted from the wire) to the Wish core.
