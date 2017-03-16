@@ -463,7 +463,11 @@ static int seed_random_init() {
     
     int c;
     for (c=0; c<32; c++) {
-        fread(&randval, sizeof(randval), 1, f);
+        size_t read = fread(&randval, sizeof(randval), 1, f);
+        if (read != 1) {
+            printf("Failed to read from /dev/urandom, this is dangerous, bailing out.\n");
+            exit(1);
+        }
         srandom(randval);
     }
     

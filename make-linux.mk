@@ -28,8 +28,8 @@ LIBS		=
 # warnings
 
 # Debug and release builds (debug starts with -g, release containts -DRELEASE_BUILD)
-CFLAGS		=  -g -O0 -Wall -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread
-#CFLAGS		=  -Os -Wall -DRELEASE_BUILD -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread
+#CFLAGS		=  -g -O0 -Wall -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread
+CFLAGS		=  -Os -Wall -DRELEASE_BUILD -Wno-pointer-sign -Werror -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -pthread
 
 CFLAGS         += -DWISH_CORE_VERSION_STRING=\"$(VERSION_STRING)\"
 
