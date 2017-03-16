@@ -169,7 +169,7 @@ void wish_close_connection(wish_core_t* core, wish_connection_t *ctx) {
     wish_core_signal_tcp_event(core, ctx, TCP_DISCONNECTED);
 }
 
-char usage_str[] = "Wish Core v" WISH_CORE_VERSION_STRING
+char usage_str[] = "Wish Core " WISH_CORE_VERSION_STRING
 "\n\n  Usage: %s [options]\n\
     -b broadcast own uid over local discovery\n\
     -l listen to local discovery broadcasts\n\

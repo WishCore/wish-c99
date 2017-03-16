@@ -18,7 +18,7 @@ void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay) {
 }
 
 void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay) {
-    printf("Relay control connection fails\n");
+    WISHDEBUG(LOG_CRITICAL, "Relay control connection fails\n");
     relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
     
     // Used for reconnect timeout
@@ -26,7 +26,7 @@ void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay) {
 }
 
 void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_t *relay) {
-    printf("Relay control connection disconnected\n");
+    WISHDEBUG(LOG_CRITICAL, "Relay control connection disconnected\n");
     relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
 
     // Used for reconnect timeout
