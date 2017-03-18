@@ -1977,9 +1977,9 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     core->app_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
     memset(core->app_api, 0, sizeof(wish_rpc_server_t));
     core->app_api->request_list_head = NULL;
-    core->app_api->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
-    memset(core->app_api->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
-    core->app_api->rpc_ctx_pool_num_slots = 10;
+    core->app_api->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*WISH_PORT_APP_RPC_POOL_SZ);
+    memset(core->app_api->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*WISH_PORT_APP_RPC_POOL_SZ);
+    core->app_api->rpc_ctx_pool_num_slots = WISH_PORT_APP_RPC_POOL_SZ;
     strncpy(core->app_api->server_name, "core-from-app", 16);
     core->app_api->context = core;
     
@@ -2045,11 +2045,19 @@ static void wish_core_app_rpc_send(void *ctx, uint8_t *data, int len) {
 void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LEN], uint8_t *data) {
     wish_app_entry_t* app = wish_service_get_entry(core, src_wsid);
     
+    int end = 0;
+    
     char *op = NULL;
     int32_t op_str_len = 0;
     if (bson_get_string(data, "op", &op, &op_str_len) == BSON_FAIL) {
-        bson_visit("There was no 'op'", data);
-        return;
+        if (bson_get_int32(data, "end", &end) == BSON_FAIL) {
+            bson_visit("There was no 'op' or 'end':", data);
+            return;
+        } else {
+            WISHDEBUG(LOG_CRITICAL, "%s sent end signal for request %i", app->name, end);
+            wish_rpc_server_end(core->app_api, end);
+            return;
+        }
     }
 
     if (app==NULL) {
@@ -2076,6 +2084,16 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
     struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->app_api);
     if (list_elem == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Core app RPC: Could not save the rpc context. Failing in wish_core_app_rpc_func.");
+        
+        rpc_server_req err_req;
+        err_req.server = core->app_api;
+        err_req.send = wish_core_app_rpc_send;
+        err_req.send_context = &err_req;
+        err_req.id = id;
+        err_req.context = app;
+        memcpy(err_req.local_wsid, src_wsid, WISH_WSID_LEN);
+        
+        wish_rpc_server_error(&err_req, 63, "Core requests full for apps.");
         return;
     } else {
         rpc_server_req* req = &(list_elem->request_ctx);
