@@ -143,7 +143,12 @@ void send_core_to_app_via_tcp(wish_core_t* core, uint8_t wsid[WISH_ID_LEN], uint
             memcpy(buf, p, 2);
             memcpy(buf+2, data, len);
             
+#ifdef __APPLE__
+            ssize_t write_ret = send(app_fds[i], buf, 2+len, SO_NOSIGPIPE);
+#else
             ssize_t write_ret = send(app_fds[i], buf, 2+len, MSG_NOSIGNAL);
+#endif
+            
             if (write_ret != 2+len) {
                 printf("App connection: Write error! (c) Wanted %i got %li\n", 2, write_ret);
                 return;

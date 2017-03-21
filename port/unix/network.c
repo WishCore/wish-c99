@@ -24,6 +24,7 @@
  */
 static void find_local_ip_default_route(char *addr_buffer, 
         size_t addr_buffer_len) {
+#ifndef __APPLE__    
     FILE *f;
     char line[100] , *p=NULL , *c;
      
@@ -88,6 +89,7 @@ static void find_local_ip_default_route(char *addr_buffer,
     freeifaddrs(ifaddr);
     strncpy(addr_buffer, host, addr_buffer_len);
     fclose(f);
+#endif
 }
 
 /**
