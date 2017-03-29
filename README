@@ -32,8 +32,6 @@ $ ./mist_c99 server_advert
 Cross-compile build for ESP8266
 
 
-
-
 Wish/Mist C implementation for esp8266
 
 This is the repository for the proof-of-concept ANSI C implementation of
