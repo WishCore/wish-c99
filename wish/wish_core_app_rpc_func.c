@@ -1958,14 +1958,14 @@ handler identity_friend_request_decline_handler =     { .op_str = "identity.frie
 
 handler directory_find_handler =                      { .op_str = "directory.find",                    .handler = wish_api_directory_find };
 
-handler api_acl_check_h =                                 { .op_str = "acl.check",                         .handler = wish_api_acl_check };
-handler api_acl_allow_h =                                 { .op_str = "acl.allow",                         .handler = wish_api_acl_allow };
-handler api_acl_remove_allow_h =                          { .op_str = "acl.removeAllow",                   .handler = wish_api_acl_remove_allow };
-handler api_acl_add_user_roles_h =                        { .op_str = "acl.addUserRoles",                  .handler = wish_api_acl_add_user_roles };
-handler api_acl_remove_user_roles_h =                     { .op_str = "acl.removeUserRoles",               .handler = wish_api_acl_remove_user_roles };
-handler api_acl_user_roles_h =                            { .op_str = "acl.userRoles",                     .handler = wish_api_acl_user_roles };
-handler api_acl_what_resources_h =                        { .op_str = "acl.whatResources",                 .handler = wish_api_acl_what_resources };
-handler api_acl_allowed_permissions_h =                   { .op_str = "acl.allowedPermissions",            .handler = wish_api_acl_allowed_permissions };
+handler api_acl_check_h =                             { .op_str = "acl.check",                         .handler = wish_api_acl_check };
+handler api_acl_allow_h =                             { .op_str = "acl.allow",                         .handler = wish_api_acl_allow };
+handler api_acl_remove_allow_h =                      { .op_str = "acl.removeAllow",                   .handler = wish_api_acl_remove_allow };
+handler api_acl_add_user_roles_h =                    { .op_str = "acl.addUserRoles",                  .handler = wish_api_acl_add_user_roles };
+handler api_acl_remove_user_roles_h =                 { .op_str = "acl.removeUserRoles",               .handler = wish_api_acl_remove_user_roles };
+handler api_acl_user_roles_h =                        { .op_str = "acl.userRoles",                     .handler = wish_api_acl_user_roles };
+handler api_acl_what_resources_h =                    { .op_str = "acl.whatResources",                 .handler = wish_api_acl_what_resources };
+handler api_acl_allowed_permissions_h =               { .op_str = "acl.allowedPermissions",            .handler = wish_api_acl_allowed_permissions };
         
 handler relay_list_handler =                          { .op_str = "relay.list",                        .handler = relay_list };
 handler relay_add_handler =                           { .op_str = "relay.add",                         .handler = relay_add };

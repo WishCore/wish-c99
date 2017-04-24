@@ -403,6 +403,8 @@ int wish_send_advertizement(wish_core_t* core, uint8_t *ad_msg, size_t ad_len) {
             (struct sockaddr*) &si_other, addrlen) == -1) {
         if (errno == ENETUNREACH || errno == ENETDOWN) {
             printf("wld: Network currently unreachable, or down. Retrying later.\n");
+        } else if (errno == EPERM) {
+            printf("wld: Network returned EPERM.\n");
         } else {
             error("sendto()");
         }
