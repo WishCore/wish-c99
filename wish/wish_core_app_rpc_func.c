@@ -398,6 +398,18 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
+    char* voucher = 0;
+    int32_t voucher_len = 0;
+    if (bson_get_binary(args, "2", (uint8_t**) &voucher, &voucher_len) != BSON_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Export without voucher.");
+        // ensure voucher is NULL
+        voucher = NULL;
+        //wish_rpc_server_error(req, 8, "Missing export type argument");
+        //return;
+    } else {
+        WISHDEBUG(LOG_CRITICAL, "Export with voucher. %p %i", voucher, voucher_len);
+    }
+
     wish_identity_t id;
     
     if ( ret_success != wish_identity_load(arg_uid, &id) ) {
@@ -416,19 +428,21 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
 
     int i = 0;
 
-    if (core->relay_db != NULL) {
-        bson_append_start_array(&bs, "transports");
+    if (strcmp(export_type_str, "binary") == 0) {
+        if (core->relay_db != NULL) {
+            bson_append_start_array(&bs, "transports");
 
-        LL_FOREACH(core->relay_db, relay) {
-            char index[21];
-            BSON_NUMSTR(index, i++);
-            char host[29];
-            snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+            LL_FOREACH(core->relay_db, relay) {
+                char index[21];
+                BSON_NUMSTR(index, i++);
+                char host[29];
+                snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
 
-            bson_append_string(&bs, index, host);
+                bson_append_string(&bs, index, host);
+            }
+
+            bson_append_finish_array(&bs);
         }
-
-        bson_append_finish_array(&bs);
     }
 
     bson_append_finish_object(&bs);
@@ -469,14 +483,35 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
         }
         
         bson_append_start_object(&b, "data");
+        bson_append_binary(&b, "data", bson_data(&bs), bson_size(&bs));
+        
+        if (core->relay_db != NULL) {
+            bson_append_start_object(&b, "meta");
+            bson_append_start_array(&b, "transports");
+
+            LL_FOREACH(core->relay_db, relay) {
+                char index[21];
+                BSON_NUMSTR(index, i++);
+                char host[29];
+                snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+
+                bson_append_string(&b, index, host);
+            }
+
+            bson_append_finish_array(&b);
+            bson_append_finish_object(&b);
+        }
+        
         bson_append_start_array(&b, "signatures");
         bson_append_start_object(&b, "0");
         bson_append_string(&b, "algo", "sha256-ed25519");
         bson_append_binary(&b, "uid", id.uid, WISH_UID_LEN);
         bson_append_binary(&b, "sign", signature, ED25519_SIGNATURE_LEN);
+        if (voucher != NULL && voucher_len > 0) {
+            bson_append_binary(&b, "voucher", voucher, voucher_len);
+        }
         bson_append_finish_array(&b);
         bson_append_finish_object(&b);
-        bson_append_binary(&b, "cert", bson_data(&bs), bson_size(&bs));
         bson_append_finish_object(&b);
     } else if (strcmp(export_type_str, "binary") == 0) {
         bson_append_binary(&b, "data", bson_data(&bs), bson_size(&bs));
@@ -1878,6 +1913,8 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    
+    wish_core_config_save(core);
 }
 
 /*
