@@ -1724,6 +1724,8 @@ static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
 
     wish_connection_t *friend_req_ctx = wish_connection_init(core, luid, ruid);
     friend_req_ctx->friend_req_connection = true;
+    memcpy(friend_req_ctx->rhid, rhid, WISH_ID_LEN);
+        
     uint8_t *ip = db[i].transport_ip.addr;
     
     WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);

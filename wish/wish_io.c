@@ -328,7 +328,8 @@ again:
                                 /* Normal situation, proceed */
                             }
                             else if (conn_type ==  WISH_WIRE_TYPE_FRIEND_REQ) {
-                                WISHDEBUG(LOG_CRITICAL, "Friend req");
+                                WISHDEBUG(LOG_CRITICAL, "Friend req");           
+#if 0
                                 /* We have received a fried request.
                                  * Since we have already read in more
                                  * data than we would have needed, a
@@ -362,6 +363,9 @@ again:
                                 wish_message_processor_notify(&evt);
 
                                 break;
+#else
+                                connection->friend_req_connection = true;
+#endif
                             } else {
                                 WISHDEBUG(LOG_CRITICAL, "Unknown connection type");
                                 wish_close_connection(core, connection);
@@ -382,12 +386,20 @@ again:
                     uint8_t* dst_id = &(buf[3]);
                     uint8_t* src_id = &(buf[3+WISH_ID_LEN]);
 
-                    if (wish_core_check_wsid(core, connection, dst_id, src_id) == false) {
-                        wish_close_connection(core, connection);
-                        break;
-                    } else {
-                        wish_debug_print_array(LOG_DEBUG, "UIDs are known", src_id, WISH_ID_LEN);
-                        wish_debug_print_array(LOG_DEBUG, "remote: ", dst_id, WISH_ID_LEN);
+                    if (connection->friend_req_connection == false) {
+                        /* For a normal connection, check that we are talking with a known friend */
+                        if (wish_core_check_wsid(core, connection, dst_id, src_id) == false) {
+                            WISHDEBUG(LOG_CRITICAL, "Bad UIDs in handshake, closing connection");
+                            wish_close_connection(core, connection);
+                            break;
+                        } else {
+                            wish_debug_print_array(LOG_DEBUG, "UIDs are known", src_id, WISH_ID_LEN);
+                            wish_debug_print_array(LOG_DEBUG, "remote: ", dst_id, WISH_ID_LEN);
+                        }
+                    }
+                    else {
+                        /* Friend request connection */
+                        WISHDEBUG(LOG_CRITICAL, "Skipping UID check in handshake, because friend request connection");
                     }
 
                     memcpy(connection->luid, dst_id, WISH_ID_LEN);
@@ -414,8 +426,7 @@ again:
                         wish_close_connection(core, connection);
                         break;
                     }
-                    ret 
-                        = mbedtls_mpi_read_string(&(server_dhm_ctx->G), 16, 
+                    ret = mbedtls_mpi_read_string(&(server_dhm_ctx->G), 16, 
                             MBEDTLS_DHM_RFC3526_MODP_3072_G);
                     if (ret) {
                         WISHDEBUG(LOG_CRITICAL, "Error setting up DHM G, closing connection");
@@ -499,10 +510,33 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
     WISHDEBUG(LOG_DEBUG, "TCP Event for connection id %d", connection->connection_id);
     switch (ev) {
     case TCP_CONNECTED:
+    {
         WISHDEBUG(LOG_DEBUG, "Event TCP_CONNECTED");
 
         connection->outgoing = true;
         
+        /* Start the whole show by sending the handshake bytes */
+        const int buffer_len = 2+1+WISH_ID_LEN+WISH_ID_LEN;
+        unsigned char buffer[buffer_len];
+        buffer[0] = 'W';
+        buffer[1] = '.';
+        if (connection->friend_req_connection == false) {
+            buffer[2] = (WISH_WIRE_VERSION << 4) | (WISH_WIRE_TYPE_NORMAL); 
+        }
+        else {
+            buffer[2] = (WISH_WIRE_VERSION << 4) | WISH_WIRE_TYPE_FRIEND_REQ;
+        }
+        /* Now copy the destination id */
+        memcpy(buffer+3, connection->ruid, WISH_ID_LEN);
+        /* then copy the source id */
+        memcpy(buffer+3+WISH_ID_LEN, connection->luid, WISH_ID_LEN);
+        connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+        connection->curr_protocol_state = PROTO_STATE_DH;
+
+        /* Maestro, take it away please */
+        connection->send(connection->send_arg, buffer, buffer_len);
+    }
+#if 0
         if (connection->friend_req_connection == false) {
             /* Start the whole show by sending the handshake bytes */
             const int buffer_len = 2+1+WISH_ID_LEN+WISH_ID_LEN;
@@ -522,7 +556,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             connection->send(connection->send_arg, buffer, buffer_len);
         }
         else {
-            WISHDEBUG(LOG_CRITICAL, "Sending frient request!");
+            WISHDEBUG(LOG_CRITICAL, "Sending friend request!");
             /* To send a friend request, you send 
              * W.<high_nible 1|llow nible 3> */
             const int buffer_len = 500;
@@ -589,6 +623,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
                 connection->curr_protocol_state = PROTO_STATE_FRIEND_REQ_RESPONSE;
             }
         }
+#endif
         break;
     case TCP_CLIENT_DISCONNECTED:
         WISHDEBUG(LOG_DEBUG, "Event TCP_CLIENT_DISCONNECTED");
@@ -825,10 +860,11 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 break;
             }
 
-            uint8_t output[384];
-            size_t wr_len = 384;
+            const size_t dhm_public_len = 384;
+            uint8_t dhm_public[dhm_public_len];
+            
             ret = mbedtls_dhm_make_public(&dhm_ctx, 2,
-                output, wr_len, wish_platform_fill_random, NULL);
+                dhm_public, dhm_public_len, wish_platform_fill_random, NULL);
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, "Error writing DHM own public %hhx", ret);
                 wish_close_connection(core, connection);
@@ -836,7 +872,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             }
             /* Send our public value to the peer */
             char frame_len_data[2] = { 0 };
-            memcpy(frame_len_data, &wr_len, 2);
+            memcpy(frame_len_data, &dhm_public_len, 2);
             /* byte order conversion here is not portable */
             uint8_t tmp = frame_len_data[0];
             frame_len_data[0] = frame_len_data[1];
@@ -845,13 +881,13 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             WISHDEBUG(LOG_TRIVIAL, "1: %hhx", frame_len_data[1]);
             unsigned char out_buffer[2+384];
             memcpy(out_buffer, frame_len_data, 2);
-            memcpy(out_buffer+2, output, 384);
+            memcpy(out_buffer+2, dhm_public, 384);
             /* Send the frame length and the key in one go */
             connection->send(connection->send_arg, out_buffer, 2+384);
 
             /* Calculate shared secret */
             ret = mbedtls_dhm_calc_secret(&dhm_ctx, 
-                output, 384, &wr_len, NULL, NULL);
+                dhm_public, 384, (size_t *)&dhm_public_len, NULL, NULL);
             if (ret) {
                 WISHDEBUG(LOG_CRITICAL, "Error deriving shared secret %x", ret);
                 wish_close_connection(core, connection);
@@ -859,10 +895,10 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             }
             else {
                 /* Shared secret was calculated */
-                WISHDEBUG(LOG_TRIVIAL, "shared secret, len %d: ", wr_len);
+                WISHDEBUG(LOG_TRIVIAL, "shared secret, len %d: ", dhm_public_len);
                 int i = 0;
-                for (i = 0; i < wr_len; i++) {
-                    WISHDEBUG2(LOG_INFO, "0x%x ", output[i]);
+                for (i = 0; i < dhm_public_len; i++) {
+                    WISHDEBUG2(LOG_INFO, "0x%x ", dhm_public[i]);
                 }
             }
             mbedtls_dhm_free(&dhm_ctx);
@@ -870,10 +906,10 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             /* Copy AES key and IV vectors for in the outgoing (they are
              * the same at first, but then their nonce parts are
              * separately incremented at every transmission and receive*/
-            memcpy(connection->aes_gcm_key_in, output+32, 16);
-            memcpy(connection->aes_gcm_key_out, output, 16);
-            memcpy(connection->aes_gcm_iv_in, output+32+16, 12);
-            memcpy(connection->aes_gcm_iv_out, output+16, 12);
+            memcpy(connection->aes_gcm_key_in, dhm_public+32, 16);
+            memcpy(connection->aes_gcm_key_out, dhm_public, 16);
+            memcpy(connection->aes_gcm_iv_in, dhm_public+32+16, 12);
+            memcpy(connection->aes_gcm_iv_out, dhm_public+16, 12);
 
             int i = 0;
             /* Print out key */
@@ -885,7 +921,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             /* Build the client and server hashes now, because we have
              * the secret at hand. The hashes are stored
              * in the wish context struct */
-            build_client_and_server_hashes(connection, output);
+            build_client_and_server_hashes(connection, dhm_public);
 
             connection->curr_protocol_state = PROTO_STATE_ID_VERIFY_SEND_CLIENT_HASH;
         }
@@ -930,24 +966,32 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 break;
             }
             
-            uint8_t remote_pubkey[WISH_PUBKEY_LEN] = { 0 };
-            if (wish_load_pubkey(connection->ruid, remote_pubkey)) {
-                WISHDEBUG(LOG_CRITICAL, "Could not load remote pubkey");
-                wish_close_connection(core, connection);
-                break;
-            }
+            if (connection->friend_req_connection == false ) {
+                /* Normal connection */
+                uint8_t remote_pubkey[WISH_PUBKEY_LEN] = { 0 };
+                if (wish_load_pubkey(connection->ruid, remote_pubkey)) {
+                    WISHDEBUG(LOG_CRITICAL, "Could not load remote pubkey");
+                    wish_close_connection(core, connection);
+                    break;
+                }
 
-            if (ed25519_verify(server_signature, connection->server_hash,
-                    SHA256_HASH_LEN, remote_pubkey) == 0) {
-                WISHDEBUG(LOG_CRITICAL, "Server hash signature check fail");
-                wish_close_connection(core, connection);
-                break;
-            }
-            else {
-                WISHDEBUG(LOG_DEBUG, "Server hash signature check OK");
-            }
+                if (ed25519_verify(server_signature, connection->server_hash,
+                        SHA256_HASH_LEN, remote_pubkey) == 0) {
+                    WISHDEBUG(LOG_CRITICAL, "Server hash signature check fail");
+                    wish_close_connection(core, connection);
+                    break;
+                }
+                else {
+                    WISHDEBUG(LOG_DEBUG, "Server hash signature check OK");
+                }
 
-            connection->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
+                connection->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
+            } else {
+                /* Friend request connection */
+                WISHDEBUG(LOG_CRITICAL, "Outgoing friend req: Skipping server signature check");
+                connection->curr_protocol_state = PROTO_STATE_WISH_SEND_OWN_CERT;
+                goto friend_req_send_own_cert; /* FIME remove goto */
+            }
         }
         break;
     case PROTO_STATE_WISH_HANDSHAKE:
@@ -1013,6 +1057,53 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             wish_debug_print_array(LOG_TRIVIAL, "Plaintext", plaintxt, len);
             wish_core_process_message(core, connection, plaintxt);
             wish_platform_free(plaintxt);
+        }
+        break;
+    case PROTO_STATE_WISH_SEND_OWN_CERT:
+        friend_req_send_own_cert:
+        /* Outgoing friend request connection: the connection is now established, send own certificate now */
+        {
+            int doc_len = 512;
+            uint8_t doc[doc_len];
+            bson bs;
+            bson_init_buffer(&bs, doc, doc_len);
+            bson_append_binary(&bs, "ruid", connection->ruid, WISH_ID_LEN);
+            int req_id_len = 7;
+            uint8_t req_id[req_id_len];
+            wish_platform_fill_random(NULL, req_id, req_id_len);
+            int i = 0;
+            for (i = 0; i < req_id_len; i++) {
+                req_id[i] = req_id[i] % 26 + 'a';
+            }
+            req_id[6] = 0;
+            bson_append_string(&bs, "id", req_id);
+
+            /* Generate our own cert */
+            size_t my_cert_max_len = 300;
+            uint8_t my_identity[my_cert_max_len];
+            
+            if (wish_load_identity_bson(connection->luid, my_identity, my_cert_max_len) < 0) {
+                WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
+                break;
+            }
+            WISHDEBUG(LOG_CRITICAL, "cert len = %d", bson_get_doc_len(my_identity));
+            /* Then, filter out privkey from the identity */
+            uint8_t my_cert[my_cert_max_len];
+            bson_filter_out_elem("privkey", my_identity, my_cert);
+
+            bson_append_binary(&bs, "cert", my_cert, bson_get_doc_len(my_cert));
+            bson_finish(&bs);
+
+            
+            if (bs.err) {
+                WISHDEBUG(LOG_CRITICAL, "Send friend request: Failed writing bson.");
+            }
+            else {
+                WISHDEBUG(LOG_CRITICAL, "Send friend request: sending own cert");
+                wish_core_send_message(core, connection, doc, bson_size(&bs));
+                connection->curr_protocol_state = PROTO_STATE_FRIEND_REQ_RESPONSE;
+                
+            }
         }
         break;
     case PROTO_SERVER_STATE_DH:
@@ -1104,27 +1195,35 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 break;
             }
             
-            uint8_t remote_pubkey[WISH_PUBKEY_LEN] = { 0 };
-            if (wish_load_pubkey(connection->ruid, remote_pubkey)) {
-                WISHDEBUG(LOG_CRITICAL, "Could not load remote pubkey");
-                wish_close_connection(core, connection);
+            if (connection->friend_req_connection == false) {
+                /* Incoming normal connection */
+                uint8_t remote_pubkey[WISH_PUBKEY_LEN] = { 0 };
+                if (wish_load_pubkey(connection->ruid, remote_pubkey)) {
+                    WISHDEBUG(LOG_CRITICAL, "Could not load remote pubkey");
+                    wish_close_connection(core, connection);
+                    break;
+                }
+
+                if (ed25519_verify(client_signature, connection->client_hash,
+                        SHA256_HASH_LEN, remote_pubkey) == 0) {
+                    WISHDEBUG(LOG_CRITICAL, "Client hash signature check fail");
+                    wish_close_connection(core, connection);
+                    break;
+                }
+                else {
+                    WISHDEBUG(LOG_DEBUG, "Client hash signature check OK");
+
+                }
+
+                /* Identities have now been successfully verified */
+                connection->curr_protocol_state 
+                    = PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE;
+            } else {
+                /* Incoming friend request connection */
+                WISHDEBUG(LOG_CRITICAL, "Incoming friend req connection, skipping client hash check");
+                connection->curr_protocol_state = PROTO_SERVER_STATE_READ_FRIEND_CERT;
                 break;
             }
-
-            if (ed25519_verify(client_signature, connection->client_hash,
-                    SHA256_HASH_LEN, remote_pubkey) == 0) {
-                WISHDEBUG(LOG_CRITICAL, "Client hash signature check fail");
-                wish_close_connection(core, connection);
-                break;
-            }
-            else {
-                WISHDEBUG(LOG_DEBUG, "Client hash signature check OK");
-
-            }
-
-            /* Identities have now been successfully verified */
-            connection->curr_protocol_state 
-                = PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE;
         }
         /* WARNING: FALLTHROUGH */
     case PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE:
@@ -1226,171 +1325,179 @@ wish send handshake");
                 .event_type = WISH_EVENT_NEW_CORE_CONNECTION,
                 .context = connection };
             wish_message_processor_notify(&evt);
-
-
         }
         break;
-    case PROTO_SERVER_STATE_READ_FRIEND_CERT:
-        {
-            if (len != bson_get_doc_len(payload)) {
-                WISHDEBUG(LOG_CRITICAL, "Friend request: Unexpected cert len");
-                wish_close_connection(core, connection);
-                break;
-            }
+    case PROTO_SERVER_STATE_READ_FRIEND_CERT: {
+        uint8_t plaintxt[len];
+        memset(plaintxt, 0, len);
+        /* Decrypt */
+        int ciphertxt_len = len-AES_GCM_AUTH_TAG_LEN;
+         /* Pointer to the beginning of the auth_tag */
+        uint8_t* auth_tag = payload + ciphertxt_len;
 
-            /* Get the recepient identity of the friend request */
-            int32_t recepient_uid_len = 0;
-            uint8_t *recepient_uid = NULL;
-            if (bson_get_binary(payload, "ruid", &recepient_uid, &recepient_uid_len) != BSON_SUCCESS) {
-                WISHDEBUG(LOG_CRITICAL, "Did not find ruid");
-            }
-            if (recepient_uid_len != WISH_ID_LEN) {
-                WISHDEBUG(LOG_CRITICAL, "ruid len missmatch");
-            }
+        int ret = wish_core_decrypt(core, connection, payload, ciphertxt_len, 
+            auth_tag, AES_GCM_AUTH_TAG_LEN, plaintxt, len);
 
-
-            int32_t cert_doc_len = 0;
-            uint8_t *cert_doc = NULL;
-            if (bson_get_binary(payload, "cert", &cert_doc, &cert_doc_len) 
-                    != BSON_SUCCESS) {
-                WISHDEBUG(LOG_CRITICAL, "Did not find cert");
-            }
-
-            if (bson_get_doc_len(cert_doc) != cert_doc_len) {
-                WISHDEBUG(LOG_CRITICAL, "Contradictory cert lengths");
-            }
-
-            int32_t alias_len = 0;
-            char *alias = NULL;
-            if (bson_get_string(cert_doc, "alias", &alias, &alias_len) != BSON_SUCCESS) {
-                WISHDEBUG(LOG_CRITICAL, "Friend request: No alias");
-            }
-            WISHDEBUG(LOG_CRITICAL, "Friend request from %s", alias);
-
-            wish_relationship_req_t req;
-            strncpy(req.luid, recepient_uid, WISH_UID_LEN);
-
-            wish_identity_t* new_id = &req.id;
-            memset(new_id, 0, sizeof (wish_identity_t));
-
-            wish_populate_id_from_cert(new_id, cert_doc);
-
-            wish_relationship_req_add(core, &req);
-            
-            /* Save the 'id' element in payload to wish context. It will be
-             * used later, if/when user accepts friend request, to retrieve
-             * the friend request from "quarantine" and really add it to
-             * contacts */
-            //memcpy(ctx->pending_friend_req_id, friend_req_id, SIZEOF_ID)
-
-            /* Save the recipient UID of the friend request as luid for the
-             * context. This information will be used later when exporting
-             * the cert */
-            memcpy(connection->luid, recepient_uid, WISH_ID_LEN);
-            memcpy(connection->ruid, new_id->uid, WISH_ID_LEN);
-            
-            WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
-            WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
-
-            struct wish_event evt = {
-                .event_type = WISH_EVENT_FRIEND_REQUEST, 
-                .context = connection 
-            };
-            wish_message_processor_notify(&evt);
-            
-            int buf_len = 1024;
-            char buf[1024];
-            
-            bson bs;
-            bson_init_buffer(&bs, buf, buf_len);
-            bson_append_start_array(&bs, "data");
-            bson_append_string(&bs, "0", "friendRequest");
-            bson_append_finish_array(&bs);
-            bson_finish(&bs);
-            
-            wish_core_signals_emit(core, &bs);
-        }
-        break;
-    case PROTO_SERVER_STATE_REPLY_FRIEND_REQ_ACCEPTED:
-        {
-            WISHDEBUG(LOG_CRITICAL, "Replying to friend request");
-
-            /* First, load the identity... The UID of the identity that
-             * the remote wish core wanted to befriend with is stored in
-             * ctx->local_wuid FIXME? */
-            size_t my_cert_max_len = 512;
-            uint8_t my_identity[my_cert_max_len];
-            
-            if (wish_load_identity_bson(connection->luid, my_identity, my_cert_max_len) < 0) {
-                WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
-            }
-            WISHDEBUG(LOG_CRITICAL, "len = %d", bson_get_doc_len(my_identity));
-
-            /* Then, filter out privkey from the identity */
-            uint8_t my_cert[my_cert_max_len];
-            bson_filter_out_elem("privkey", my_identity, my_cert);
-            WISHDEBUG(LOG_CRITICAL, "len = %d", bson_get_doc_len(my_cert));
-
-            const int32_t friend_req_frame_max_len = my_cert_max_len + 100;
-            uint8_t friend_req_frame[friend_req_frame_max_len];
-            bson_init_doc(friend_req_frame, friend_req_frame_max_len);
-            bson_write_binary(friend_req_frame, friend_req_frame_max_len, "cert", my_cert, bson_get_doc_len(my_cert));
-
-            /* Encode the length of the document in the begining, then
-             * send len + the frame */
-            /* FIXME REFACTOR */
-            /* Sinxa LE->BE */
-            uint16_t frame_len = bson_get_doc_len(friend_req_frame);
-            uint8_t frame[2+frame_len];
-            uint16_t frame_len_be = uint16_native2be(frame_len);
-            memcpy(frame, &frame_len_be, 2);
-            memcpy(frame+2, friend_req_frame, bson_get_doc_len(friend_req_frame));
-            /* Send the frame length and the key in one go */
-            int ret = connection->send(connection->send_arg, frame, 2+frame_len);
- 
-            if (ret != 0) {
-                /* Sending failed */
-                WISHDEBUG(LOG_CRITICAL, "Sending failed");
-            }
+        if (ret) {
+            WISHDEBUG(LOG_CRITICAL, 
+                "There was an error while decrypting Wish message when reading friend request cert");
+            wish_platform_free(plaintxt);
             wish_close_connection(core, connection);
+            break;
+        }
 
+        /* Get the recepient identity of the friend request */
+        int32_t recepient_uid_len = 0;
+        uint8_t *recepient_uid = NULL;
+        if (bson_get_binary(plaintxt, "ruid", &recepient_uid, &recepient_uid_len) != BSON_SUCCESS) {
+            WISHDEBUG(LOG_CRITICAL, "Did not find ruid");
         }
-        break;
-    case PROTO_SERVER_STATE_REPLY_FRIEND_REQ_DECLINED:
-        {
-            WISHDEBUG(LOG_CRITICAL, "Replying to friend request with decline");
-            
-            int buf_len = 512;
-            char buf[buf_len];
-            
-            bson bs;
-            bson_init_buffer(&bs, buf, buf_len);
-            bson_append_bool(&bs, "decline", true);
-            bson_finish(&bs);
-            
-            uint16_t frame_len = bson_size(&bs);
-            uint8_t frame[2+frame_len];
-            uint16_t frame_len_be = uint16_native2be(frame_len);
-            memcpy(frame, &frame_len_be, 2);
-            memcpy(frame+2, bson_data(&bs), bson_size(&bs));
-            /* Send the frame length and the key in one go */
-            int ret = connection->send(connection->send_arg, frame, 2+frame_len);
- 
-            if (ret != 0) {
-                /* Sending failed */
-                WISHDEBUG(LOG_CRITICAL, "Sending failed");
-            }
-            wish_close_connection(core, connection);
+        if (recepient_uid_len != WISH_ID_LEN) {
+            WISHDEBUG(LOG_CRITICAL, "ruid len missmatch");
         }
+
+
+        int32_t cert_doc_len = 0;
+        uint8_t *cert_doc = NULL;
+        if (bson_get_binary(plaintxt, "cert", &cert_doc, &cert_doc_len) 
+                != BSON_SUCCESS) {
+            WISHDEBUG(LOG_CRITICAL, "Did not find cert");
+        }
+
+        if (bson_get_doc_len(cert_doc) != cert_doc_len) {
+            WISHDEBUG(LOG_CRITICAL, "Contradictory cert lengths");
+        }
+
+        int32_t alias_len = 0;
+        char *alias = NULL;
+        if (bson_get_string(cert_doc, "alias", &alias, &alias_len) != BSON_SUCCESS) {
+            WISHDEBUG(LOG_CRITICAL, "Friend request: No alias");
+        }
+        WISHDEBUG(LOG_CRITICAL, "Friend request from %s", alias);
+
+        wish_relationship_req_t req;
+        strncpy(req.luid, recepient_uid, WISH_UID_LEN);
+
+        wish_identity_t* new_id = &req.id;
+        memset(new_id, 0, sizeof (wish_identity_t));
+
+        wish_populate_id_from_cert(new_id, cert_doc);
+
+        wish_relationship_req_add(core, &req);
+
+        /* Save the 'id' element in payload to wish context. It will be
+         * used later, if/when user accepts friend request, to retrieve
+         * the friend request from "quarantine" and really add it to
+         * contacts */
+        //memcpy(ctx->pending_friend_req_id, friend_req_id, SIZEOF_ID)
+
+        /* Save the recipient UID of the friend request as luid for the
+         * context. This information will be used later when exporting
+         * the cert */
+        memcpy(connection->luid, recepient_uid, WISH_ID_LEN);
+        memcpy(connection->ruid, new_id->uid, WISH_ID_LEN);
+
+        WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
+        WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
+
+        struct wish_event evt = {
+            .event_type = WISH_EVENT_FRIEND_REQUEST, 
+            .context = connection 
+        };
+        wish_message_processor_notify(&evt);
+
+        int buf_len = 1024;
+        char buf[1024];
+
+        bson bs;
+        bson_init_buffer(&bs, buf, buf_len);
+        bson_append_start_array(&bs, "data");
+        bson_append_string(&bs, "0", "friendRequest");
+        bson_append_finish_array(&bs);
+        bson_finish(&bs);
+
+        wish_core_signals_emit(core, &bs);
         break;
+    }
+        
+    case PROTO_SERVER_STATE_REPLY_FRIEND_REQ_ACCEPTED: {
+        WISHDEBUG(LOG_CRITICAL, "Replying to friend request");
+
+        /* First, load the identity... The UID of the identity that
+         * the remote wish core wanted to befriend with is stored in
+         * ctx->local_wuid FIXME? */
+        size_t my_cert_max_len = 512;
+        uint8_t my_identity[my_cert_max_len];
+
+        if (wish_load_identity_bson(connection->luid, my_identity, my_cert_max_len) < 0) {
+            WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
+        }
+        WISHDEBUG(LOG_CRITICAL, "len = %d", bson_get_doc_len(my_identity));
+
+        /* Then, filter out privkey from the identity */
+        uint8_t my_cert[my_cert_max_len];
+        bson_filter_out_elem("privkey", my_identity, my_cert);
+        WISHDEBUG(LOG_CRITICAL, "len = %d", bson_get_doc_len(my_cert));
+
+        const int32_t friend_req_frame_max_len = my_cert_max_len + 100;
+        uint8_t friend_req_frame[friend_req_frame_max_len];
+        bson_init_doc(friend_req_frame, friend_req_frame_max_len);
+        bson_write_binary(friend_req_frame, friend_req_frame_max_len, "cert", my_cert, bson_get_doc_len(my_cert));
+
+        int ret = wish_core_send_message(core, connection, friend_req_frame, bson_get_doc_len(friend_req_frame));
+
+        if (ret != 0) {
+            /* Sending failed */
+            WISHDEBUG(LOG_CRITICAL, "Sending failed");
+        }
+        wish_close_connection(core, connection);
+        break;
+    }     
+    case PROTO_SERVER_STATE_REPLY_FRIEND_REQ_DECLINED: {
+        WISHDEBUG(LOG_CRITICAL, "Replying to friend request with decline");
+
+        int buf_len = 512;
+        char buf[buf_len];
+
+        bson bs;
+        bson_init_buffer(&bs, buf, buf_len);
+        bson_append_bool(&bs, "decline", true);
+        bson_finish(&bs);
+
+        int ret = wish_core_send_message(core, connection, buf, bson_size(&bs));
+
+        if (ret != 0) {
+            /* Sending failed */
+            WISHDEBUG(LOG_CRITICAL, "Sending failed");
+        }
+        wish_close_connection(core, connection);
+        break;
+    }
     case PROTO_STATE_FRIEND_REQ_RESPONSE: {
         /* This state is entered after we have sent a friend request to
          * a peer, and the peer has sent some kind of a reply to us 
          * (usually a cert, if the frient request was accepted) */
-        ;
+        
+        /* Length of part of incoming payload containing cipher text */
+        int ciphertxt_len = len - AES_GCM_AUTH_TAG_LEN;
+        int plaintxt_len = ciphertxt_len;
+        uint8_t plaintxt[plaintxt_len];
+        
+        /* Pointer to the beginning of the auth_tag */
+        uint8_t* auth_tag = payload + ciphertxt_len;
+
+        int ret = wish_core_decrypt(core, connection, payload, ciphertxt_len, 
+                auth_tag, AES_GCM_AUTH_TAG_LEN, plaintxt, plaintxt_len);
+
+        if (ret) {
+            WISHDEBUG(LOG_CRITICAL, 
+                "There was an error while decrypting Wish message");
+            wish_close_connection(core, connection);
+            break;
+        }
         
         bson_iterator it;
-        bson_type type = bson_find_from_buffer(&it, payload, "decline");
+        bson_type type = bson_find_from_buffer(&it, plaintxt, "decline");
         
         if ( BSON_BOOL == type ) {
             WISHDEBUG(LOG_CRITICAL, "Friend request was declined.");
@@ -1417,7 +1524,7 @@ wish send handshake");
         
         int32_t cert_len = 0;
         uint8_t *cert;
-        if (bson_get_binary(payload, "cert", &cert, &cert_len) == BSON_FAIL) {
+        if (bson_get_binary(plaintxt, "cert", &cert, &cert_len) == BSON_FAIL) {
             WISHDEBUG(LOG_CRITICAL, "Cannot get certificate from friend req reply");
             wish_close_connection(core, connection);
             break;
@@ -1455,7 +1562,6 @@ wish send handshake");
         if(!found) {
             wish_save_identity_entry(&new_friend_id);
         }
-
 
         int buf_len = 1024;
         char buf[1024];

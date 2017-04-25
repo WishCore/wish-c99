@@ -55,13 +55,15 @@ enum protocol_state {
     PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE,
     /* Server's state where the handshake reply sent by client is processed */
     PROTO_SERVER_STATE_WISH_HANDSHAKE_READ_REPLY, 
-    /* Server is handling a friend request, examine certificate */
+    /* Server is handling an incoming friend request connection, examine certificate sent by the peer */
     PROTO_SERVER_STATE_READ_FRIEND_CERT,
     /* Friend request accepted by user, send own certificate back */
     PROTO_SERVER_STATE_REPLY_FRIEND_REQ_ACCEPTED,    
     /* Friend request declined by user, sends response depending on type of decline (ignore, ban, decline) */
-    PROTO_SERVER_STATE_REPLY_FRIEND_REQ_DECLINED,    
-    /* Friend request was sent by us, and now we are recieveing a reply from the new friend */
+    PROTO_SERVER_STATE_REPLY_FRIEND_REQ_DECLINED,
+    /* Outgoing fried request connection, send own cert */
+    PROTO_STATE_WISH_SEND_OWN_CERT,
+    /* Friend request was sent by us, and now we are receiving a reply from the new friend */
     PROTO_STATE_FRIEND_REQ_RESPONSE,
 };
 
