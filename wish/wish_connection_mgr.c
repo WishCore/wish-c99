@@ -110,12 +110,14 @@ void check_connection_liveliness(wish_core_t* core, void* ctx) {
                 wish_close_connection(core, connection);
             }
             break;
-        case WISH_CONTEXT_IN_MAKING:
-            if (core->core_time > (connection->latest_input_timestamp + PING_TIMEOUT)) {
+        case WISH_CONTEXT_IN_MAKING: {
+            int timeout = connection->friend_req_connection ? FRIEND_REQ_TIMEOUT : CONNECTION_SETUP_TIMEOUT;
+            if (core->core_time > (connection->latest_input_timestamp + timeout)) {
                 WISHDEBUG(LOG_CRITICAL, "Connection ping: Killing connection because it has been in handshake phase for too long");
                 wish_close_connection(core, connection);
             }
             break;
+        }
         case WISH_CONTEXT_CLOSING:
             WISHDEBUG(LOG_CRITICAL, "Connection ping: Found context in closing state! Forcibly closing it.");
             wish_close_connection(core, connection);

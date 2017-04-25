@@ -7,6 +7,12 @@
 
 #define CONNECTION_TIMEOUT 30 /* seconds */
 
+/** Timeout of connection in making */
+#define CONNECTION_SETUP_TIMEOUT PING_TIMEOUT
+
+/** Timeout of a friend request connection */
+#define FRIEND_REQ_TIMEOUT 300 /* Seconds */
+
 /* Wish connection manager interface.
  * These functions will usually be implemented in port-specific code */
 
