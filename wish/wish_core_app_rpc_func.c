@@ -398,6 +398,18 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
+    char* claim = 0;
+    int32_t claim_len = 0;
+    if (bson_get_binary(args, "2", (uint8_t**) &claim, &claim_len) != BSON_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Export without claim.");
+        // ensure claim is NULL
+        claim = NULL;
+        //wish_rpc_server_error(req, 8, "Missing export type argument");
+        //return;
+    } else {
+        WISHDEBUG(LOG_CRITICAL, "Export with claim. %p %i", claim, claim_len);
+    }
+
     wish_identity_t id;
     
     if ( ret_success != wish_identity_load(arg_uid, &id) ) {
@@ -416,19 +428,21 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
 
     int i = 0;
 
-    if (core->relay_db != NULL) {
-        bson_append_start_array(&bs, "transports");
+    if (strcmp(export_type_str, "binary") == 0) {
+        if (core->relay_db != NULL) {
+            bson_append_start_array(&bs, "transports");
 
-        LL_FOREACH(core->relay_db, relay) {
-            char index[21];
-            BSON_NUMSTR(index, i++);
-            char host[29];
-            snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+            LL_FOREACH(core->relay_db, relay) {
+                char index[21];
+                BSON_NUMSTR(index, i++);
+                char host[29];
+                snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
 
-            bson_append_string(&bs, index, host);
+                bson_append_string(&bs, index, host);
+            }
+
+            bson_append_finish_array(&bs);
         }
-
-        bson_append_finish_array(&bs);
     }
 
     bson_append_finish_object(&bs);
@@ -445,38 +459,28 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
     bson b;
     bson_init_size(&b, WISH_PORT_RPC_BUFFER_SZ);
     
-    if (strcmp(export_type_str, "signed") == 0) {
-        mbedtls_sha256_context sha256;
-        mbedtls_sha256_init(&sha256);
-        mbedtls_sha256_starts(&sha256, 0); 
-        mbedtls_sha256_update(&sha256, bson_data(&bs), bson_size(&bs)); 
-        int hash_len = 32;
-        uint8_t hash[hash_len];
-        mbedtls_sha256_finish(&sha256, hash);
-        mbedtls_sha256_free(&sha256);
-
-
-        uint8_t signature[ED25519_SIGNATURE_LEN];
-        uint8_t privkey[WISH_PRIVKEY_LEN];
-
-        if (wish_load_privkey(id.uid, privkey)) {
-            WISHDEBUG(LOG_CRITICAL, "Could not load privkey for signing export %s", id.alias);
-            wish_rpc_server_error(req, 345, "Could not sign exported document.");
-            bson_destroy(&bs);
-            return;
-        } else {
-            ed25519_sign(signature, hash, hash_len, privkey);
-        }
+    if (strcmp(export_type_str, "document") == 0) {
         
         bson_append_start_object(&b, "data");
-        bson_append_start_array(&b, "signatures");
-        bson_append_start_object(&b, "0");
-        bson_append_string(&b, "algo", "sha256-ed25519");
-        bson_append_binary(&b, "uid", id.uid, WISH_UID_LEN);
-        bson_append_binary(&b, "sign", signature, ED25519_SIGNATURE_LEN);
-        bson_append_finish_array(&b);
-        bson_append_finish_object(&b);
-        bson_append_binary(&b, "cert", bson_data(&bs), bson_size(&bs));
+        bson_append_binary(&b, "data", bson_data(&bs), bson_size(&bs));
+        
+        if (core->relay_db != NULL) {
+            bson_append_start_object(&b, "meta");
+            bson_append_start_array(&b, "transports");
+
+            LL_FOREACH(core->relay_db, relay) {
+                char index[21];
+                BSON_NUMSTR(index, i++);
+                char host[29];
+                snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+
+                bson_append_string(&b, index, host);
+            }
+
+            bson_append_finish_array(&b);
+            bson_append_finish_object(&b);
+        }
+        
         bson_append_finish_object(&b);
     } else if (strcmp(export_type_str, "binary") == 0) {
         bson_append_binary(&b, "data", bson_data(&bs), bson_size(&bs));
@@ -882,6 +886,10 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
+    // allocate space for signature and privkey
+    uint8_t signature[ED25519_SIGNATURE_LEN];
+    uint8_t privkey[WISH_PRIVKEY_LEN];
+
     bson_iterator it;
     bson_find_from_buffer(&it, args, "0");
     
@@ -892,44 +900,157 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
 
     uint8_t *luid = 0;
     luid = (uint8_t *)bson_iterator_bin_data(&it);
-
-    bson_find_from_buffer(&it, args, "1");
     
-    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) < 32 || bson_iterator_bin_len(&it) > 64 ) {
-        wish_rpc_server_error(req, 345, "Invalid hash.");
-        return;
-    }
-    
-    char hash[64];
-    int hash_len = bson_iterator_bin_len(&it);
-    
-    memcpy(hash, bson_iterator_bin_data(&it), hash_len);
-
-    uint8_t signature[ED25519_SIGNATURE_LEN];
-    uint8_t local_privkey[WISH_PRIVKEY_LEN];
-    if (wish_load_privkey(luid, local_privkey)) {
+    // check if we can make a signature with this identity
+    if (wish_load_privkey(luid, privkey)) {
         WISHDEBUG(LOG_CRITICAL, "Could not load privkey");
         wish_rpc_server_error(req, 345, "Could not load private key.");
         return;
     }
-    else {
-        ed25519_sign(signature, hash, hash_len, local_privkey);
+
+    const char* claim = NULL;
+    int32_t claim_len = 0;
+
+    bson_find_from_buffer(&it, args, "2");
+
+    if(bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 5 && bson_iterator_bin_len(&it) <= 512 ) {
+        claim = bson_iterator_bin_data(&it);
+        claim_len = bson_iterator_bin_len(&it);
+        WISHDEBUG(LOG_CRITICAL, "Sign with claim. %p %i", claim, claim_len);
     }
+    
+    bson_find_from_buffer(&it, args, "1");
+    
+    if(bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 32 && bson_iterator_bin_len(&it) <= 64 ) {
+        // sign hash
+        char hash[64];
+        int hash_len = bson_iterator_bin_len(&it);
 
-    //wish_debug_print_array(LOG_DEBUG, signature, ED25519_SIGNATURE_LEN);
+        memcpy(hash, bson_iterator_bin_data(&it), hash_len);
 
-    bson bs;
+        ed25519_sign(signature, hash, hash_len, privkey);
 
-    bson_init_buffer(&bs, buffer, buffer_len);
-    bson_append_binary(&bs, "data", signature, ED25519_SIGNATURE_LEN);
-    bson_finish(&bs);
+        //wish_debug_print_array(LOG_DEBUG, signature, ED25519_SIGNATURE_LEN);
 
-    if(bs.err != 0) {
-        wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        bson bs;
+
+        bson_init_buffer(&bs, buffer, buffer_len);
+        bson_append_binary(&bs, "data", signature, ED25519_SIGNATURE_LEN);
+        bson_finish(&bs);
+
+        if(bs.err != 0) {
+            wish_rpc_server_error(req, 344, "Failed writing reponse.");
+            return;
+        }
+
+        wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+    } else if (bson_iterator_type(&it) == BSON_OBJECT) {
+        // sign object { data: Buffer(n) }
+
+        bson b;
+
+        bson_init_buffer(&b, buffer, buffer_len);
+        bson_append_start_object(&b, "data");
+        
+        bson_iterator_from_buffer(&it, args);
+        
+        if ( bson_find_fieldpath_value("1.data", &it) != BSON_BINDATA ) {
+            WISHDEBUG(LOG_CRITICAL, "1.data not bin data");
+            
+            wish_rpc_server_error(req, 345, "Second arg object does not have { data: <Buffer> }.");
+            return;
+        }
+
+        // copy the data blob to response
+        const char* data = bson_iterator_bin_data(&it);
+        int data_len = bson_iterator_bin_len(&it);
+        bson_append_binary(&b, "data", data, data_len);
+        
+        bson_append_field_from_iterator(&it, &b);
+
+        bson_iterator_from_buffer(&it, args);
+        
+        if ( bson_find_fieldpath_value("1.meta", &it) != BSON_EOO ) {
+            WISHDEBUG(LOG_CRITICAL, "1.meta");
+            bson_append_field_from_iterator(&it, &b);
+        }
+        
+        int hash_len = 32;
+        uint8_t hash[hash_len];
+        uint8_t claim_hash[hash_len];
+        
+        mbedtls_sha256_context sha256;
+        mbedtls_sha256_init(&sha256);
+        mbedtls_sha256_starts(&sha256, 0); 
+        mbedtls_sha256_update(&sha256, data, data_len); 
+        mbedtls_sha256_finish(&sha256, hash);
+        mbedtls_sha256_free(&sha256);
+
+
+        if (claim != NULL && claim_len > 0) {
+            // If a claim is present xor it's sha256 hash with the data hash.
+            // This way the signature covers the original data and the claim
+            //   claim: BSON({ msg: 'This guy is good!', timestamp: Date.now(), trust: 'VERIFIED', (algo: 'sha256-ed25519') })
+            
+            mbedtls_sha256_init(&sha256);
+            mbedtls_sha256_starts(&sha256, 0);
+            mbedtls_sha256_update(&sha256, claim, claim_len);
+            mbedtls_sha256_finish(&sha256, claim_hash);
+            mbedtls_sha256_free(&sha256);
+            
+            int c = 0;
+            for(c=0; c<32; c++) {
+                hash[c] ^= claim_hash[c];
+            }
+        }
+        
+        bson_iterator_from_buffer(&it, args);
+
+        bson_append_start_array(&b, "signatures");
+
+        char index[21];
+        int i = 0;
+        
+        // copy signatures already present
+        if ( bson_find_fieldpath_value("1.signatures.0", &it) != BSON_EOO ) {
+            WISHDEBUG(LOG_CRITICAL, "1.signatures.0 already present, should be copied.");
+            
+            do {
+                BSON_NUMSTR(index, i++);
+                bson_append_element(&b, index, &it);
+            } while ( bson_iterator_next(&it) != BSON_EOO );
+        }
+        
+        // add signature by uid
+        ed25519_sign(signature, hash, hash_len, privkey);
+        
+        BSON_NUMSTR(index, i++);
+
+        bson_append_start_object(&b, index);
+        bson_append_string(&b, "algo", "sha256-ed25519");
+        bson_append_binary(&b, "uid", luid, WISH_UID_LEN);
+        bson_append_binary(&b, "sign", signature, ED25519_SIGNATURE_LEN);
+        if (claim != NULL && claim_len > 0) {
+            bson_append_binary(&b, "claim", claim, claim_len);
+        }
+        
+        bson_append_finish_object(&b);
+        bson_append_finish_array(&b);
+        
+        bson_append_finish_object(&b);
+        bson_finish(&b);
+
+        if(b.err != 0) {
+            wish_rpc_server_error(req, 344, "Failed writing reponse.");
+            return;
+        }
+        
+        wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
+        return;
+    } else {
+        wish_rpc_server_error(req, 345, "Second arg not valid hash or object.");
         return;
     }
-
-    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
 }
 
 /*
@@ -1880,6 +2001,8 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
     }
     
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    
+    wish_core_config_save(core);
 }
 
 /*
@@ -1960,14 +2083,14 @@ handler identity_friend_request_decline_handler =     { .op_str = "identity.frie
 
 handler directory_find_handler =                      { .op_str = "directory.find",                    .handler = wish_api_directory_find };
 
-handler api_acl_check_h =                                 { .op_str = "acl.check",                         .handler = wish_api_acl_check };
-handler api_acl_allow_h =                                 { .op_str = "acl.allow",                         .handler = wish_api_acl_allow };
-handler api_acl_remove_allow_h =                          { .op_str = "acl.removeAllow",                   .handler = wish_api_acl_remove_allow };
-handler api_acl_add_user_roles_h =                        { .op_str = "acl.addUserRoles",                  .handler = wish_api_acl_add_user_roles };
-handler api_acl_remove_user_roles_h =                     { .op_str = "acl.removeUserRoles",               .handler = wish_api_acl_remove_user_roles };
-handler api_acl_user_roles_h =                            { .op_str = "acl.userRoles",                     .handler = wish_api_acl_user_roles };
-handler api_acl_what_resources_h =                        { .op_str = "acl.whatResources",                 .handler = wish_api_acl_what_resources };
-handler api_acl_allowed_permissions_h =                   { .op_str = "acl.allowedPermissions",            .handler = wish_api_acl_allowed_permissions };
+handler api_acl_check_h =                             { .op_str = "acl.check",                         .handler = wish_api_acl_check };
+handler api_acl_allow_h =                             { .op_str = "acl.allow",                         .handler = wish_api_acl_allow };
+handler api_acl_remove_allow_h =                      { .op_str = "acl.removeAllow",                   .handler = wish_api_acl_remove_allow };
+handler api_acl_add_user_roles_h =                    { .op_str = "acl.addUserRoles",                  .handler = wish_api_acl_add_user_roles };
+handler api_acl_remove_user_roles_h =                 { .op_str = "acl.removeUserRoles",               .handler = wish_api_acl_remove_user_roles };
+handler api_acl_user_roles_h =                        { .op_str = "acl.userRoles",                     .handler = wish_api_acl_user_roles };
+handler api_acl_what_resources_h =                    { .op_str = "acl.whatResources",                 .handler = wish_api_acl_what_resources };
+handler api_acl_allowed_permissions_h =               { .op_str = "acl.allowedPermissions",            .handler = wish_api_acl_allowed_permissions };
         
 handler relay_list_handler =                          { .op_str = "relay.list",                        .handler = relay_list };
 handler relay_add_handler =                           { .op_str = "relay.add",                         .handler = relay_add };
