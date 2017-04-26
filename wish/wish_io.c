@@ -329,43 +329,7 @@ again:
                             }
                             else if (conn_type ==  WISH_WIRE_TYPE_FRIEND_REQ) {
                                 WISHDEBUG(LOG_CRITICAL, "Friend req");           
-#if 0
-                                /* We have received a fried request.
-                                 * Since we have already read in more
-                                 * data than we would have needed, a
-                                 * procedure must be followed:
-                                 *
-                                 * 1) Read out all of the unconsumed data
-                                 * 2) Clear the ring buffer
-                                 * 3) Write back the data we already consumed: 
-                                 * buf+3, len = (WISH_CLIENT_HELLO_LEN - 3) 
-                                 * 4) Write the unconsumed data to the ring buffer */
-                                uint16_t unconsumed_data_len = ring_buffer_length(&(connection->rx_ringbuf));
-                                uint8_t unconsumed_data[unconsumed_data_len];
-                                
-                                ring_buffer_read(&(connection->rx_ringbuf), unconsumed_data, unconsumed_data_len);
-                                ring_buffer_write(&(connection->rx_ringbuf), buf+3, WISH_CLIENT_HELLO_LEN-3);
-                                
-                                if (unconsumed_data_len > 0) {
-                                    ring_buffer_write(&(connection->rx_ringbuf), unconsumed_data, unconsumed_data_len);
-                                }
-
-                                /* Advance protocol states */
-                                connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
-                                connection->curr_protocol_state = PROTO_SERVER_STATE_READ_FRIEND_CERT;
-
-                                /* Place a "synthetic" notification that
-                                 * there is new data available */
-                                struct wish_event evt = { 
-                                    .event_type = WISH_EVENT_NEW_DATA, 
-                                    .context = connection 
-                                };
-                                wish_message_processor_notify(&evt);
-
-                                break;
-#else
                                 connection->friend_req_connection = true;
-#endif
                             } else {
                                 WISHDEBUG(LOG_CRITICAL, "Unknown connection type");
                                 wish_close_connection(core, connection);
@@ -509,8 +473,7 @@ void wish_core_register_send(wish_core_t* core, wish_connection_t* connection, i
 void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection,  enum tcp_event ev) {
     WISHDEBUG(LOG_DEBUG, "TCP Event for connection id %d", connection->connection_id);
     switch (ev) {
-    case TCP_CONNECTED:
-    {
+    case TCP_CONNECTED: {
         WISHDEBUG(LOG_DEBUG, "Event TCP_CONNECTED");
 
         connection->outgoing = true;
@@ -535,96 +498,8 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
 
         /* Maestro, take it away please */
         connection->send(connection->send_arg, buffer, buffer_len);
-    }
-#if 0
-        if (connection->friend_req_connection == false) {
-            /* Start the whole show by sending the handshake bytes */
-            const int buffer_len = 2+1+WISH_ID_LEN+WISH_ID_LEN;
-            unsigned char buffer[buffer_len];
-            buffer[0] = 'W';
-            buffer[1] = '.';
-            /* Protocol version and function */
-            buffer[2] = (WISH_WIRE_VERSION << 4) | (WISH_WIRE_TYPE_NORMAL); 
-            /* Now copy the destination id */
-            memcpy(buffer+3, connection->ruid, WISH_ID_LEN);
-            /* then copy the source id */
-            memcpy(buffer+3+WISH_ID_LEN, connection->luid, WISH_ID_LEN);
-            connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
-            connection->curr_protocol_state = PROTO_STATE_DH;
-
-            /* Maestro, take it away please */
-            connection->send(connection->send_arg, buffer, buffer_len);
-        }
-        else {
-            WISHDEBUG(LOG_CRITICAL, "Sending friend request!");
-            /* To send a friend request, you send 
-             * W.<high_nible 1|llow nible 3> */
-            const int buffer_len = 500;
-            uint8_t buffer[buffer_len];
-            uint8_t *handshake = buffer;
-            handshake[0] = 'W';
-            handshake[1] = '.';
-            handshake[2] = WISH_WIRE_VERSION << 4 | WISH_WIRE_TYPE_FRIEND_REQ;
-
-            /* Next, we will send our own certificate, but first we need
-             * to wrap it inside a frame, so the next two bytes after
-             * the handshake will be fill out later when we know the
-             * cert frame length. 
-             */
-
-            /* Note +5, because we leave two bytes for frame len */
-            uint8_t *doc = buffer+5;
-            size_t doc_len = buffer_len -5;
-
-            bson bs;
-            bson_init_buffer(&bs, doc, doc_len);
-            bson_append_binary(&bs, "ruid", connection->ruid, WISH_ID_LEN);
-            int req_id_len = 7;
-            uint8_t req_id[req_id_len];
-            wish_platform_fill_random(NULL, req_id, req_id_len);
-            int i = 0;
-            for (i = 0; i < req_id_len; i++) {
-                req_id[i] = req_id[i] % 26 + 'a';
-            }
-            req_id[6] = 0;
-            bson_append_string(&bs, "id", req_id);
-
-            /* Generate our own cert */
-            size_t my_cert_max_len = 300;
-            uint8_t my_identity[my_cert_max_len];
-            
-            if (wish_load_identity_bson(connection->luid, my_identity, my_cert_max_len) < 0) {
-                WISHDEBUG(LOG_CRITICAL, "Identity could not be loaded");
-                break;
-            }
-            WISHDEBUG(LOG_CRITICAL, "cert len = %d", bson_get_doc_len(my_identity));
-            /* Then, filter out privkey from the identity */
-            uint8_t my_cert[my_cert_max_len];
-            bson_filter_out_elem("privkey", my_identity, my_cert);
-
-            bson_append_binary(&bs, "cert", my_cert, bson_get_doc_len(my_cert));
-            bson_finish(&bs);
-
-            
-            if (bs.err) {
-                WISHDEBUG(LOG_CRITICAL, "Send friend request: Failed writing bson.");
-            }
-            else {
-                int frame_len = bson_size(&bs);
-                uint8_t *frame_hdr = buffer + 3;
-                uint16_t frame_len_be = uint16_native2be(frame_len);
-                memcpy(frame_hdr, &frame_len_be, 2);
-                int ret = connection->send(connection->send_arg, buffer, 3+2+frame_len);
-                if (ret) {
-                    WISHDEBUG(LOG_CRITICAL, "Failed sending friend request");
-                    break;
-                }
-                connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
-                connection->curr_protocol_state = PROTO_STATE_FRIEND_REQ_RESPONSE;
-            }
-        }
-#endif
         break;
+    }
     case TCP_CLIENT_DISCONNECTED:
         WISHDEBUG(LOG_DEBUG, "Event TCP_CLIENT_DISCONNECTED");
         /* FALLTHROUGH */
@@ -1059,6 +934,8 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             wish_platform_free(plaintxt);
         }
         break;
+        
+
     case PROTO_STATE_WISH_SEND_OWN_CERT:
         friend_req_send_own_cert:
         /* Outgoing friend request connection: the connection is now established, send own certificate now */
@@ -1644,16 +1521,6 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, uin
         return 1;
     }
 
-#if 0
-    WISHDEBUG(LOG_TRIVIAL, "Auth tag:");
-    int i = 0;
-    for (i = 0; i < AES_GCM_AUTH_TAG_LEN; i++) {
-        WISHDEBUG2(LOG_TRIVIAL, "0x%x ", (frame+2+payload_len)[i]);
-    }
-    WISHDEBUG(LOG_TRIVIAL, "");
-#endif
-
-
     /* Sinxa LE->BE */
     uint16_t frame_len_be = uint16_native2be(payload_len+AES_GCM_AUTH_TAG_LEN);
     memcpy(frame, &frame_len_be, 2);
@@ -1692,23 +1559,6 @@ size_t plaintxt_len) {
         mbedtls_gcm_free(&aes_gcm_ctx);
         return WISH_CORE_DECRYPT_FAIL;
     }
-
-#if 0
-    int i = 0;
-
-    /* Print out iv */
-    WISHDEBUG(LOG_TRIVIAL, "iv: ");
-    for (i = 0; i < AES_GCM_IV_LEN; i++) {
-        WISHDEBUG2(LOG_TRIVIAL, "0x%x ", ctx->aes_gcm_iv_in[i]);
-    }
-    WISHDEBUG(LOG_TRIVIAL, "ciphertext len=%d: ", ciphertxt_len);
-
-    /* Print out ciphertext */
-    for (i = 0; i < ciphertxt_len; i++) {
-        WISHDEBUG2(LOG_TRIVIAL, "0x%x ", payload[i]);
-    }
-    WISHDEBUG(LOG_TRIVIAL, "auth tag: ");
-#endif
 
     /* The locally calculated auth tag is stored here - for later
      * comparison */
