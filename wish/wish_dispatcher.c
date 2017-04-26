@@ -43,14 +43,14 @@ static return_t zeroes(void* src, int bytes) {
     for (i=0; i< bytes; i++) {
         char* b = (char*) src;
         if (b[i] & 0xff) {
-            return ret_fail;
+            return RET_FAIL;
         }
     }
-    return ret_success;
+    return RET_SUCCESS;
 }
 
 size_t wish_core_get_host_id(wish_core_t* core, uint8_t *hostid_ptr) {
-    if ( zeroes(core->id, WISH_WHID_LEN) == ret_success ) {
+    if ( zeroes(core->id, WISH_WHID_LEN) == RET_SUCCESS ) {
         WISHDEBUG(LOG_CRITICAL, "Creating new host id");
         /* Create new host id file */        
         char sys_id_input_str[WISH_WHID_LEN];

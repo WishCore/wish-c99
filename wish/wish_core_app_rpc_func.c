@@ -398,21 +398,9 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
-    char* claim = 0;
-    int32_t claim_len = 0;
-    if (bson_get_binary(args, "2", (uint8_t**) &claim, &claim_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Export without claim.");
-        // ensure claim is NULL
-        claim = NULL;
-        //wish_rpc_server_error(req, 8, "Missing export type argument");
-        //return;
-    } else {
-        WISHDEBUG(LOG_CRITICAL, "Export with claim. %p %i", claim, claim_len);
-    }
-
     wish_identity_t id;
     
-    if ( ret_success != wish_identity_load(arg_uid, &id) ) {
+    if ( RET_SUCCESS != wish_identity_load(arg_uid, &id) ) {
         wish_rpc_server_error(req, 343, "Failed to load identity.");
         return;
     }
@@ -850,7 +838,7 @@ static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
         luid = (uint8_t *)bson_iterator_bin_data(&it);
 
         wish_identity_t id_to_remove;
-        if (wish_identity_load(luid, &id_to_remove) == ret_success) {
+        if (wish_identity_load(luid, &id_to_remove) == RET_SUCCESS) {
             wish_report_identity_to_local_services(core, &id_to_remove, false);
         }
         
@@ -883,12 +871,17 @@ static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
  * App to core: { op: "identity.sign", args: [ <Buffer> uid, <Buffer> hash ], id: 5 }
  */
 static void identity_sign(rpc_server_req* req, uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
     // allocate space for signature and privkey
-    uint8_t signature[ED25519_SIGNATURE_LEN];
-    uint8_t privkey[WISH_PRIVKEY_LEN];
+    uint8_t signature_base[ED25519_SIGNATURE_LEN];
+    
+    bin signature;
+    signature.base = signature_base;
+    signature.len = ED25519_SIGNATURE_LEN;
 
     bson_iterator it;
     bson_find_from_buffer(&it, args, "0");
@@ -901,22 +894,23 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
     uint8_t *luid = 0;
     luid = (uint8_t *)bson_iterator_bin_data(&it);
     
+    wish_identity_t uid;
+    
     // check if we can make a signature with this identity
-    if (wish_load_privkey(luid, privkey)) {
-        WISHDEBUG(LOG_CRITICAL, "Could not load privkey");
-        wish_rpc_server_error(req, 345, "Could not load private key.");
+    if (wish_identity_load(luid, &uid) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+        wish_rpc_server_error(req, 345, "Could not load identity.");
         return;
     }
-
-    const char* claim = NULL;
-    int32_t claim_len = 0;
+    
+    bin claim;
 
     bson_find_from_buffer(&it, args, "2");
 
     if(bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 5 && bson_iterator_bin_len(&it) <= 512 ) {
-        claim = bson_iterator_bin_data(&it);
-        claim_len = bson_iterator_bin_len(&it);
-        WISHDEBUG(LOG_CRITICAL, "Sign with claim. %p %i", claim, claim_len);
+        claim.base = (char*) bson_iterator_bin_data(&it);
+        claim.len = bson_iterator_bin_len(&it);
+        WISHDEBUG(LOG_CRITICAL, "Sign with claim. %p %i", claim.base, claim.len);
     }
     
     bson_find_from_buffer(&it, args, "1");
@@ -928,14 +922,12 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
 
         memcpy(hash, bson_iterator_bin_data(&it), hash_len);
 
-        ed25519_sign(signature, hash, hash_len, privkey);
-
         //wish_debug_print_array(LOG_DEBUG, signature, ED25519_SIGNATURE_LEN);
 
         bson bs;
 
         bson_init_buffer(&bs, buffer, buffer_len);
-        bson_append_binary(&bs, "data", signature, ED25519_SIGNATURE_LEN);
+        bson_append_binary(&bs, "data", signature.base, ED25519_SIGNATURE_LEN);
         bson_finish(&bs);
 
         if(bs.err != 0) {
@@ -962,9 +954,11 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
         }
 
         // copy the data blob to response
-        const char* data = bson_iterator_bin_data(&it);
-        int data_len = bson_iterator_bin_len(&it);
-        bson_append_binary(&b, "data", data, data_len);
+        bin data;
+        data.base = (char*) bson_iterator_bin_data(&it);
+        data.len = bson_iterator_bin_len(&it);
+        
+        bson_append_binary(&b, "data", data.base, data.len);
         
         bson_append_field_from_iterator(&it, &b);
 
@@ -974,36 +968,7 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
             WISHDEBUG(LOG_CRITICAL, "1.meta");
             bson_append_field_from_iterator(&it, &b);
         }
-        
-        int hash_len = 32;
-        uint8_t hash[hash_len];
-        uint8_t claim_hash[hash_len];
-        
-        mbedtls_sha256_context sha256;
-        mbedtls_sha256_init(&sha256);
-        mbedtls_sha256_starts(&sha256, 0); 
-        mbedtls_sha256_update(&sha256, data, data_len); 
-        mbedtls_sha256_finish(&sha256, hash);
-        mbedtls_sha256_free(&sha256);
 
-
-        if (claim != NULL && claim_len > 0) {
-            // If a claim is present xor it's sha256 hash with the data hash.
-            // This way the signature covers the original data and the claim
-            //   claim: BSON({ msg: 'This guy is good!', timestamp: Date.now(), trust: 'VERIFIED', (algo: 'sha256-ed25519') })
-            
-            mbedtls_sha256_init(&sha256);
-            mbedtls_sha256_starts(&sha256, 0);
-            mbedtls_sha256_update(&sha256, claim, claim_len);
-            mbedtls_sha256_finish(&sha256, claim_hash);
-            mbedtls_sha256_free(&sha256);
-            
-            int c = 0;
-            for(c=0; c<32; c++) {
-                hash[c] ^= claim_hash[c];
-            }
-        }
-        
         bson_iterator_from_buffer(&it, args);
 
         bson_append_start_array(&b, "signatures");
@@ -1013,25 +978,25 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
         
         // copy signatures already present
         if ( bson_find_fieldpath_value("1.signatures.0", &it) != BSON_EOO ) {
-            WISHDEBUG(LOG_CRITICAL, "1.signatures.0 already present, should be copied.");
             
             do {
                 BSON_NUMSTR(index, i++);
+                WISHDEBUG(LOG_CRITICAL, "1.signatures.0 already present, should be copied. %i", i);
                 bson_append_element(&b, index, &it);
             } while ( bson_iterator_next(&it) != BSON_EOO );
         }
         
         // add signature by uid
-        ed25519_sign(signature, hash, hash_len, privkey);
+        wish_identity_sign(core, &uid, &data, &claim, &signature);
         
         BSON_NUMSTR(index, i++);
 
         bson_append_start_object(&b, index);
         bson_append_string(&b, "algo", "sha256-ed25519");
         bson_append_binary(&b, "uid", luid, WISH_UID_LEN);
-        bson_append_binary(&b, "sign", signature, ED25519_SIGNATURE_LEN);
-        if (claim != NULL && claim_len > 0) {
-            bson_append_binary(&b, "claim", claim, claim_len);
+        bson_append_binary(&b, "sign", signature.base, ED25519_SIGNATURE_LEN);
+        if (claim.base != NULL && claim.len > 0) {
+            bson_append_binary(&b, "claim", claim.base, claim.len);
         }
         
         bson_append_finish_object(&b);

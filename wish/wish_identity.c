@@ -221,7 +221,7 @@ int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len ) {
 
 
 return_t wish_identity_load(uint8_t *uid, wish_identity_t *identity) {
-    int retval = ret_fail;
+    int retval = RET_FAIL;
 
     if (uid == NULL) {
         return retval;
@@ -304,7 +304,7 @@ return_t wish_identity_load(uint8_t *uid, wish_identity_t *identity) {
 
             /* When we got this far, we are satisfied with import, the
              * rest is optional */
-            retval = ret_success;
+            retval = RET_SUCCESS;
 
             uint8_t *transports_doc = NULL;
             int32_t transports_doc_len = 0;
@@ -522,7 +522,7 @@ int wish_load_pubkey(uint8_t *uid, uint8_t *dst_buffer) {
     wish_identity_t id;
     return_t retval = wish_identity_load(uid, &id);
 
-    if (retval != ret_success) {
+    if (retval != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "wish_load_pubkey: Identity not found");
         return -1;
     }
@@ -539,7 +539,7 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer) {
     wish_identity_t id;
     return_t retval = wish_identity_load(uid, &id);
 
-    if (retval != ret_success) {
+    if (retval != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "wish_load_privkey: Identity not found");
         return -1;
     }
@@ -752,3 +752,48 @@ int wish_get_local_identity_list(wish_uid_list_elem_t *list, int list_len) {
     }
     return j;
 }
+
+return_t wish_identity_sign(wish_core_t* core, wish_identity_t* uid, const bin* data, const bin* claim, bin* signature) {
+    if (!uid->has_privkey) {
+        return RET_E_NO_PRIVKEY;
+    }
+
+    if (data == NULL || data->base == NULL || data->len == 0) {
+        return RET_E_INVALID_INPUT;
+    }
+    
+    int hash_len = 32;
+    uint8_t hash[hash_len];
+    uint8_t claim_hash[hash_len];
+
+    mbedtls_sha256_context sha256;
+    mbedtls_sha256_init(&sha256);
+    mbedtls_sha256_starts(&sha256, 0); 
+    mbedtls_sha256_update(&sha256, data->base, data->len); 
+    mbedtls_sha256_finish(&sha256, hash);
+    mbedtls_sha256_free(&sha256);
+
+
+    if (claim != NULL && claim->base != NULL && claim->len > 0) {
+        // If a claim is present xor it's sha256 hash with the data hash.
+        // This way the signature covers the original data and the claim
+        //   claim: BSON({ msg: 'This guy is good!', timestamp: Date.now(), trust: 'VERIFIED', (algo: 'sha256-ed25519') })
+
+        mbedtls_sha256_init(&sha256);
+        mbedtls_sha256_starts(&sha256, 0);
+        mbedtls_sha256_update(&sha256, claim->base, claim->len);
+        mbedtls_sha256_finish(&sha256, claim_hash);
+        mbedtls_sha256_free(&sha256);
+
+        int c = 0;
+        for(c=0; c<32; c++) {
+            hash[c] ^= claim_hash[c];
+        }
+    }
+    
+    ed25519_sign(signature->base, hash, hash_len, uid->privkey);
+    
+    return RET_SUCCESS;
+}
+
+
