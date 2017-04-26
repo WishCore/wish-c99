@@ -96,6 +96,7 @@ typedef struct wish_core {
 
     wish_rpc_server_t* core_api;
     wish_rpc_server_t* app_api;
+    wish_rpc_server_t* friend_req_api;
     
     /* Services */
     struct wish_service_entry* service_registry;

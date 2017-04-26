@@ -13,8 +13,12 @@
 #include "wish_service_registry.h"
 #include "core_service_ipc.h"
 #include "bson_visitor.h"
+#include "wish_relationship.h"
+#include "wish_event.h"
+#include "wish_core_signals.h"
 
 #include "utlist.h"
+
 
 void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service_entry, bool online) {
     int buffer_len = 300;
@@ -352,11 +356,142 @@ static void core_directory(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_error(req, 500, "Not implemented.");
 }
 
+/**
+ * 
+ * 
+ * @param req
+ * @param args a BSON object, like this: [ 0: { data: <Buffer> cert, meta: <Buffer> transports, signatures: { } } ]
+ */
+static void core_friend_req(rpc_server_req* req, uint8_t* args) {
+    wish_connection_t *connection = req->send_context;
+    wish_core_t *core = req->server->context;
+    
+    /* Get the recepient identity of the friend request */
+    uint8_t *recepient_uid = connection->luid;
+    uint8_t *new_friend_uid = connection->ruid;
+    
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    if (bson_iterator_type(&it) != BSON_OBJECT) {
+        WISHDEBUG(LOG_CRITICAL, "Cannot get the object '0'");
+        wish_rpc_server_error(req, 501, "Bad friend request args");
+        return;
+    }
+    
+    /* Reset iterator */
+    bson_iterator_from_buffer(&it, args);
+    /* Find the element pointed by 0.data */
+    if ( bson_find_fieldpath_value("0.data", &it) != BSON_BINDATA ) {
+        WISHDEBUG(LOG_CRITICAL, "0.data not bin data");
+
+        wish_rpc_server_error(req, 502, "friend req args does not have { data: <Buffer> }.");
+        return;
+    }
+    
+    char *cert = (char *) bson_iterator_bin_data(&it);
+    
+    /* Reset iterator */
+    bson_iterator_from_buffer(&it, args);
+    /* Find the element pointed by 0.data */
+    if ( bson_find_fieldpath_value("0.meta", &it) != BSON_BINDATA ) {
+        WISHDEBUG(LOG_CRITICAL, "0.meta not bin data");
+
+        wish_rpc_server_error(req, 502, "friend req args does not have { meta: <Buffer> }.");
+        return;
+    }
+    
+    char *meta = (char *) bson_iterator_bin_data(&it);
+    
+   
+    wish_relationship_req_t rel;
+    strncpy(rel.luid, recepient_uid, WISH_UID_LEN);
+
+    wish_identity_t* new_id = &rel.id;
+    memset(new_id, 0, sizeof (wish_identity_t));
+
+    wish_populate_id_from_cert(new_id, cert);
+
+    wish_relationship_req_add(core, &rel);
+
+    /* Save the 'id' element in payload to wish context. It will be
+     * used later, if/when user accepts friend request, to retrieve
+     * the friend request from "quarantine" and really add it to
+     * contacts */
+    //memcpy(ctx->pending_friend_req_id, friend_req_id, SIZEOF_ID)
+
+    /* Save the recipient UID of the friend request as luid for the
+     * context. This information will be used later when exporting
+     * the cert */
+    memcpy(connection->luid, recepient_uid, WISH_ID_LEN);
+    memcpy(connection->ruid, new_id->uid, WISH_ID_LEN);
+
+    WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
+    WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
+
+    struct wish_event evt = {
+        .event_type = WISH_EVENT_FRIEND_REQUEST, 
+        .context = connection 
+    };
+    wish_message_processor_notify(&evt);
+
+    int buf_len = 1024;
+    char buf[1024];
+
+    bson bs;
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_append_start_array(&bs, "data");
+    bson_append_string(&bs, "0", "friendRequest");
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
+
+    wish_core_signals_emit(core, &bs);
+
+}
+
+static void friend_req_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t payload_len) {
+    
+}
+
+void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
+    size_t request_max_len = 100;
+    uint8_t request[request_max_len];
+    size_t buffer_max_len = 75;
+    uint8_t buffer[buffer_max_len];
+    
+    size_t args_len = 1024;
+    uint8_t args[args_len];
+        
+    bson bs;
+    bson_init_buffer(&bs, args, args_len);
+    
+    bson_append_start_array(&bs, "args");
+    //bson_append_binary(&bs, "0", cert_buf);
+    
+    
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
+    
+    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "friendRequest", (uint8_t *) bson_data(&bs), bson_size(&bs), friend_req_callback,
+        buffer, buffer_max_len);
+
+    rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
+    mreq->cb_context = ctx;
+    
+    
+    bson_init_doc(request, request_max_len);
+    bson_write_embedded_doc_or_array(request, request_max_len,
+        "req", buffer, BSON_KEY_DOCUMENT);
+    wish_core_send_message(core, ctx, request, bson_get_doc_len(request));
+}
+
+
+
 
 typedef struct wish_rpc_server_handler handler;
 
 handler core_directory_h =                             { .op_str = "directory",                           .handler = core_directory };
 
+handler core_friend_req_h =                            { .op_str = "friendRequest",                       .handler = core_friend_req };
 
 void wish_core_init_rpc(wish_core_t* core) {
     core->core_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
@@ -373,6 +508,21 @@ void wish_core_init_rpc(wish_core_t* core) {
     wish_rpc_server_add_handler(core->core_api, "peers", peers_op_handler);
     wish_rpc_server_add_handler(core->core_api, "send", send_op_handler);
     wish_rpc_server_register(core->core_api, &core_directory_h);
+    
+    /* Initialize core "friend request API" RPC server */
+    core->friend_req_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
+    memset(core->friend_req_api, 0, sizeof(wish_rpc_server_t));
+  
+    core->friend_req_api->request_list_head = NULL;
+    
+    core->friend_req_api->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
+    memset(core->friend_req_api->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
+    core->friend_req_api->rpc_ctx_pool_num_slots = 10;
+    
+    strncpy(core->friend_req_api->server_name, "c2c unsecure", 13);
+    core->friend_req_api->context = core;
+    
+    wish_rpc_server_register(core->friend_req_api, &core_friend_req_h);
 }
 
 void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
@@ -436,7 +586,13 @@ void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connecti
         return;
     } else {
         rpc_server_req *req = &(list_elem->request_ctx);
-        req->server = core->core_api;
+        if (connection->friend_req_connection) {
+            /* Friend request connection: Feed to the message to the special untrusted friend request RPC server */
+            req->server = core->friend_req_api;
+        } else {
+            /* Normal Wish connection: feed the message to the normal "core to core" RPC server */
+            req->server = core->core_api;
+        }
         req->send = wish_core_connection_send;
         req->send_context = connection;
         memset(req->op_str, 0, MAX_RPC_OP_LEN);

@@ -29,3 +29,6 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *registr
  @param ctx the core connection context of the severed link
  */
 void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx);
+
+/** Function for sending out a "friendRequest" RPC */
+void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx);

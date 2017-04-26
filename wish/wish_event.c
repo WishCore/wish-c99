@@ -101,6 +101,8 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
         
         break;
     case WISH_EVENT_ACCEPT_FRIEND_REQUEST:
+        WISHDEBUG(LOG_CRITICAL, "event WISH_EVENT_ACCEPT_FRIEND_REQUEST is unhandled");
+#if 0
         if (connection->curr_protocol_state == PROTO_SERVER_STATE_READ_FRIEND_CERT) {
             connection->curr_protocol_state = PROTO_SERVER_STATE_REPLY_FRIEND_REQ_ACCEPTED;
             wish_core_handle_payload(core, connection, NULL, 0);
@@ -109,9 +111,11 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
             WISHDEBUG(LOG_CRITICAL, "Unexpected state, closing connection!");
             wish_close_connection(core, connection);
         }
-
+#endif
         break;
     case WISH_EVENT_DECLINE_FRIEND_REQUEST:
+        WISHDEBUG(LOG_CRITICAL, "event WISH_EVENT_DECLINE_FRIEND_REQUEST is unhandled");
+#if 0
         if (connection->curr_protocol_state == PROTO_SERVER_STATE_READ_FRIEND_CERT) {
             connection->curr_protocol_state = PROTO_SERVER_STATE_REPLY_FRIEND_REQ_DECLINED;
             wish_core_handle_payload(core, connection, NULL, 0);
@@ -120,7 +124,7 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
             WISHDEBUG(LOG_CRITICAL, "Unexpected state, closing connection!");
             wish_close_connection(core, connection);
         }
-
+#endif
         break;
     case WISH_EVENT_REQUEST_CONNECTION_CLOSING:
         wish_close_connection(core, connection);

@@ -864,8 +864,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             } else {
                 /* Friend request connection */
                 WISHDEBUG(LOG_CRITICAL, "Outgoing friend req: Skipping server signature check");
-                connection->curr_protocol_state = PROTO_STATE_WISH_SEND_OWN_CERT;
-                goto friend_req_send_own_cert; /* FIME remove goto */
+                connection->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
             }
         }
         break;
@@ -894,9 +893,16 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             wish_core_process_handshake(core, connection, plaintxt);
             connection->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
 
-            struct wish_event evt = { .event_type =
-                WISH_EVENT_NEW_CORE_CONNECTION, .context = connection };
-            wish_message_processor_notify(&evt);
+            if (connection->friend_req_connection) {
+                WISHDEBUG(LOG_CRITICAL, "Sending friend request RPC");
+                /* FIXME: this should just call a "connection established" handler instead, which would in turn call the RPC client for sending the friend req */
+                wish_core_send_friend_req(core, connection);
+            }
+            else {
+                struct wish_event evt = { .event_type =
+                    WISH_EVENT_NEW_CORE_CONNECTION, .context = connection };
+                wish_message_processor_notify(&evt);
+            }
 
        }
         break;
@@ -934,8 +940,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             wish_platform_free(plaintxt);
         }
         break;
-        
-
+#if 0
     case PROTO_STATE_WISH_SEND_OWN_CERT:
         friend_req_send_own_cert:
         /* Outgoing friend request connection: the connection is now established, send own certificate now */
@@ -983,6 +988,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             }
         }
         break;
+#endif
     case PROTO_SERVER_STATE_DH:
         WISHDEBUG(LOG_DEBUG, "Begin server diffie-helman");
         /* Before entering this state, we have initialised the
@@ -1098,8 +1104,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             } else {
                 /* Incoming friend request connection */
                 WISHDEBUG(LOG_CRITICAL, "Incoming friend req connection, skipping client hash check");
-                connection->curr_protocol_state = PROTO_SERVER_STATE_READ_FRIEND_CERT;
-                break;
+                connection->curr_protocol_state = PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE;
             }
         }
         /* WARNING: FALLTHROUGH */
@@ -1198,12 +1203,15 @@ wish send handshake");
             /* Start pinging process */
 
             connection->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
-            struct wish_event evt = { 
-                .event_type = WISH_EVENT_NEW_CORE_CONNECTION,
-                .context = connection };
-            wish_message_processor_notify(&evt);
+            if (connection->friend_req_connection == false) {
+                struct wish_event evt = { 
+                    .event_type = WISH_EVENT_NEW_CORE_CONNECTION,
+                    .context = connection };
+                wish_message_processor_notify(&evt);
+            }
         }
         break;
+#if 0
     case PROTO_SERVER_STATE_READ_FRIEND_CERT: {
         uint8_t plaintxt[len];
         memset(plaintxt, 0, len);
@@ -1463,6 +1471,7 @@ wish send handshake");
         wish_close_connection(core, connection);
         break;
     }
+#endif
     case PROTO_STATE_INITIAL:
         WISHDEBUG(LOG_CRITICAL, "PROTO_STATE_INITIAL: id %d", connection->connection_id);
     default:
