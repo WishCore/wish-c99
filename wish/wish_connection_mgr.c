@@ -134,10 +134,10 @@ return_t wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t 
     wish_identity_t lu;
     wish_identity_t ru;
     
-    if ( ret_success != wish_identity_load(luid, &lu) 
-            || ret_success != wish_identity_load(ruid, &ru) )
+    if ( RET_SUCCESS != wish_identity_load(luid, &lu) 
+            || RET_SUCCESS != wish_identity_load(ruid, &ru) )
     {
-        return ret_fail;
+        return RET_FAIL;
     }
     
     wish_connection_t *new_ctx = wish_connection_init(core, luid, ruid);
@@ -146,5 +146,5 @@ return_t wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t 
         wish_open_connection(core, new_ctx, ip, port, false);
     }
     
-    return ret_success;
+    return RET_SUCCESS;
 }

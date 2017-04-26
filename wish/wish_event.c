@@ -41,7 +41,7 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
             return_t load_retval2 = wish_identity_load(e->context->ruid, tmp_id);
             char *remote_alias = my_strdup(tmp_id->alias);
             
-            if (load_retval != ret_success || load_retval2 != ret_success) {
+            if (load_retval != RET_SUCCESS || load_retval2 != RET_SUCCESS) {
                 WISHDEBUG(LOG_CRITICAL, "Unexpected problem with id db!");
             }
 

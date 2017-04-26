@@ -7,8 +7,11 @@ extern "C" {
 #include "limits.h"    
     
 typedef enum {
-    ret_success = INT_MIN,
-    ret_fail,
+    RET_SUCCESS = INT_MIN,
+    RET_FAIL,
+    RET_E_NO_IDENTITY,
+    RET_E_NO_PRIVKEY,
+    RET_E_INVALID_INPUT
 } return_t;
 
 #ifdef __cplusplus

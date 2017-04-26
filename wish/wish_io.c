@@ -212,12 +212,12 @@ bool wish_core_check_wsid(wish_core_t* core, wish_connection_t* ctx, uint8_t* ds
     /* Load the source id from our DB.  */
     wish_identity_t tmp_id;
     
-    if ( wish_identity_load(src_id, &tmp_id) != ret_success ) {
+    if ( wish_identity_load(src_id, &tmp_id) != RET_SUCCESS ) {
         WISHDEBUG(LOG_CRITICAL, "We don't know to guy trying to connect to us.");
         return false;
     }
     
-    if ( wish_identity_load(dst_id, &tmp_id) != ret_success ) {
+    if ( wish_identity_load(dst_id, &tmp_id) != RET_SUCCESS ) {
         WISHDEBUG(LOG_CRITICAL, "We know who is trying to connect to us, but not the one he wants to connect to. (Did we delete an identity?)");
         return false;
     }
@@ -515,8 +515,8 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             wish_identity_t lu;
             wish_identity_t ru;
 
-            if ( ret_success == wish_identity_load(conn->luid, &lu) 
-                    && ret_success == wish_identity_load(conn->ruid, &ru) )
+            if ( RET_SUCCESS == wish_identity_load(conn->luid, &lu) 
+                    && RET_SUCCESS == wish_identity_load(conn->ruid, &ru) )
             {
                 WISHDEBUG(LOG_CRITICAL, "Connection attempt failed: %s > %s (%u.%u.%u.%u:%hu)",
                         lu.alias, ru.alias, conn->remote_ip_addr[0], conn->remote_ip_addr[1], conn->remote_ip_addr[2], conn->remote_ip_addr[3], conn->remote_port);
