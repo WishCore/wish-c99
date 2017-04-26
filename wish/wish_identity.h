@@ -148,3 +148,5 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]);
 void wish_identity_delete_db(void);
 
 return_t wish_identity_sign(wish_core_t* core, wish_identity_t* uid, const bin* data, const bin* claim, bin* signature);
+
+return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffer);

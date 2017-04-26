@@ -13,6 +13,8 @@
 #include "wish_port_config.h"
 #include "wish_connection_mgr.h"
 
+#include "utlist.h"
+
 int wish_save_identity_entry(wish_identity_t *identity) {
     int num_uids_in_db = wish_get_num_uid_entries();
     wish_uid_list_elem_t uid_list[num_uids_in_db];
@@ -796,4 +798,72 @@ return_t wish_identity_sign(wish_core_t* core, wish_identity_t* uid, const bin* 
     return RET_SUCCESS;
 }
 
+/*
+var document = {
+  // exported identity
+  alias: String,
+  uid: Buffer(32),
+  pubkey: Buffer(32),
+};
+
+var certificate = {
+  // type: 'inline' | 'url',
+  data: BSON(document),
+  meta: BSON({ transports: ['123.234.123.234:40000'] }),
+};
+*/
+
+return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffer) {
+    int id_export_len = 1024;
+    uint8_t id_export[id_export_len];
+    bson bs;
+    bson_init_buffer(&bs, id_export, id_export_len);
+    bson_append_string(&bs, "alias", id->alias);
+    bson_append_binary(&bs, "uid", id->uid, WISH_UID_LEN);
+    bson_append_binary(&bs, "pubkey", id->pubkey, WISH_PUBKEY_LEN);
+    bson_finish(&bs);
+
+    if (bs.err) {
+        WISHDEBUG(LOG_CRITICAL, "Failed while writing id_export document");
+        return RET_FAIL;
+    }
+    
+    const char *id_export_bson = bson_data(&bs);
+    const int id_export_bson_len = bson_size(&bs);
+    
+    size_t meta_buf_len = 246;
+    char meta_buf[meta_buf_len];
+    bson meta;
+    
+    bson_init_buffer(&meta, meta_buf, meta_buf_len);
+    
+    wish_relay_client_t* relay;
+    int i = 0;
+    
+    if (core->relay_db != NULL) {
+        bson_append_start_array(&meta, "transports");
+
+        LL_FOREACH(core->relay_db, relay) {
+            char index[21];
+            BSON_NUMSTR(index, i++);
+            char host[29];
+            snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+
+            bson_append_string(&meta, index, host);
+        }
+
+        bson_append_finish_array(&meta);
+    }
+    bson_finish(&meta);
+
+    bson b;
+    bson_init_buffer(&b, buffer->base, buffer->len);
+       
+    bson_append_binary(&b, "data", id_export_bson, id_export_bson_len);
+    bson_append_binary(&b, "meta", (char *) bson_data(&meta), bson_size(&meta));
+
+    bson_finish(&b);
+    
+    return RET_SUCCESS;
+}
 
