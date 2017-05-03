@@ -1959,8 +1959,16 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
     wish_relay_client_t* relay;
     wish_relay_client_t* tmp;
     
+    bool found = false;
+    
     LL_FOREACH_SAFE(core->relay_db, relay, tmp) {
         if ( memcmp(&relay->ip.addr, &ctx.ip.addr, 4) != 0 || relay->port != ctx.port ) { continue; }
+
+        found = true;
+        
+        // close the underlying connection
+        wish_relay_client_close(core, relay);
+        
         LL_DELETE(core->relay_db, relay);
         wish_platform_free(relay);
     }
@@ -1969,7 +1977,7 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
     
     bson bs;
     bson_init_buffer(&bs, buffer, WISH_PORT_RPC_BUFFER_SZ);
-    bson_append_bool(&bs, "data", true);
+    bson_append_bool(&bs, "data", found);
     bson_append_finish_array(&bs);
     bson_finish(&bs);
 
@@ -1977,7 +1985,7 @@ static void relay_remove(rpc_server_req* req, uint8_t* args) {
         wish_rpc_server_error(req, 305, "Failed writing bson.");
         return;
     }
-    
+
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     
     wish_core_config_save(core);
