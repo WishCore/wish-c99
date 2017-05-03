@@ -70,20 +70,6 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
     case WISH_EVENT_NEW_CORE_CONNECTION:
         wish_core_send_peers_rpc_req(core, connection);
         break;
-    case WISH_EVENT_FRIEND_REQUEST:
-        WISHDEBUG(LOG_CRITICAL, "event WISH_EVENT_FRIEND_REQUEST is unhandled");
-        /* Or can this event be deprecated?  */
-        break;
-    case WISH_EVENT_ACCEPT_FRIEND_REQUEST:
-        WISHDEBUG(LOG_CRITICAL, "event WISH_EVENT_ACCEPT_FRIEND_REQUEST is unhandled");
-        /* Insert logic for sending our certificate to the friend requestor. Or can this event be deprecated?  */
-        
-        break;
-    case WISH_EVENT_DECLINE_FRIEND_REQUEST:
-        WISHDEBUG(LOG_CRITICAL, "event WISH_EVENT_DECLINE_FRIEND_REQUEST is unhandled");
-        /* Insert logic for sending a "declined" message to the friend requestor. Or can this event be deprecated? */
-
-        break;
     case WISH_EVENT_REQUEST_CONNECTION_CLOSING:
         wish_close_connection(core, connection);
         break;

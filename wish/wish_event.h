@@ -10,10 +10,6 @@ enum wish_event_type {
     WISH_EVENT_NEW_CORE_CONNECTION,  /* Signal that a connection to a
     remote core has been established. Normally this would result in
     sending a 'peers' request */
-    WISH_EVENT_FRIEND_REQUEST,  /* Friend request received, waiting for
-    user approval */
-    WISH_EVENT_ACCEPT_FRIEND_REQUEST,   /* Fried request accepted */
-    WISH_EVENT_DECLINE_FRIEND_REQUEST,   /* Fried request declined */
     WISH_EVENT_REQUEST_CONNECTION_CLOSING,
 };
 

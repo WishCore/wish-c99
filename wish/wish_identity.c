@@ -854,8 +854,13 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffe
 
         bson_append_finish_array(&meta);
     }
+    
     bson_finish(&meta);
 
+    if (meta.err) {
+        return RET_FAIL;
+    }
+    
     bson b;
     bson_init_buffer(&b, buffer->base, buffer->len);
        
@@ -864,6 +869,98 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffe
 
     bson_finish(&b);
     
+    if (b.err) {
+        return RET_FAIL;
+    }
+    
     return RET_SUCCESS;
 }
 
+/**
+ * Helper function for building a signed certificates, usually used for friend request RPC client / RPC server handler
+ * 
+ * @param core
+ * @param luid the uid to generate signed certificate for
+ * @param result_array_name The name of the BSON array, usually "data" (when called by RPC server handler) or "args" (when called by RPC client)
+ * @param buffer the buffer where the BSON result array is stored to
+ * @param signed_cert_actual_len the actual length of the BSON result array is stored here
+ * @return RET_SUCCESS for success, RET_FAIL for errors
+ */
+return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, char *result_array_name, bin *buffer, size_t *signed_cert_actual_len) {
+    /* identity.export on the "luid" identity */
+    wish_identity_t id;
+    
+    if (wish_identity_load(luid, &id) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load the identity");
+        return RET_FAIL;
+    }
+    
+    size_t cert_buffer_len = 1024;
+    char cert_buffer[cert_buffer_len];
+    bin cert = { .base = cert_buffer, .len = cert_buffer_len };
+    if (wish_identity_export(core, &id, &cert) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Could not export the identity");
+        return RET_FAIL;
+    }
+   
+    size_t signature_len = 64;
+    char signature_buffer[signature_len];
+    bin signature = { .base = signature_buffer, .len = signature_len };
+    
+    if (wish_identity_sign(core, &id, &cert, NULL, &signature) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Could not sign the identity");
+        return RET_FAIL;
+    }
+    
+    size_t args_len = buffer->len;
+    uint8_t *args = buffer->base;
+    bson bs;
+    bson_init_buffer(&bs, args, args_len);
+    
+    bson_append_start_array(&bs, result_array_name);
+    bson_append_start_object(&bs, "0");
+    
+    bson_iterator it;
+    if (bson_find_from_buffer(&it, cert.base, "data") == BSON_EOO) {
+        WISHDEBUG(LOG_CRITICAL, "Could not find the data element from export");
+        return RET_FAIL;
+    }
+    // bson_visit("cert.base", cert.base);
+ 
+    bson_append_element(&bs, NULL, &it); /* Also appends the element name */
+    
+    if (bson_find_from_buffer(&it, cert.base, "meta") == BSON_EOO) {
+        WISHDEBUG(LOG_CRITICAL, "Could not find the meta element from export");
+        return RET_FAIL;
+    }
+    
+    bson_append_element(&bs, NULL, &it); /* Also appends the element name */
+    
+    bson_append_start_array(&bs, "signatures");
+    bson_append_start_object(&bs, "0");
+    bson_append_binary(&bs, "uid", id.uid, WISH_ID_LEN);
+    bson_append_binary(&bs, "sign", signature.base, signature.len);
+    bson_append_finish_object(&bs);
+    bson_append_finish_array(&bs);
+    
+    bson_append_finish_object(&bs);
+    
+    bson_append_finish_array(&bs);
+    bson_finish(&bs);
+    
+    if (bs.err) {
+        WISHDEBUG(LOG_CRITICAL, "Could not properly write the signed cert");
+        return RET_FAIL;
+    }
+    
+    size_t len = bson_size(&bs);
+    
+    if (len > buffer->len) {
+        WISHDEBUG(LOG_CRITICAL, "Target buffer too short for signed cert");
+        return RET_FAIL;
+    }
+    
+    *signed_cert_actual_len = len;
+    
+    return RET_SUCCESS;
+}

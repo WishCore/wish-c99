@@ -357,7 +357,7 @@ static void core_directory(rpc_server_req* req, uint8_t* args) {
 }
 
 /**
- * 
+ * This is the core2core RPC server handler for the method "friendRequest"
  * 
  * @param req
  * @param args a BSON object, like this: [ 0: { data: <Buffer> cert, meta: <Buffer> transports, signatures: { } } ]
@@ -416,7 +416,12 @@ static void core_friend_req(rpc_server_req* req, uint8_t* args) {
     
     /* TODO: verify signatures */
    
+    /* Start setting up a relationship request. */
     wish_relationship_req_t rel;
+    
+    /* Copy the RPC request context to the relationship request */
+    memcpy(&(rel.friend_rpc_req), req, sizeof (rpc_server_req));
+    
     strncpy(rel.luid, recepient_uid, WISH_UID_LEN);
 
     wish_identity_t* new_id = &rel.id;
@@ -438,14 +443,8 @@ static void core_friend_req(rpc_server_req* req, uint8_t* args) {
     memcpy(connection->luid, recepient_uid, WISH_ID_LEN);
     memcpy(connection->ruid, new_id->uid, WISH_ID_LEN);
 
-    WISHDEBUG(LOG_CRITICAL, "Friend request connection context local uid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
-    WISHDEBUG(LOG_CRITICAL, "Friend request connection context remote uid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
-
-    struct wish_event evt = {
-        .event_type = WISH_EVENT_FRIEND_REQUEST, 
-        .context = connection 
-    };
-    wish_message_processor_notify(&evt);
+    WISHDEBUG(LOG_CRITICAL, "Friend request to luid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
+    WISHDEBUG(LOG_CRITICAL, "Friend request from ruid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
 
     int buf_len = 1024;
     char buf[1024];
@@ -462,10 +461,52 @@ static void core_friend_req(rpc_server_req* req, uint8_t* args) {
 }
 
 static void friend_req_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t payload_len) {
+    bson_visit("Friend req callback, payload: ", payload);
     
+    bson_iterator data_it;
+    bson_iterator_from_buffer(&data_it, payload);
+    bson_type type = bson_find_fieldpath_value("data.0.data", &data_it);
+    if ( type != BSON_BINDATA ) {
+        WISHDEBUG(LOG_CRITICAL, "Could not import friend cert, data.0.data not BSON_BINDATA, is type %i", type );
+        return;
+    }
+    
+    uint8_t *cert_data = (uint8_t *) bson_iterator_bin_data(&data_it);
+    bson_visit("Friend req callback, cert data: ", cert_data);
+         
+    /* FIXME TODO: verify cert signatures */
+      
+    wish_identity_t new_friend_id;
+    memset(&new_friend_id, 0, sizeof (wish_identity_t));
+
+    wish_populate_id_from_cert(&new_friend_id, cert_data);
+    
+    // Check if identity is already in db
+
+    int num_uids_in_db = wish_get_num_uid_entries();
+    wish_uid_list_elem_t uid_list[num_uids_in_db];
+    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+
+
+    bool found = false;
+    int i = 0;
+    for (i = 0; i < num_uids; i++) {
+        if ( memcmp(&uid_list[i].uid, new_friend_id.uid, WISH_ID_LEN) == 0 ) {
+            WISHDEBUG(LOG_CRITICAL, "New friend identity already in DB, we wont add it multiple times.");
+            found = true;
+            break;
+        }
+    }
+
+    if(!found) {
+        wish_save_identity_entry(&new_friend_id);
+    }
 }
 
+
 /**
+ * This function is used to send a friend request over a Wish connection to the remote core 
+ * 
  * args to the RPC 'friendRequest':
  [ 0: {
   data: BSON(document),
@@ -476,74 +517,20 @@ static void friend_req_callback(rpc_client_req* req, void *context, uint8_t *pay
   ]
  }]
 */
-
-void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {    
-
-        
-    /* identity.export on the "luid" identity */
-    wish_identity_t uid;
+void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {        
+    size_t signed_cert_buffer_len = 1024;
+    uint8_t signed_cert_buffer[signed_cert_buffer_len];
+    bin signed_cert = { .base = signed_cert_buffer, .len = signed_cert_buffer_len };
+    size_t signed_cert_actual_len = 0;
     
-    if (wish_identity_load(ctx->luid, &uid) != RET_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not load the identity");
+    if (wish_build_signed_cert(core, ctx->luid, "args", &signed_cert, &signed_cert_actual_len) == RET_FAIL) {
+        WISHDEBUG(LOG_CRITICAL, "Could not construct the signed cert");
         return;
     }
-    
-    size_t cert_buffer_len = 1024;
-    char cert_buffer[cert_buffer_len];
-    bin cert = { .base = cert_buffer, .len = cert_buffer_len };
-    if (wish_identity_export(core, &uid, &cert) != RET_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not export the identity");
-        return;
-    }
-   
-    size_t signature_len = 64;
-    char signature_buffer[signature_len];
-    bin signature = { .base = signature_buffer, .len = signature_len };
-    
-    if (wish_identity_sign(core, &uid, &cert, NULL, &signature) != RET_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not sign the identity");
-        return;
-    }
-    
-    size_t args_len = 1024;
-    uint8_t args[args_len];
-    bson bs;
-    bson_init_buffer(&bs, args, args_len);
-    
-    bson_append_start_array(&bs, "args");
-    bson_append_start_object(&bs, "0");
-    
-    bson_iterator it;
-    if (bson_find_from_buffer(&it, cert.base, "data") == BSON_EOO) {
-        WISHDEBUG(LOG_CRITICAL, "Could not find the data element from export");
-        return;
-    }
-    // bson_visit("cert.base", cert.base);
- 
-    bson_append_element(&bs, NULL, &it); /* Also appends the element name */
-    
-    if (bson_find_from_buffer(&it, cert.base, "meta") == BSON_EOO) {
-        WISHDEBUG(LOG_CRITICAL, "Could not find the meta element from export");
-        return;
-    }
-    
-    bson_append_element(&bs, NULL, &it); /* Also appends the element name */
-    
-    bson_append_start_array(&bs, "signatures");
-    bson_append_start_object(&bs, "0");
-    bson_append_binary(&bs, "uid", uid.uid, WISH_ID_LEN);
-    bson_append_binary(&bs, "sign", signature.base, signature.len);
-    bson_append_finish_object(&bs);
-    bson_append_finish_array(&bs);
-    
-    bson_append_finish_object(&bs);
-    
-    bson_append_finish_array(&bs);
-    bson_finish(&bs);
     
     size_t buffer_len = 1024;
     uint8_t buffer[buffer_len];
-    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "friendRequest", (uint8_t *) bson_data(&bs), bson_size(&bs), friend_req_callback,
+    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "friendRequest", (uint8_t *) signed_cert.base, signed_cert_actual_len, friend_req_callback,
         buffer, buffer_len);
 
     rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);

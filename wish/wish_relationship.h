@@ -6,6 +6,7 @@ extern "C" {
 
 #include "wish_core.h"
 #include "wish_identity.h"
+#include "wish_rpc.h"
 
 #define WISH_RELATIONSHIP_DB_LEN 10
     
@@ -20,6 +21,8 @@ typedef struct wish_relationship_req_t {
     wish_identity_t id;
     struct wish_relationship_req_t* prev;
     struct wish_relationship_req_t* next;
+    /* A a copy of the RPC request structure representing the friend request sent by the remote core */
+    rpc_server_req friend_rpc_req;
 } wish_relationship_req_t;
 
 void wish_relationship_init(wish_core_t* core);

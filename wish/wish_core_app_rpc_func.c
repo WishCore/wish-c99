@@ -1182,6 +1182,7 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
     // Find the connection which was used for receiving the friend request   
     
     int i = 0;
+
     found = false;
     
     wish_connection_t* wish_connection = NULL;
@@ -1212,6 +1213,7 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
         wish_rpc_server_error(req, 344, "Friend request connection not found while trying to accept.");
         return;
     }
+
     
     // found the connection (wish_connection)
 
@@ -1238,13 +1240,26 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
 
     
     WISHDEBUG(LOG_CRITICAL, "Accepting friend request");
-    struct wish_event new_evt = {
-        .event_type = WISH_EVENT_ACCEPT_FRIEND_REQUEST,
-        .context = wish_connection,
-    };
-    wish_message_processor_notify(&new_evt);
-
     
+    /* The friend request has been accepted, send our certificate as a RPC response to the remote core that originally sent us the core-to-core friend request. */
+    size_t signed_cert_buffer_len = 1024;
+    uint8_t signed_cert_buffer[signed_cert_buffer_len];
+    bin signed_cert = { .base = signed_cert_buffer, .len = signed_cert_buffer_len };
+    size_t signed_cert_actual_len = 0;
+    if (wish_build_signed_cert(core, elt->luid, "data", &signed_cert, &signed_cert_actual_len) == RET_FAIL) {
+        WISHDEBUG(LOG_CRITICAL, "Could not construct the signed cert");
+        return;
+    }
+    
+    bson_visit("Signed cert buffer: ", signed_cert.base);
+    
+    wish_rpc_server_send(&(elt->friend_rpc_req), signed_cert.base, signed_cert_actual_len);
+    
+    WISHDEBUG(LOG_CRITICAL, "Send friend req reply, closing connection now");
+    wish_close_connection(core, wish_connection);
+            
+    
+    /* Send RPC reply to the App that performed the friendRequestAccept RPC*/
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
@@ -1348,13 +1363,11 @@ static void identity_friend_request_decline(rpc_server_req* req, uint8_t* args) 
     
     // found the connection (wish_connection)
     
-    WISHDEBUG(LOG_CRITICAL, "Declining friend request (informing requester)");
-    struct wish_event new_evt = {
-        .event_type = WISH_EVENT_DECLINE_FRIEND_REQUEST,
-        .context = wish_connection,
-    };
-    wish_message_processor_notify(&new_evt);
-
+    WISHDEBUG(LOG_CRITICAL, "Declining friend request (informing requester) and closing connection");
+    
+    /* Send a relationship decline notification to remote core, as an RPC error */
+    wish_rpc_server_error(&(elt->friend_rpc_req), 123, "Declining friend request.");
+    wish_close_connection(core, wish_connection);
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
