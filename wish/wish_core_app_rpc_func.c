@@ -904,7 +904,7 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
     }
     
     bin claim;
-    claim.base = null;
+    claim.base = NULL;
     claim.len = 0;
 
     bson_find_from_buffer(&it, args, "2");
