@@ -954,7 +954,23 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
 /*
  * identity.verify
  *
- * App to core: { op: "identity.verify", args: [ <Buffer> uid, <Buffer> signature, <Buffer> hash ], id: 5 }
+ * args: BSON(
+ *   [ { 
+ *     data: <Buffer>,
+ *     meta: <Buffer>,
+ *     signatures: [{ 
+ *       uid: Buffer,
+ *       sign: Buffer,
+ *       claim?: Buffer }] ] })
+ * 
+ * return: BSON(
+ *   [ { 
+ *     data: <Buffer>,
+ *     meta: <Buffer>,
+ *     signatures: [{ 
+ *       uid: Buffer,
+ *       sign: bool | null,
+ *       claim?: Buffer }] ] })
  */
 static void identity_verify(rpc_server_req* req, uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -968,57 +984,81 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
-    uint8_t *luid = 0;
-    luid = (uint8_t *)bson_iterator_bin_data(&it);
+    bson b;
 
-    bson_find_from_buffer(&it, args, "1");
-    
-    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != 64 ) {
-        wish_rpc_server_error(req, 346, "Invalid signature.");
+    bson_init_buffer(&b, buffer, buffer_len);
+    bson_append_start_object(&b, "data");
+
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("0.data", &it) != BSON_BINDATA ) {
+        WISHDEBUG(LOG_CRITICAL, "0.data not bin data");
+
+        wish_rpc_server_error(req, 345, "Object does not have { data: <Buffer> }.");
         return;
     }
-    
-    char signature[64];
-    int signature_len = bson_iterator_bin_len(&it);
-    
-    memcpy(signature, bson_iterator_bin_data(&it), signature_len);
 
-    bson_find_from_buffer(&it, args, "2");
-    
-    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) < 32 || bson_iterator_bin_len(&it) > 64 ) {
-        wish_rpc_server_error(req, 345, "Invalid hash.");
-        return;
-    }
-    
-    char hash[64];
-    int hash_len = bson_iterator_bin_len(&it);
-    
-    memcpy(hash, bson_iterator_bin_data(&it), hash_len);
+    // copy the data blob to response
+    bin data;
+    data.base = (char*) bson_iterator_bin_data(&it);
+    data.len = bson_iterator_bin_len(&it);
 
-    bool verification = false;
-    uint8_t pubkey[WISH_PUBKEY_LEN];
-    if (wish_load_pubkey(luid, pubkey)) {
-        WISHDEBUG(LOG_CRITICAL, "Could not load pubkey");
-        wish_rpc_server_error(req, 345, "Could not load private key.");
-        return;
-    } else {
-        verification = ed25519_verify(signature, hash, hash_len, pubkey) ? true : false;
+    bson_append_binary(&b, "data", data.base, data.len);
+
+    bson_append_field_from_iterator(&it, &b);
+
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("0.meta", &it) != BSON_EOO ) {
+        WISHDEBUG(LOG_CRITICAL, "0.meta");
+        bson_append_field_from_iterator(&it, &b);
     }
 
-    //wish_debug_print_array(LOG_DEBUG, signature, ED25519_SIGNATURE_LEN);
+    bson_iterator_from_buffer(&it, args);
 
-    bson bs;
+    bson_append_start_array(&b, "signatures");
 
-    bson_init_buffer(&bs, buffer, buffer_len);
-    bson_append_bool(&bs, "data", verification);
-    bson_finish(&bs);
+    char index[21];
+    int i = 0;
 
-    if(bs.err != 0) {
+    // parse signature array
+    if ( bson_find_fieldpath_value("0.signatures.0", &it) == BSON_OBJECT ) {
+        do {
+            BSON_NUMSTR(index, i++);
+            WISHDEBUG(LOG_CRITICAL, "0.signatures.0 already present, should be verified. %i %s", bson_iterator_type(&it), bson_iterator_key(&it));
+            bson obj;
+            bson_iterator_subobject(&it, &obj);
+            bson_iterator sit;
+            bson_iterator_init(&sit, &obj);
+            while ( bson_iterator_next(&sit) != BSON_EOO ) {
+                WISHDEBUG(LOG_CRITICAL, "  sub object %i %s", bson_iterator_type(&sit), bson_iterator_key(&sit));
+            }
+            
+            /*
+            bson_append_start_object(&b, index);
+            bson_append_string(&b, "algo", "sha256-ed25519");
+            bson_append_binary(&b, "uid", luid, WISH_UID_LEN);
+            //bson_append_bool(&b, "sign", wish_identity_verify(core, &uid, &data, &claim, &signature); signature.base, ED25519_SIGNATURE_LEN);
+            if (claim.base != NULL && claim.len > 0) {
+                bson_append_binary(&b, "claim", claim.base, claim.len);
+            }
+
+            bson_append_finish_object(&b);
+            */
+        } while ( bson_iterator_next(&it) != BSON_EOO );
+    }
+
+    bson_append_finish_array(&b);
+
+    bson_append_finish_object(&b);
+    bson_finish(&b);
+
+    if(b.err != 0) {
         wish_rpc_server_error(req, 344, "Failed writing reponse.");
         return;
     }
 
-    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+    wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
 /*
