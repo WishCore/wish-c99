@@ -1471,6 +1471,9 @@ int bson_append_field_from_iterator2(const char *key, const bson_iterator *from,
         case BSON_CODE:
             bson_append_code(into, key, bson_iterator_code(from));
             break;
+        case BSON_BINDATA:
+            bson_append_binary(into, key, bson_iterator_bin_data(from), bson_iterator_bin_len(from));
+            break;
         case BSON_INT:
             bson_append_int(into, key, bson_iterator_int_raw(from));
             break;
