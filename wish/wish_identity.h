@@ -30,6 +30,7 @@
 
 #define WISH_PUBKEY_LEN  32     /* Length of ED25519 pubkey */
 #define WISH_PRIVKEY_LEN 64     /* Length of ED25519 privkey */
+#define WISH_SIGNATURE_LEN 64   /* Length of ED25519 signature */
 #define WISH_ID_LEN 32  /* Actually, length of a SH256 checksum */
 #ifndef WISH_WSID_LEN
 // This check is due to refactoring dependencies: disconnecting wish_app from the core
@@ -68,7 +69,7 @@ int wish_get_num_uid_entries(void);
 int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len); 
 /* This function loads the contact specified by 'uid', storing it to
  * the pointer 'contact' */
-return_t wish_identity_load(uint8_t *uid, wish_identity_t *identity);
+return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity);
 
 // returns < 0 on error, == 0 is false, > 0 is true
 int wish_identity_exists(uint8_t *uid);

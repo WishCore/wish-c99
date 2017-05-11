@@ -222,7 +222,7 @@ int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len ) {
 }
 
 
-return_t wish_identity_load(uint8_t *uid, wish_identity_t *identity) {
+return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
     int retval = RET_FAIL;
 
     if (uid == NULL) {
@@ -755,6 +755,16 @@ int wish_get_local_identity_list(wish_uid_list_elem_t *list, int list_len) {
     return j;
 }
 
+/**
+ * Creates signature for data and if claim is present signature covers claim
+ * 
+ * @param core
+ * @param uid Input
+ * @param data Input
+ * @param claim Input
+ * @param signature Output
+ * @return 
+ */
 return_t wish_identity_sign(wish_core_t* core, wish_identity_t* uid, const bin* data, const bin* claim, bin* signature) {
     if (!uid->has_privkey) {
         return RET_E_NO_PRIVKEY;
@@ -794,6 +804,7 @@ return_t wish_identity_sign(wish_core_t* core, wish_identity_t* uid, const bin* 
     }
     
     ed25519_sign(signature->base, hash, hash_len, uid->privkey);
+    signature->len = WISH_SIGNATURE_LEN;
     
     return RET_SUCCESS;
 }

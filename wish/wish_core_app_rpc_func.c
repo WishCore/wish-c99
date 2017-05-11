@@ -371,119 +371,51 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
-    /* Get the uid of identity to export, the uid is argument "0" in
-     * args */
-    uint8_t *arg_uid = 0;
-    int32_t arg_uid_len = 0;
-    if (bson_get_binary(args, "0", &arg_uid, &arg_uid_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get argument: uid");
-        wish_rpc_server_error(req, 8, "Missing export uid argument");
+    
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if ( bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
+        WISHDEBUG(LOG_CRITICAL, "Could not get argument[0]: uid, expecting Buffer(32)");
+        wish_rpc_server_error(req, 8, "Missing export uid argument, expecting Buffer(32)");
         return;
     }
 
-    if (arg_uid_len != WISH_ID_LEN) {
-        WISHDEBUG(LOG_CRITICAL, "argument uid has illegal length");
-        return;
-    }
-
-    /* Get the requested export type, element 1 of args array. 
-     * This impelementation requires an
-     * explicit string argument 'binary', which means that the
-     * identity shall be exported as BSON document. */
-    char *export_type_str = 0;
-    int32_t export_type_str_len = 0;
-    if (bson_get_string(args, "1", &export_type_str, &export_type_str_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Missing export type argument");
-        wish_rpc_server_error(req, 8, "Missing export type argument");
-        return;
-    }
-
+    const uint8_t* uid = bson_iterator_bin_data(&it);
+    
     wish_identity_t id;
     
-    if ( RET_SUCCESS != wish_identity_load(arg_uid, &id) ) {
+    if ( RET_SUCCESS != wish_identity_load(uid, &id) ) {
         wish_rpc_server_error(req, 343, "Failed to load identity.");
+        return;
+    }
+
+    char buf_base[WISH_PORT_RPC_BUFFER_SZ];
+    
+    bin buf;
+    buf.base = buf_base;
+    buf.len = WISH_PORT_RPC_BUFFER_SZ;
+    
+    if ( RET_SUCCESS != wish_identity_export(core, &id, &buf) ) {
+        wish_rpc_server_error(req, 92, "Internal export failed.");
         return;
     }
     
     bson bs;
-    bson_init_size(&bs, 256);
-    bson_append_string(&bs, "alias", id.alias);
-    bson_append_binary(&bs, "uid", id.uid, WISH_UID_LEN);
-    bson_append_binary(&bs, "pubkey", id.pubkey, WISH_PUBKEY_LEN);
+    bson_init_with_data(&bs, buf.base);
 
-
-    wish_relay_client_t* relay;
-
-    int i = 0;
-
-    if (strcmp(export_type_str, "binary") == 0) {
-        if (core->relay_db != NULL) {
-            bson_append_start_array(&bs, "transports");
-
-            LL_FOREACH(core->relay_db, relay) {
-                char index[21];
-                BSON_NUMSTR(index, i++);
-                char host[29];
-                snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
-
-                bson_append_string(&bs, index, host);
-            }
-
-            bson_append_finish_array(&bs);
-        }
-    }
-
-    bson_append_finish_object(&bs);
+    char buf_base2[WISH_PORT_RPC_BUFFER_SZ];
     
-    if (bs.err) {
-        wish_rpc_server_error(req, 349, "Export document bson too large.");
-        bson_destroy(&bs);
-        return;
-    }
-
-    //bson_visit("Export brand new:", bs.data);
-    //WISHDEBUG(LOG_CRITICAL, "size %i", bs.dataSize);
-
+    bin buf2;
+    buf2.base = buf_base2;
+    buf2.len = WISH_PORT_RPC_BUFFER_SZ;
+    
     bson b;
-    bson_init_size(&b, WISH_PORT_RPC_BUFFER_SZ);
-    
-    if (strcmp(export_type_str, "document") == 0) {
-        
-        bson_append_start_object(&b, "data");
-        bson_append_binary(&b, "data", bson_data(&bs), bson_size(&bs));
-        
-        if (core->relay_db != NULL) {
-            bson_append_start_object(&b, "meta");
-            bson_append_start_array(&b, "transports");
-
-            LL_FOREACH(core->relay_db, relay) {
-                char index[21];
-                BSON_NUMSTR(index, i++);
-                char host[29];
-                snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
-
-                bson_append_string(&b, index, host);
-            }
-
-            bson_append_finish_array(&b);
-            bson_append_finish_object(&b);
-        }
-        
-        bson_append_finish_object(&b);
-    } else if (strcmp(export_type_str, "binary") == 0) {
-        bson_append_binary(&b, "data", bson_data(&bs), bson_size(&bs));
-    } else {
-        wish_rpc_server_error(req, 8, "Export type not binary/signed.");
-        goto cleanup;
-    }
-    
+    bson_init_buffer(&b, buf2.base, buf2.len);
+    bson_append_bson(&b, "data", &bs);
     bson_finish(&b);
-
-    wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
     
-cleanup:    
-    bson_destroy(&b);
-    bson_destroy(&bs);
+    wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
 /* This is the Call-back function invoked by the core's "app" RPC
