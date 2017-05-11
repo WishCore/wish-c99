@@ -897,7 +897,7 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffe
  * @param signed_cert_actual_len the actual length of the BSON result array is stored here
  * @return RET_SUCCESS for success, RET_FAIL for errors
  */
-return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, char *result_array_name, bin *buffer, size_t *signed_cert_actual_len) {
+return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, bin *buffer) {
     /* identity.export on the "luid" identity */
     wish_identity_t id;
     
@@ -914,7 +914,7 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, char *result_a
         return RET_FAIL;
     }
    
-    size_t signature_len = 64;
+    size_t signature_len = WISH_SIGNATURE_LEN;
     char signature_buffer[signature_len];
     bin signature = { .base = signature_buffer, .len = signature_len };
     
@@ -927,9 +927,6 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, char *result_a
     uint8_t *args = buffer->base;
     bson bs;
     bson_init_buffer(&bs, args, args_len);
-    
-    bson_append_start_array(&bs, result_array_name);
-    bson_append_start_object(&bs, "0");
     
     bson_iterator it;
     if (bson_find_from_buffer(&it, cert.base, "data") == BSON_EOO) {
@@ -954,24 +951,12 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, char *result_a
     bson_append_finish_object(&bs);
     bson_append_finish_array(&bs);
     
-    bson_append_finish_object(&bs);
-    
-    bson_append_finish_array(&bs);
     bson_finish(&bs);
     
     if (bs.err) {
         WISHDEBUG(LOG_CRITICAL, "Could not properly write the signed cert");
         return RET_FAIL;
     }
-    
-    size_t len = bson_size(&bs);
-    
-    if (len > buffer->len) {
-        WISHDEBUG(LOG_CRITICAL, "Target buffer too short for signed cert");
-        return RET_FAIL;
-    }
-    
-    *signed_cert_actual_len = len;
     
     return RET_SUCCESS;
 }

@@ -823,8 +823,7 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
-    uint8_t *luid = 0;
-    luid = (uint8_t *)bson_iterator_bin_data(&it);
+    uint8_t* luid = (uint8_t *)bson_iterator_bin_data(&it);
     
     wish_identity_t uid;
     
@@ -869,7 +868,7 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
             return;
         }
 
-        wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+        wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     } else if (bson_iterator_type(&it) == BSON_OBJECT) {
         // sign object { data: Buffer(n) }
 
@@ -964,8 +963,8 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     bson_iterator it;
     bson_find_from_buffer(&it, args, "0");
     
-    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
-        wish_rpc_server_error(req, 345, "Invalid uid.");
+    if(bson_iterator_type(&it) != BSON_OBJECT) {
+        wish_rpc_server_error(req, 345, "Expected object");
         return;
     }
 
@@ -1179,15 +1178,29 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
     size_t signed_cert_buffer_len = 1024;
     uint8_t signed_cert_buffer[signed_cert_buffer_len];
     bin signed_cert = { .base = signed_cert_buffer, .len = signed_cert_buffer_len };
-    size_t signed_cert_actual_len = 0;
-    if (wish_build_signed_cert(core, elt->luid, "data", &signed_cert, &signed_cert_actual_len) == RET_FAIL) {
+    
+    if (wish_build_signed_cert(core, elt->luid, &signed_cert) == RET_FAIL) {
         WISHDEBUG(LOG_CRITICAL, "Could not construct the signed cert");
         return;
     }
+
+    bson cert;
+    bson_init_with_data(&cert, signed_cert.base);
     
-    bson_visit("Signed cert buffer: ", signed_cert.base);
+    char buf_base[WISH_PORT_RPC_BUFFER_SZ];
     
-    wish_rpc_server_send(&(elt->friend_rpc_req), signed_cert.base, signed_cert_actual_len);
+    bin buf;
+    buf.base = buf_base;
+    buf.len = WISH_PORT_RPC_BUFFER_SZ;
+    
+    bson b;
+    bson_init_buffer(&b, buf.base, buf.len);
+    bson_append_bson(&b, "data", &cert);
+    bson_finish(&b);
+    
+    bson_visit("Signed cert buffer: ", bson_data(&b));
+
+    wish_rpc_server_send(&(elt->friend_rpc_req), bson_data(&b), bson_size(&b));
     
     WISHDEBUG(LOG_CRITICAL, "Send friend req reply, closing connection now");
     wish_close_connection(core, wish_connection);

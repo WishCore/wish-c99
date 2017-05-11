@@ -465,9 +465,9 @@ static void friend_req_callback(rpc_client_req* req, void *context, uint8_t *pay
     
     bson_iterator data_it;
     bson_iterator_from_buffer(&data_it, payload);
-    bson_type type = bson_find_fieldpath_value("data.0.data", &data_it);
+    bson_type type = bson_find_fieldpath_value("data.data", &data_it);
     if ( type != BSON_BINDATA ) {
-        WISHDEBUG(LOG_CRITICAL, "Could not import friend cert, data.0.data not BSON_BINDATA, is type %i", type );
+        WISHDEBUG(LOG_CRITICAL, "Could not import friend cert, data.data not BSON_BINDATA, is type %i", type );
         return;
     }
     
@@ -521,17 +521,33 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
     size_t signed_cert_buffer_len = 1024;
     uint8_t signed_cert_buffer[signed_cert_buffer_len];
     bin signed_cert = { .base = signed_cert_buffer, .len = signed_cert_buffer_len };
-    size_t signed_cert_actual_len = 0;
     
-    if (wish_build_signed_cert(core, ctx->luid, "args", &signed_cert, &signed_cert_actual_len) == RET_FAIL) {
+    if (wish_build_signed_cert(core, ctx->luid, &signed_cert) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not construct the signed cert");
         return;
     }
     
+    bson cert;
+    bson_init_with_data(&cert, signed_cert.base);
+    
+    char buf_base[WISH_PORT_RPC_BUFFER_SZ];
+    
+    bin buf;
+    buf.base = buf_base;
+    buf.len = WISH_PORT_RPC_BUFFER_SZ;
+    
+    bson b;
+    bson_init_buffer(&b, buf.base, buf.len);
+    bson_append_start_array(&b, "args");
+    bson_append_bson(&b, "0", &cert);
+    bson_append_finish_array(&b);
+    bson_finish(&b);
+    
+    bson_visit("Signed cert buffer: ", bson_data(&b));
+
     size_t buffer_len = 1024;
     uint8_t buffer[buffer_len];
-    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "friendRequest", (uint8_t *) signed_cert.base, signed_cert_actual_len, friend_req_callback,
-        buffer, buffer_len);
+    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "friendRequest", (uint8_t*)bson_data(&b), bson_size(&b), friend_req_callback, buffer, buffer_len);
 
     rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
     mreq->cb_context = ctx;
@@ -540,8 +556,7 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
     uint8_t request[request_max_len];
     
     bson_init_doc(request, request_max_len);
-    bson_write_embedded_doc_or_array(request, request_max_len,
-        "req", buffer, BSON_KEY_DOCUMENT);
+    bson_write_embedded_doc_or_array(request, request_max_len, "req", buffer, BSON_KEY_DOCUMENT);
     wish_core_send_message(core, ctx, request, bson_get_doc_len(request));
 }
 
@@ -551,7 +566,6 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
 typedef struct wish_rpc_server_handler handler;
 
 handler core_directory_h =                             { .op_str = "directory",                           .handler = core_directory };
-
 handler core_friend_req_h =                            { .op_str = "friendRequest",                       .handler = core_friend_req };
 
 void wish_core_init_rpc(wish_core_t* core) {
