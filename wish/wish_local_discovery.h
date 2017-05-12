@@ -1,5 +1,4 @@
-#ifndef WISH_LOCAL_DISCOVERY_H
-#define WISH_LOCAL_DISCOVERY_H
+#pragma once
 
 /* 
  * Wish local UDP discovery functionality
@@ -48,8 +47,7 @@ void wish_ldiscover_disable_bcast(wish_core_t* core);
  * ip[4], the originating IPv4 address
  * port, the originating UDP port (in host byte order)
  */
-void wish_ldiscover_feed(wish_core_t* core, wish_ip_addr_t *ip, uint16_t port, uint8_t *buffer, 
-size_t buffer_len);
+void wish_ldiscover_feed(wish_core_t* core, wish_ip_addr_t *ip, uint16_t port, uint8_t *buffer, size_t buffer_len);
 
 /* Send out one "advertizement" message for wish identity my_uid */
 void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid);
@@ -59,4 +57,3 @@ void wish_ldiscover_clear(wish_core_t* core);
 
 wish_ldiscover_t *wish_ldiscover_get(wish_core_t* core);
 
-#endif //WISH_LOCAL_DISCOVERY_H

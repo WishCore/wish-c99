@@ -36,7 +36,7 @@ wish_connection_t* wish_core_get_connection_pool(wish_core_t* core) {
 }
 
 /* Start an instance of wish communication */
-wish_connection_t* wish_connection_init(wish_core_t* core, uint8_t *luid, uint8_t *ruid) {
+wish_connection_t* wish_connection_init(wish_core_t* core, const uint8_t* luid, const uint8_t* ruid) {
 
     wish_connection_t* connection;
 

@@ -461,41 +461,6 @@ static void identity_import_handler(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
-    uint8_t *befriend_wuid = 0;
-    int32_t befriend_wuid_len = 0;
-    if (bson_get_binary(args, "1", &befriend_wuid, &befriend_wuid_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get argument 1: befriend wuid");
-        wish_rpc_server_error(req, 71, "Could not get argument 1: uid");
-        return;
-    }
-
-    if (befriend_wuid_len != WISH_ID_LEN) {
-        WISHDEBUG(LOG_CRITICAL, "argument 1 befriend wuid has illegal length");
-        wish_rpc_server_error(req, 72, "Could not get argument 1: uid length not expected");
-        return;
-    }
-    /* FIXME We don't have the concept of "befriend uid with new
-     * contact */
- 
-    /* Get the requested import type, element 2 of args array. 
-     * This impelementation requires an
-     * explicit string argument 'binary', which means that the
-     * identity is imported as BSON document (inside a BSON binary element). */
-    char *import_type_str = 0;
-    int32_t import_type_str_len = 0;
-    if (bson_get_string(args, "2", &import_type_str, 
-            &import_type_str_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Missing import type argument");
-        wish_rpc_server_error(req, 73, "Missing import type argument");
-        return;
-    }
-
-    if (strcmp(import_type_str, "binary") != 0) {
-        WISHDEBUG(LOG_CRITICAL, "Illegal import type");
-        wish_rpc_server_error(req, 74, "Illegal import type");
-        return;
-    }
-
     /* Start to examine the imported identity doc */
     
     int32_t bson_doc_len = bson_get_doc_len(new_id_doc);
@@ -1080,6 +1045,148 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     bson_append_finish_array(&b);
 
     bson_append_finish_object(&b);
+    bson_finish(&b);
+
+    if(b.err != 0) {
+        wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        return;
+    }
+
+    wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
+}
+
+/*
+ * identity.friendRequest
+ *
+ * args: [{ 
+    data: Buffer,
+    meta?: Buffer,
+    signatures?: any[] }]
+ */
+static void identity_friend_request(rpc_server_req* req, uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+
+    const char* luid = NULL;
+    
+    if (bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
+        wish_rpc_server_error(req, 345, "Expected luid: Buffer(32)");
+        return;
+    }
+    
+    luid = bson_iterator_bin_data(&it);
+
+    bson_find_from_buffer(&it, args, "1");
+    
+    if(bson_iterator_type(&it) != BSON_OBJECT) {
+        wish_rpc_server_error(req, 345, "Expected object");
+        return;
+    }
+
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("1.data", &it) != BSON_BINDATA ) {
+        WISHDEBUG(LOG_CRITICAL, "1.data not bin data");
+
+        wish_rpc_server_error(req, 345, "Object does not have { data: <Buffer> }.");
+        return;
+    }
+
+    bson_iterator data;
+    bson_iterator_from_buffer(&data, bson_iterator_bin_data(&it));
+    
+    const char* ruid = NULL;
+    const char* pubkey = NULL;
+    const char* alias = NULL;
+    
+    bson_find_fieldpath_value("uid", &data);
+    
+    if (bson_iterator_type(&data) != BSON_BINDATA || bson_iterator_bin_len(&data) != WISH_UID_LEN ) {
+        wish_rpc_server_error(req, 351, "uid not Buffer(32)");
+        return;
+    }
+
+    ruid = bson_iterator_bin_data(&data);
+    
+    bson_iterator_from_buffer(&data, bson_iterator_bin_data(&it));
+    bson_find_fieldpath_value("pubkey", &data);
+    
+    if (bson_iterator_type(&data) != BSON_BINDATA || bson_iterator_bin_len(&data) != WISH_PUBKEY_LEN ) {
+        wish_rpc_server_error(req, 351, "pubkey not Buffer(32)");
+        return;
+    }
+
+    pubkey = bson_iterator_bin_data(&data);
+    
+    bson_iterator_from_buffer(&data, bson_iterator_bin_data(&it));
+    bson_find_fieldpath_value("alias", &data);
+    
+    if (bson_iterator_type(&data) != BSON_STRING) {
+        wish_rpc_server_error(req, 351, "alias not string");
+        return;
+    }
+
+    alias = bson_iterator_string(&data);
+
+    const char* transport = NULL;
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("1.meta", &it) == BSON_BINDATA ) {
+        WISHDEBUG(LOG_CRITICAL, "1.meta");
+        bson_iterator meta;
+        bson_iterator_from_buffer(&meta, bson_iterator_bin_data(&it));
+
+
+        bson_find_fieldpath_value("transports.0", &meta);
+
+        if (bson_iterator_type(&meta) != BSON_STRING) {
+            wish_rpc_server_error(req, 351, "transports not string");
+            return;
+        }
+
+        if ( memcmp("wish://", bson_iterator_string(&meta), 7) ) {
+            transport = bson_iterator_string(&meta) + 7;
+        } else {
+            transport = bson_iterator_string(&meta);
+        }
+    }
+    
+    if (transport == NULL) {
+        wish_rpc_server_error(req, 351, "No transports available.");
+    }
+    
+    WISHDEBUG(LOG_CRITICAL, "alias for remote friend req: %s", alias);
+    WISHDEBUG(LOG_CRITICAL, "tranport for remote friend req: %s", transport);
+
+
+    
+    wish_connection_t* friend_req_ctx = wish_connection_init(core, luid, ruid);
+    friend_req_ctx->friend_req_connection = true;
+    //memcpy(friend_req_ctx->rhid, rhid, WISH_ID_LEN);
+        
+    //uint8_t *ip = db[i].transport_ip.addr;
+    
+    wish_ip_addr_t ip;
+    uint16_t port;
+    
+    wish_parse_transport_ip_port(transport, strnlen(transport, 32), &ip, &port);
+    
+    WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip.addr[0], ip.addr[1], ip.addr[2], ip.addr[3]);
+
+    wish_open_connection(core, friend_req_ctx, &ip, port, false);
+    
+    
+    
+    
+    
+    
+    uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
+
+    bson b;
+    bson_init_buffer(&b, buffer, WISH_PORT_RPC_BUFFER_SZ);
+    bson_append_bool(&b, "data", true);
     bson_finish(&b);
 
     if(b.err != 0) {
@@ -2079,6 +2186,7 @@ handler services_send_handler =                       { .op_str = "services.send
 
 handler identity_sign_handler =                       { .op_str = "identity.sign",                     .handler = identity_sign };
 handler identity_verify_handler =                     { .op_str = "identity.verify",                   .handler = identity_verify };
+handler identity_friend_request_handler =             { .op_str = "identity.friendRequest",            .handler = identity_friend_request };
 handler identity_friend_request_list_handler =        { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list };
 handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",      .handler = identity_friend_request_accept };
 handler identity_friend_request_decline_handler =     { .op_str = "identity.friendRequestDecline",     .handler = identity_friend_request_decline };
@@ -2125,6 +2233,7 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     wish_rpc_server_add_handler(core->app_api, "identity.remove", identity_remove_handler);
     wish_rpc_server_register(core->app_api, &identity_sign_handler);
     wish_rpc_server_register(core->app_api, &identity_verify_handler);
+    wish_rpc_server_register(core->app_api, &identity_friend_request_handler);
     wish_rpc_server_register(core->app_api, &identity_friend_request_list_handler);
     wish_rpc_server_register(core->app_api, &identity_friend_request_accept_handler);
     wish_rpc_server_register(core->app_api, &identity_friend_request_decline_handler);
