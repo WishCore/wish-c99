@@ -809,6 +809,57 @@ return_t wish_identity_sign(wish_core_t* core, wish_identity_t* uid, const bin* 
     return RET_SUCCESS;
 }
 
+/**
+ * Creates signature for data and if claim is present signature covers claim
+ * 
+ * @param core
+ * @param uid Input
+ * @param data Input
+ * @param claim Input
+ * @param signature Output
+ * @return 
+ */
+return_t wish_identity_verify(wish_core_t* core, wish_identity_t* uid, const bin* data, const bin* claim, const bin* signature) {
+    if (data == NULL || data->base == NULL || data->len == 0) {
+        return RET_E_INVALID_INPUT;
+    }
+    
+    int hash_len = 32;
+    uint8_t hash[hash_len];
+    uint8_t claim_hash[hash_len];
+
+    mbedtls_sha256_context sha256;
+    mbedtls_sha256_init(&sha256);
+    mbedtls_sha256_starts(&sha256, 0); 
+    mbedtls_sha256_update(&sha256, data->base, data->len); 
+    mbedtls_sha256_finish(&sha256, hash);
+    mbedtls_sha256_free(&sha256);
+
+
+    if (claim != NULL && claim->base != NULL && claim->len > 0) {
+        // If a claim is present xor it's sha256 hash with the data hash.
+        // This way the signature covers the original data and the claim
+        //   claim: BSON({ msg: 'This guy is good!', timestamp: Date.now(), trust: 'VERIFIED', (algo: 'sha256-ed25519') })
+
+        mbedtls_sha256_init(&sha256);
+        mbedtls_sha256_starts(&sha256, 0);
+        mbedtls_sha256_update(&sha256, claim->base, claim->len);
+        mbedtls_sha256_finish(&sha256, claim_hash);
+        mbedtls_sha256_free(&sha256);
+
+        int c = 0;
+        for(c=0; c<32; c++) {
+            hash[c] ^= claim_hash[c];
+        }
+    }
+    
+    if ( ed25519_verify(signature->base, hash, hash_len, uid->pubkey) ) {
+        return RET_SUCCESS;
+    } else {
+        return RET_FAIL;
+    }
+}
+
 /*
 var document = {
   // exported identity

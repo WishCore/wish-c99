@@ -150,6 +150,8 @@ void wish_identity_delete_db(void);
 
 return_t wish_identity_sign(wish_core_t* core, wish_identity_t* uid, const bin* data, const bin* claim, bin* signature);
 
+return_t wish_identity_verify(wish_core_t* core, wish_identity_t* uid, const bin* data, const bin* claim, const bin* signature);
+
 return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffer);
 
 return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, bin *buffer);

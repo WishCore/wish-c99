@@ -969,12 +969,13 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
  *     meta: <Buffer>,
  *     signatures: [{ 
  *       uid: Buffer,
- *       sign: bool | null,
+ *       sign: bool | null, // bool: verification result, null: unable to verify signature
  *       claim?: Buffer }] ] })
  */
 static void identity_verify(rpc_server_req* req, uint8_t* args) {
-    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
-    uint8_t buffer[buffer_len];
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
 
     bson_iterator it;
     bson_find_from_buffer(&it, args, "0");
@@ -986,7 +987,7 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
 
     bson b;
 
-    bson_init_buffer(&b, buffer, buffer_len);
+    bson_init_buffer(&b, buffer, WISH_PORT_RPC_BUFFER_SZ);
     bson_append_start_object(&b, "data");
 
     bson_iterator_from_buffer(&it, args);
@@ -1025,26 +1026,54 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     if ( bson_find_fieldpath_value("0.signatures.0", &it) == BSON_OBJECT ) {
         do {
             BSON_NUMSTR(index, i++);
+            bson_append_start_object(&b, index);
+            
             WISHDEBUG(LOG_CRITICAL, "0.signatures.0 already present, should be verified. %i %s", bson_iterator_type(&it), bson_iterator_key(&it));
             bson obj;
             bson_iterator_subobject(&it, &obj);
             bson_iterator sit;
             bson_iterator_init(&sit, &obj);
+            
+            const char* uid = NULL;
+            
+            bin claim;
+            memset(&claim, 0, sizeof(bin));
+            
+            bin signature;
+            memset(&signature, 0, sizeof(bin));
+            
             while ( bson_iterator_next(&sit) != BSON_EOO ) {
-                WISHDEBUG(LOG_CRITICAL, "  sub object %i %s", bson_iterator_type(&sit), bson_iterator_key(&sit));
+                WISHDEBUG(LOG_CRITICAL, "  sub object %i: %s", bson_iterator_type(&sit), bson_iterator_key(&sit));
+                if (strncmp("sign", bson_iterator_key(&sit), 5) == 0 && bson_iterator_type(&sit) == BSON_BINDATA && bson_iterator_bin_len(&sit) == WISH_SIGNATURE_LEN ) {
+                    signature.base = (char*) bson_iterator_bin_data(&sit);
+                    signature.len = bson_iterator_bin_len(&sit);
+                } else if (strncmp("uid", bson_iterator_key(&sit), 4) == 0 && bson_iterator_type(&sit) == BSON_BINDATA && bson_iterator_bin_len(&sit) == WISH_UID_LEN ) {
+                    uid = bson_iterator_bin_data(&sit);
+                    bson_append_element(&b, bson_iterator_key(&sit), &sit);
+                } else if (strncmp("claim", bson_iterator_key(&sit), 6) == 0 && bson_iterator_type(&sit) == BSON_BINDATA ) {
+                    claim.base = (char*) bson_iterator_bin_data(&sit);
+                    claim.len = bson_iterator_bin_len(&sit);
+                    bson_append_element(&b, bson_iterator_key(&sit), &sit);
+                } else {
+                    bson_append_element(&b, bson_iterator_key(&sit), &sit);
+                }
             }
             
-            /*
-            bson_append_start_object(&b, index);
-            bson_append_string(&b, "algo", "sha256-ed25519");
-            bson_append_binary(&b, "uid", luid, WISH_UID_LEN);
-            //bson_append_bool(&b, "sign", wish_identity_verify(core, &uid, &data, &claim, &signature); signature.base, ED25519_SIGNATURE_LEN);
-            if (claim.base != NULL && claim.len > 0) {
-                bson_append_binary(&b, "claim", claim.base, claim.len);
+            if (signature.base != NULL && uid != NULL) {
+                wish_identity_t id;
+                
+                if ( RET_SUCCESS == wish_identity_load(uid, &id) ) {
+                    if ( RET_SUCCESS == wish_identity_verify(core, &id, &data, &claim, &signature) ) {
+                        bson_append_bool(&b, "sign", true);
+                    } else {
+                        bson_append_bool(&b, "sign", false);
+                    }
+                } else {
+                    bson_append_null(&b, "sign");
+                }
             }
-
+            
             bson_append_finish_object(&b);
-            */
         } while ( bson_iterator_next(&it) != BSON_EOO );
     }
 
