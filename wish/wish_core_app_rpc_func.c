@@ -61,6 +61,8 @@ static void methods(rpc_server_req* req, uint8_t* args) {
     
     while (h != NULL) {
         bson_append_start_object(&bs, h->op_str);
+        if (h->args) { bson_append_string(&bs, "args", h->args); }
+        if (h->doc) { bson_append_string(&bs, "doc", h->doc); }
         bson_append_finish_object(&bs);
 
         h = h->next;
@@ -307,7 +309,7 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
  *   { name: 'GPS',      sid: <Buffer 47 50 ... 6a 73>, protocols: ['ucp'] }
  * ]
  */
-static void services_list_handler(rpc_server_req* req, uint8_t* args) {
+static void services_list(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -367,7 +369,7 @@ static void services_list_handler(rpc_server_req* req, uint8_t* args) {
  *       }
  *
  */
-static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
+static void identity_export(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -444,7 +446,7 @@ static void identity_export_handler(rpc_server_req* req, uint8_t* args) {
  *   The first arg is alias and second argument is the uid of the imported id
  *
  */
-static void identity_import_handler(rpc_server_req* req, uint8_t* args) {
+static void identity_import(rpc_server_req* req, uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
@@ -559,7 +561,7 @@ static void identity_import_handler(rpc_server_req* req, uint8_t* args) {
  *       ]
  *
  */
-static void identity_list_handler(rpc_server_req* req, uint8_t* args) {
+static void identity_list(rpc_server_req* req, uint8_t* args) {
     
     int num_uids_in_db = wish_get_num_uid_entries();
     wish_uid_list_elem_t uid_list[num_uids_in_db];
@@ -649,7 +651,7 @@ static void identity_list_handler(rpc_server_req* req, uint8_t* args) {
  *  identity.create (An identity creation always involves creation of
  *  private key and public key)
  */
-static void identity_create_handler(rpc_server_req* req, uint8_t* args) {
+static void identity_create(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -718,7 +720,7 @@ static void identity_create_handler(rpc_server_req* req, uint8_t* args) {
  *  identity.create (An identity creation always involves creation of
  *  private key and public key)
  */
-static void identity_remove_handler(rpc_server_req* req, uint8_t* args) {
+static void identity_remove(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1527,7 +1529,7 @@ static void identity_friend_request_decline(rpc_server_req* req, uint8_t* args) 
  *  identity.create (An identity creation always involves creation of
  *  private key and public key)
  */
-static void identity_get_handler(rpc_server_req* req, uint8_t* args) {
+static void identity_get(rpc_server_req* req, uint8_t* args) {
     WISHDEBUG(LOG_DEBUG, "In identity_get_handler");
 
     bson bs; 
@@ -1632,7 +1634,7 @@ static void identity_get_handler(rpc_server_req* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
-static void connections_list_handler(rpc_server_req* req, uint8_t* args) {
+static void connections_list(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1684,7 +1686,7 @@ static void connections_list_handler(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-static void connections_disconnect_handler(rpc_server_req* req, uint8_t* args) {
+static void connections_disconnect(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = 1400;
@@ -1756,7 +1758,7 @@ static void connections_check_connections(rpc_server_req* req, uint8_t* args) {
  * }
  * 
  */
-static void wld_list_handler(rpc_server_req* req, uint8_t* args) {
+static void wld_list(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1805,7 +1807,7 @@ static void wld_list_handler(rpc_server_req* req, uint8_t* args) {
  * Response core to App:
  *  { ack: 5, data: true }
  */
-static void wld_announce_handler(rpc_server_req* req, uint8_t* args) {
+static void wld_announce(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
 
     wish_ldiscover_announce_all(core);
@@ -1840,7 +1842,7 @@ static void wld_announce_handler(rpc_server_req* req, uint8_t* args) {
  * }
  * 
  */
-static void wld_clear_handler(rpc_server_req* req, uint8_t* args) {
+static void wld_clear(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1878,7 +1880,7 @@ static void wld_clear_handler(rpc_server_req* req, uint8_t* args) {
 
 
 
-static void wld_friend_request_handler(rpc_server_req* req, uint8_t* args) {
+static void wld_friend_request(rpc_server_req* req, uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -2178,20 +2180,32 @@ static void debug_disable(struct wish_rpc_context* req,
 */
 
 
-handler methods_handler =                             { .op_str = "methods",                           .handler = methods };
-handler signals_handler =                             { .op_str = "signals",                           .handler = wish_core_signals };
-handler version_handler =                             { .op_str = "version",                           .handler = version };
+handler methods_h =                                   { .op_str = "methods",                           .handler = methods, .args = "(void): string" };
+handler signals_h =                                   { .op_str = "signals",                           .handler = wish_core_signals, .args = "(filter?: string): Signal" };
+handler version_h =                                   { .op_str = "version",                           .handler = version, .args = "(void): string", .doc = "Returns core version." };
 
-handler services_send_handler =                       { .op_str = "services.send",                     .handler = services_send };
+handler services_send_h =                             { .op_str = "services.send",                     .handler = services_send, .args = "(peer: Peer, payload: Buffer): bool", .doc = "Send payload to peer." };
+handler services_list_h =                             { .op_str = "services.list",                     .handler = services_list, .args = "(void): Service[]", .doc = "List local services." };
 
-handler identity_sign_handler =                       { .op_str = "identity.sign",                     .handler = identity_sign };
-handler identity_verify_handler =                     { .op_str = "identity.verify",                   .handler = identity_verify };
-handler identity_friend_request_handler =             { .op_str = "identity.friendRequest",            .handler = identity_friend_request };
-handler identity_friend_request_list_handler =        { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list };
-handler identity_friend_request_accept_handler =      { .op_str = "identity.friendRequestAccept",      .handler = identity_friend_request_accept };
-handler identity_friend_request_decline_handler =     { .op_str = "identity.friendRequestDecline",     .handler = identity_friend_request_decline };
+handler identity_list_h =                             { .op_str = "identity.list",                     .handler = identity_list, .args="(void): Identity[]" };
+handler identity_export_h =                           { .op_str = "identity.export",                   .handler = identity_export, .args="(void): Document" };
+handler identity_import_h =                           { .op_str = "identity.import",                   .handler = identity_import, .args="(identity: Document): Identity" };
+handler identity_create_h =                           { .op_str = "identity.create",                   .handler = identity_create, .args="(alias: string): Identity" };
+handler identity_get_h =                              { .op_str = "identity.get",                      .handler = identity_get, .args="(uid: Uid): Identity" };
+handler identity_remove_h =                           { .op_str = "identity.remove",                   .handler = identity_remove, .args="(uid: Uid): bool" };
 
-handler directory_find_handler =                      { .op_str = "directory.find",                    .handler = wish_api_directory_find };
+handler identity_sign_h =                             { .op_str = "identity.sign",                     .handler = identity_sign, .args="(uid: Uid, document: Document): Document" };
+handler identity_verify_h =                           { .op_str = "identity.verify",                   .handler = identity_verify, .args = "(document: Document): Document" };
+handler identity_friend_request_h =                   { .op_str = "identity.friendRequest",            .handler = identity_friend_request, .args = "(luid: Uid, contact: Contact): bool" };
+handler identity_friend_request_list_h =              { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list, .args = "(void): FriendRequest[]" };
+handler identity_friend_request_accept_h =            { .op_str = "identity.friendRequestAccept",      .handler = identity_friend_request_accept, .args = "(luid: Uid, ruid: Uid): bool" };
+handler identity_friend_request_decline_h =           { .op_str = "identity.friendRequestDecline",     .handler = identity_friend_request_decline, .args = "(luid: Uid, ruid: Uid): bool" };
+
+handler connections_list_h =                          { .op_str = "connections.list",                  .handler = connections_list, .args = "(void): Connection[]" };
+handler connections_disconnect_h =                    { .op_str = "connections.disconnect",            .handler = connections_disconnect, .args = "(id: number): bool" };
+handler connections_check_connections_h =             { .op_str = "connections.checkConnections",      .handler = connections_check_connections, .args = "(id: number): bool" };
+
+handler directory_find_h =                            { .op_str = "directory.find",                    .handler = wish_api_directory_find, .args = "(filter?: string): DirectoryEntry" };
 
 handler api_acl_check_h =                             { .op_str = "acl.check",                         .handler = wish_api_acl_check };
 handler api_acl_allow_h =                             { .op_str = "acl.allow",                         .handler = wish_api_acl_allow };
@@ -2202,11 +2216,16 @@ handler api_acl_user_roles_h =                        { .op_str = "acl.userRoles
 handler api_acl_what_resources_h =                    { .op_str = "acl.whatResources",                 .handler = wish_api_acl_what_resources };
 handler api_acl_allowed_permissions_h =               { .op_str = "acl.allowedPermissions",            .handler = wish_api_acl_allowed_permissions };
         
-handler relay_list_handler =                          { .op_str = "relay.list",                        .handler = relay_list };
-handler relay_add_handler =                           { .op_str = "relay.add",                         .handler = relay_add };
-handler relay_remove_handler =                        { .op_str = "relay.remove",                      .handler = relay_remove };
+handler relay_list_h =                                { .op_str = "relay.list",                        .handler = relay_list, .args = "(void): Relay[]" };
+handler relay_add_h =                                 { .op_str = "relay.add",                         .handler = relay_add, .args = "(relay: string): bool" };
+handler relay_remove_h =                              { .op_str = "relay.remove",                      .handler = relay_remove, .args = "(relay: string): bool" };
 
-handler host_config_handler =                         { .op_str = "host.config",                       .handler = host_config };
+handler wld_list_h =                                  { .op_str = "wld.list",                          .handler = wld_list, .args = "(void): Identity[]" };
+handler wld_clear_h =                                 { .op_str = "wld.clear",                         .handler = wld_clear, .args = "(void): bool" };
+handler wld_announce_h =                              { .op_str = "wld.announce",                      .handler = wld_announce, .args = "(void): bool" };
+handler wld_friend_request_h =                        { .op_str = "wld.friendRequest",                 .handler = wld_friend_request, .args = "(luid: Uid, ruid: Uid, rhid: Hid): bool" };
+
+handler host_config_h =                               { .op_str = "host.config",                       .handler = host_config };
 
 void wish_core_app_rpc_init(wish_core_t* core) {
     core->app_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
@@ -2218,30 +2237,30 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     strncpy(core->app_api->server_name, "core-from-app", 16);
     core->app_api->context = core;
     
-    wish_rpc_server_register(core->app_api, &methods_handler);
-    wish_rpc_server_register(core->app_api, &signals_handler);
-    wish_rpc_server_register(core->app_api, &version_handler);
+    wish_rpc_server_register(core->app_api, &methods_h);
+    wish_rpc_server_register(core->app_api, &signals_h);
+    wish_rpc_server_register(core->app_api, &version_h);
     
-    wish_rpc_server_register(core->app_api, &services_send_handler);
-    wish_rpc_server_add_handler(core->app_api, "services.list", services_list_handler);
+    wish_rpc_server_register(core->app_api, &services_send_h);
+    wish_rpc_server_register(core->app_api, &services_list_h);
     
-    wish_rpc_server_add_handler(core->app_api, "identity.list", identity_list_handler);
-    wish_rpc_server_add_handler(core->app_api, "identity.export", identity_export_handler);
-    wish_rpc_server_add_handler(core->app_api, "identity.import", identity_import_handler);
-    wish_rpc_server_add_handler(core->app_api, "identity.create", identity_create_handler);
-    wish_rpc_server_add_handler(core->app_api, "identity.get", identity_get_handler);
-    wish_rpc_server_add_handler(core->app_api, "identity.remove", identity_remove_handler);
-    wish_rpc_server_register(core->app_api, &identity_sign_handler);
-    wish_rpc_server_register(core->app_api, &identity_verify_handler);
-    wish_rpc_server_register(core->app_api, &identity_friend_request_handler);
-    wish_rpc_server_register(core->app_api, &identity_friend_request_list_handler);
-    wish_rpc_server_register(core->app_api, &identity_friend_request_accept_handler);
-    wish_rpc_server_register(core->app_api, &identity_friend_request_decline_handler);
-    wish_rpc_server_register(core->app_api, &directory_find_handler);
+    wish_rpc_server_register(core->app_api, &identity_list_h);
+    wish_rpc_server_register(core->app_api, &identity_create_h);
+    wish_rpc_server_register(core->app_api, &identity_export_h);
+    wish_rpc_server_register(core->app_api, &identity_import_h);
+    wish_rpc_server_register(core->app_api, &identity_get_h);
+    wish_rpc_server_register(core->app_api, &identity_remove_h);
+    wish_rpc_server_register(core->app_api, &identity_sign_h);
+    wish_rpc_server_register(core->app_api, &identity_verify_h);
+    wish_rpc_server_register(core->app_api, &identity_friend_request_h);
+    wish_rpc_server_register(core->app_api, &identity_friend_request_list_h);
+    wish_rpc_server_register(core->app_api, &identity_friend_request_accept_h);
+    wish_rpc_server_register(core->app_api, &identity_friend_request_decline_h);
+    wish_rpc_server_register(core->app_api, &directory_find_h);
     
-    wish_rpc_server_add_handler(core->app_api, "connections.list", connections_list_handler);
-    wish_rpc_server_add_handler(core->app_api, "connections.disconnect", connections_disconnect_handler);
-    wish_rpc_server_add_handler(core->app_api, "connections.checkConnections", connections_check_connections);
+    wish_rpc_server_register(core->app_api, &connections_list_h);
+    wish_rpc_server_register(core->app_api, &connections_disconnect_h);
+    wish_rpc_server_register(core->app_api, &connections_check_connections_h);
 
     wish_rpc_server_register(core->app_api, &api_acl_check_h);
     wish_rpc_server_register(core->app_api, &api_acl_allow_h);
@@ -2252,16 +2271,16 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     wish_rpc_server_register(core->app_api, &api_acl_what_resources_h);
     wish_rpc_server_register(core->app_api, &api_acl_allowed_permissions_h);
 
-    wish_rpc_server_register(core->app_api, &relay_list_handler);
-    wish_rpc_server_register(core->app_api, &relay_add_handler);
-    wish_rpc_server_register(core->app_api, &relay_remove_handler);
+    wish_rpc_server_register(core->app_api, &relay_list_h);
+    wish_rpc_server_register(core->app_api, &relay_add_h);
+    wish_rpc_server_register(core->app_api, &relay_remove_h);
     
-    wish_rpc_server_add_handler(core->app_api, "wld.list", wld_list_handler);
-    wish_rpc_server_add_handler(core->app_api, "wld.clear", wld_clear_handler);
-    wish_rpc_server_add_handler(core->app_api, "wld.announce", wld_announce_handler);
-    wish_rpc_server_add_handler(core->app_api, "wld.friendRequest", wld_friend_request_handler);
+    wish_rpc_server_register(core->app_api, &wld_list_h);
+    wish_rpc_server_register(core->app_api, &wld_clear_h);
+    wish_rpc_server_register(core->app_api, &wld_announce_h);
+    wish_rpc_server_register(core->app_api, &wld_friend_request_h);
     
-    wish_rpc_server_register(core->app_api, &host_config_handler);
+    wish_rpc_server_register(core->app_api, &host_config_h);
     
     //wish_rpc_server_add_handler(core->core_app_rpc_server, "debug.enable", debug_enable);
     //wish_rpc_server_add_handler(core->core_app_rpc_server, "debug.disable", debug_disable);
