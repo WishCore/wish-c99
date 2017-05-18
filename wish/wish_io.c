@@ -897,6 +897,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 WISHDEBUG(LOG_CRITICAL, "Sending friend request RPC");
                 /* FIXME: this should just call a "connection established" handler instead, which would in turn call the RPC client for sending the friend req */
                 wish_core_send_friend_req(core, connection);
+                connection->context_state = WISH_CONTEXT_CONNECTED;
             }
             else {
                 struct wish_event evt = { .event_type =

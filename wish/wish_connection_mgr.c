@@ -111,8 +111,7 @@ void check_connection_liveliness(wish_core_t* core, void* ctx) {
             }
             break;
         case WISH_CONTEXT_IN_MAKING: {
-            int timeout = connection->friend_req_connection ? FRIEND_REQ_TIMEOUT : CONNECTION_SETUP_TIMEOUT;
-            if (core->core_time > (connection->latest_input_timestamp + timeout)) {
+            if (core->core_time > (connection->latest_input_timestamp + CONNECTION_SETUP_TIMEOUT)) {
                 WISHDEBUG(LOG_CRITICAL, "Connection ping: Killing connection because it has been in handshake phase for too long");
                 wish_close_connection(core, connection);
             }
