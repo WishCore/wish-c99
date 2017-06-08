@@ -1,6 +1,6 @@
 #define NUM_APP_CONNECTIONS 20
 
-#define APP_RX_RB_SZ 1024
+#define APP_RX_RB_SZ 64*1024-1
 
 #include "wish_core.h"
 

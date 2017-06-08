@@ -180,7 +180,7 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
          * (that is found in the rpc context)
          *  */
         
-        /* FIXME this is waisting stack space again */
+        /* FIXME this is wasting stack space again */
         size_t upcall_doc_max_len = peer_len + payload_len + 100;
         uint8_t upcall_doc[upcall_doc_max_len];
         bson bs;

@@ -203,21 +203,26 @@ again:
             uint16_t expect_len = len_bytes[0] << 8 | len_bytes[1];
             app_transport_expect_bytes[i] = expect_len;
             app_transport_states[i] = APP_TRANSPORT_WAIT_PAYLOAD;
-            //printf("Now Waiting payload %i\n", expect_len);
+            
+            if (expect_len>APP_RX_RB_SZ) {
+                printf("app_server.c: Buffer too small! %i (expecting: %i)\n", APP_RX_RB_SZ, expect_len);
+            }
+            
             if (ring_buffer_length(&app_rx_ring_bufs[i]) >= 
                     app_transport_expect_bytes[i]) {
                 goto again;
             }
         }
         break;
-    case APP_TRANSPORT_WAIT_PAYLOAD:
-        ;
+    case APP_TRANSPORT_WAIT_PAYLOAD: {
         uint16_t expect_len = app_transport_expect_bytes[i];
         if (ring_buffer_length(&app_rx_ring_bufs[i]) >= expect_len) {
             uint8_t payload[expect_len];
             ring_buffer_read(&app_rx_ring_bufs[i], payload, expect_len);
             app_transport_states[i] = APP_TRANSPORT_WAIT_FRAME_LEN;
+            
             //printf("Received whole frame! len = %i\n", expect_len);
+            
             if (app_login_complete[i] == false) {
                 /* Snatch WSID */
                 uint8_t *wsid;
@@ -238,8 +243,7 @@ again:
                 }
 
             }
-            /* Uncomment the following if you would like to see
-             * everything coming from the TCP app */
+
             receive_app_to_core(core, apps[i].wsid, payload, expect_len);
             if (ring_buffer_length(&app_rx_ring_bufs[i]) >= 2) {
                 goto again;
@@ -247,6 +251,7 @@ again:
         }
 
         break;
+    }
     case APP_TRANSPORT_CLOSING:
         WISHDEBUG(LOG_CRITICAL, "This transport is in CLOSING state, server is disregarding.");
         /* FIXME unhandled! */
