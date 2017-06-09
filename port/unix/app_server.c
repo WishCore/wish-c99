@@ -150,7 +150,7 @@ void send_core_to_app_via_tcp(wish_core_t* core, uint8_t wsid[WISH_ID_LEN], uint
 #endif
             
             if (write_ret != 2+len) {
-                printf("App connection: Write error! (c) Wanted %i got %li\n", 2, write_ret);
+                printf("App connection: Write error! (c) Wanted %i got %zu\n", 2, write_ret);
                 return;
             }
             return;
