@@ -1550,86 +1550,37 @@ static void identity_get(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
+    wish_identity_t identity;
 
-    int num_uids_in_db = wish_get_num_uid_entries();
-    wish_uid_list_elem_t uid_list[num_uids_in_db];
-    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
-
-    int i = 0;
-    for (i = 0; i < num_uids; i++) {
-        if( memcmp(uid_list[i].uid, arg_uid, 32) != 0 ) {
-            continue;
-        }
-        
-        /* For each uid in DB, copy the uid, alias and privkey fields */
-        size_t id_bson_doc_max_len = sizeof (wish_identity_t) + 100;
-        uint8_t id_bson_doc[id_bson_doc_max_len];
-        int ret = wish_load_identity_bson(uid_list[i].uid, id_bson_doc,
-            id_bson_doc_max_len);
-        
-        if (ret == 1) {
-
-            int32_t uid_len = 0;
-            uint8_t *uid = NULL;
-            if (bson_get_binary(id_bson_doc, "uid", &uid, &uid_len) 
-                    == BSON_FAIL) {
-                WISHDEBUG(LOG_CRITICAL, "Unexpected: no uid");
-                break;
-            }
-            bson_append_binary(&bs, "uid", uid, uid_len);
-
-            int32_t alias_len = 0;
-            char *alias = NULL;
-            if (bson_get_string(id_bson_doc, "alias", &alias, &alias_len)
-                    == BSON_FAIL) {
-                WISHDEBUG(LOG_CRITICAL, "Unexpected: no alias");
-                break;
-            }
-            bson_append_string(&bs, "alias", alias);
-
-            int32_t privkey_len = 0;
-            uint8_t *privkey = NULL;
-            bool privkey_status = false;
-            if (bson_get_binary(id_bson_doc, "privkey", &privkey,
-                    &privkey_len) == BSON_SUCCESS) {
-                /* Privkey exists in database */
-                privkey_status = true;
-            }
-            else {
-                /* Privkey not in database */
-                privkey_status = false;
-            }
-            bson_append_bool(&bs, "privkey", privkey_status);
-            
-            int32_t pubkey_len = 0;
-            uint8_t *pubkey = NULL;
-            if (bson_get_binary(id_bson_doc, "pubkey", &pubkey, &pubkey_len) == BSON_FAIL) {
-                WISHDEBUG(LOG_CRITICAL, "Error while reading pubkey");
-                wish_rpc_server_error(req, 509, "This is fail!");
-                break;
-            }
-            bson_append_binary(&bs, "pubkey", pubkey, pubkey_len);
-        } else {
-            WISHDEBUG(LOG_CRITICAL, "Could not load identity");
-            wish_rpc_server_error(req, 997, "Could not load identity");
-        }
-        
-        break;
+    if ( RET_SUCCESS != wish_identity_load(arg_uid, &identity) ) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+        wish_rpc_server_error(req, 997, "Could not load identity");
     }
-    
-    if (i >= num_uids) {
-        WISHDEBUG(LOG_CRITICAL, "The identity was not found");
-        wish_rpc_server_error(req, 997, "The identity was not found");
-    } else {
-        bson_append_finish_object(&bs);
-        bson_finish(&bs);
 
-        if (bs.err) {
-            WISHDEBUG(LOG_CRITICAL, "BSON error in identity_get_handler");
-            wish_rpc_server_error(req, 997, "BSON error in identity_get_handler");
-        } else {
-            wish_rpc_server_send(req, bs.data, bson_size(&bs));
-        }
+    bson_append_binary(&bs, "uid", identity.uid, WISH_UID_LEN);
+    bson_append_string(&bs, "alias", identity.alias);
+    bson_append_bool(&bs, "privkey", identity.has_privkey);
+    bson_append_binary(&bs, "pubkey", identity.pubkey, WISH_PUBKEY_LEN);
+
+    // TODO: Support multiple transports
+    if ( strnlen(&identity.transports[0][0], 64) % 64 != 0 ) {
+        bson_append_start_array(&bs, "hosts");
+        bson_append_start_object(&bs, "0");
+        bson_append_start_array(&bs, "transports");
+        bson_append_string(&bs, "0", &identity.transports[0][0]);
+        bson_append_finish_array(&bs);
+        bson_append_finish_object(&bs);
+        bson_append_finish_array(&bs);
+    }
+            
+    bson_append_finish_object(&bs);
+    bson_finish(&bs);
+
+    if (bs.err) {
+        WISHDEBUG(LOG_CRITICAL, "BSON error in identity_get_handler");
+        wish_rpc_server_error(req, 997, "BSON error in identity_get_handler");
+    } else {
+        wish_rpc_server_send(req, bs.data, bson_size(&bs));
     }
     bson_destroy(&bs);
 }
@@ -2367,12 +2318,12 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
 }
 
 void wish_core_app_rpc_cleanup_requests(wish_core_t* core, struct wish_service_entry *service_entry_offline) {
-    WISHDEBUG(LOG_CRITICAL, "App rpc server clean up starting");
+    //WISHDEBUG(LOG_CRITICAL, "App rpc server clean up starting");
     struct wish_rpc_context_list_elem *list_elem = NULL;
     struct wish_rpc_context_list_elem *tmp = NULL;
     LL_FOREACH_SAFE(core->app_api->request_list_head, list_elem, tmp) {
         if (list_elem->request_ctx.context == service_entry_offline) {
-            WISHDEBUG(LOG_CRITICAL, "App rpc server clean up: request op %s", list_elem->request_ctx.op_str);
+            //WISHDEBUG(LOG_CRITICAL, "App rpc server clean up: request op %s", list_elem->request_ctx.op_str);
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
             memset(&(list_elem->request_ctx), 0, sizeof(rpc_server_req));
 #else
@@ -2385,7 +2336,8 @@ void wish_core_app_rpc_cleanup_requests(wish_core_t* core, struct wish_service_e
 }
 
 void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct wish_service_entry *service_entry, bool online) {
-    WISHDEBUG(LOG_CRITICAL, "In update locals");
+    //WISHDEBUG(LOG_CRITICAL, "In update locals");
+    
     if (memcmp(dst_wsid, service_entry->wsid, WISH_ID_LEN) == 0) {
         /* Don't send any peer online/offline messages regarding service itself */
         return;
@@ -2430,7 +2382,7 @@ void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct w
                 WISHDEBUG(LOG_CRITICAL, "BSON error when creating peer message: %i %s len %i", bs.err, bs.errstr, bs.dataSize);
             }
             else {
-                WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_func: wish_send_peer_update_locals: online");
+                //WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_func: wish_send_peer_update_locals: online");
                 send_core_to_app(core, dst_wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
             }
         }

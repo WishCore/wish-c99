@@ -6,7 +6,7 @@ extern "C" {
 
 #define WISH_CONTEXT_POOL_SZ (WISH_PORT_CONTEXT_POOL_SZ)
 
-#define WISH_MAX_SERVICES 5 /* contrast with NUM_WISH_APPS due to be removed in wish_app.h */
+#define WISH_MAX_SERVICES 10 /* contrast with NUM_WISH_APPS due to be removed in wish_app.h */
 
 typedef struct {
     char* base;

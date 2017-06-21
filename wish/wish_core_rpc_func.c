@@ -25,6 +25,7 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
     uint8_t buffer[buffer_len];
     if (wish_service_entry_is_valid(core, service_entry)) {
         
+        // TODO: support multiple protocols (protocols[0])
         if (strnlen(service_entry->protocols[0].name, WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
             bson bs;
             bson_init_buffer(&bs, buffer, buffer_len);
@@ -43,11 +44,11 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
 
             bson_finish(&bs);
 
-            WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update: %s", online ? "online" : "offline");
+            //WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update: %s", online ? "online" : "offline");
             wish_rpc_server_emit_broadcast(core->core_api, "peers", bson_data(&bs), bson_size(&bs));
         } else {
             // no protocol, no peer
-            WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update, no protocol no peer: %s", service_entry->name);
+            //WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update, no protocol no peer: %s", service_entry->name);
         }
     }
 }
@@ -93,6 +94,7 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
     int i;
     for(i=0; i < WISH_MAX_SERVICES; i++) {
         if (wish_service_entry_is_valid(core, &registry[i])) {
+            // TODO: support multiple protocols (protocols[0])
             if (strnlen(registry[i].protocols[0].name, WISH_PROTOCOL_NAME_MAX_LEN) > 0) {
                 
                 memset(buffer, 0, buffer_len);
@@ -124,7 +126,7 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
                 wish_core_send_message(core, connection, (char*)bson_data(&bs), bson_size(&bs));
             } else {
                 // no protocol, no peer
-                WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update, no protocol no peer: %s", registry[i].name);
+                //WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update, no protocol no peer: %s", registry[i].name);
             }
         }
     }
@@ -402,7 +404,14 @@ static void core_friend_req(rpc_server_req* req, uint8_t* args) {
         return;
     }
     
-    char *meta = (char *) bson_iterator_bin_data(&it);
+    char* meta = (char*) bson_iterator_bin_data(&it);
+    
+    bson_iterator meta_it;
+    bson_iterator_from_buffer(&meta_it, meta);
+    
+    if (bson_find_fieldpath_value("transports.0", &meta_it) == BSON_STRING) {
+        WISHDEBUG(LOG_CRITICAL, "Found transports array in meta field! %s", bson_iterator_string(&meta_it));
+    }
     
     /* Reset iterator */
     bson_iterator_from_buffer(&it, args);
