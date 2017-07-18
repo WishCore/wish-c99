@@ -517,15 +517,16 @@ static void friend_req_callback(rpc_client_req* req, void *context, uint8_t *pay
  * This function is used to send a friend request over a Wish connection to the remote core 
  * 
  * args to the RPC 'friendRequest':
- [ 0: {
-  data: BSON(document),
-  meta: BSON({ transports: ['123.234.123.234:40000'] })
-  signatures: [ // 0..n
-    { uid: Buffer(32), sign: Buffer(64), claim: BSON({ msg: 'This guy is good!', timestamp: Date.now(), trust: 'VERIFIED', (algo: 'sha256-ed25519') }) }
-    { uid: Buffer(32), sign: Buffer(64), claim: BSON({ trust: 'NONE', (algo: 'sha256-ed25519') }) }
-  ]
- }]
-*/
+ * 
+ *     [ 0: {
+ *        data: BSON(document),
+ *        meta: BSON({ transports: ['123.234.123.234:40000'] })
+ *        signatures: [ // 0..n
+ *          { uid: Buffer(32), sign: Buffer(64), claim: BSON({ msg: 'This guy is good!', timestamp: Date.now(), trust: 'VERIFIED', (algo: 'sha256-ed25519') }) }
+ *          { uid: Buffer(32), sign: Buffer(64), claim: BSON({ trust: 'NONE', (algo: 'sha256-ed25519') }) }
+ *        ]
+ *       }]
+ */
 void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {        
     size_t signed_cert_buffer_len = 1024;
     uint8_t signed_cert_buffer[signed_cert_buffer_len];
@@ -704,20 +705,19 @@ void wish_core_send_peers_rpc_req(wish_core_t* core, wish_connection_t *ctx) {
     uint8_t request[request_max_len];
     size_t buffer_max_len = 75;
     uint8_t buffer[buffer_max_len];
-    wish_rpc_id_t id = wish_rpc_client(core->core_rpc_client, "peers", NULL, 0, peers_callback,
-        buffer, buffer_max_len);
+    wish_rpc_id_t id = wish_rpc_client(core->core_rpc_client, "peers", NULL, 0, peers_callback, buffer, buffer_max_len);
 
     rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
     mreq->cb_context = ctx;
     
     
     bson_init_doc(request, request_max_len);
-    bson_write_embedded_doc_or_array(request, request_max_len,
-        "req", buffer, BSON_KEY_DOCUMENT);
+    bson_write_embedded_doc_or_array(request, request_max_len, "req", buffer, BSON_KEY_DOCUMENT);
     wish_core_send_message(core, ctx, request, bson_get_doc_len(request));
 }
 
-/* Build and send a peer 'offline' message 
+/**
+ * Build and send a peer `offline` message 
  *
  * A peer becomes online, when the 'peers' request sent by the local
  * wish core returns with a list of services on the remote core. Each of
@@ -842,9 +842,13 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
 
 }
 
-/* 
- This function is used to clean up the core RPC server from old requests when a connection to a remote core is severed 
- @param ctx the core connection context of the severed link
+/** 
+ * Clean up requests by connection context
+ * 
+ * This function is used to clean up the core RPC server from old requests when a connection to a remote core is severed 
+ * 
+ * @param core Wish Core
+ * @param ctx The connection context of the severed link
  */
 void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
     struct wish_rpc_context_list_elem *list_elem = NULL;

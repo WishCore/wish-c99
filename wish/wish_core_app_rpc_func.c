@@ -2145,7 +2145,7 @@ handler identity_create_h =                           { .op_str = "identity.crea
 handler identity_get_h =                              { .op_str = "identity.get",                      .handler = identity_get, .args="(uid: Uid): Identity" };
 handler identity_remove_h =                           { .op_str = "identity.remove",                   .handler = identity_remove, .args="(uid: Uid): bool" };
 
-handler identity_sign_h =                             { .op_str = "identity.sign",                     .handler = identity_sign, .args="(uid: Uid, document: Document): Document" };
+handler identity_sign_h =                             { .op_str = "identity.sign",                     .handler = identity_sign, .args="(uid: Uid, document: Document, claim: Buffer): Document" };
 handler identity_verify_h =                           { .op_str = "identity.verify",                   .handler = identity_verify, .args = "(document: Document): Document" };
 handler identity_friend_request_h =                   { .op_str = "identity.friendRequest",            .handler = identity_friend_request, .args = "(luid: Uid, contact: Contact): bool" };
 handler identity_friend_request_list_h =              { .op_str = "identity.friendRequestList",        .handler = identity_friend_request_list, .args = "(void): FriendRequest[]" };
@@ -2178,6 +2178,11 @@ handler wld_friend_request_h =                        { .op_str = "wld.friendReq
 
 handler host_config_h =                               { .op_str = "host.config",                       .handler = host_config };
 
+/**
+ * Init the Core App RPC
+ * 
+ * @param core
+ */
 void wish_core_app_rpc_init(wish_core_t* core) {
     core->app_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
     memset(core->app_api, 0, sizeof(wish_rpc_server_t));
