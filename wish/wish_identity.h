@@ -83,7 +83,7 @@ int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc,
 int wish_save_identity_entry(wish_identity_t *identity);
 
 /* Save identity, expressed in BSON format, to the identity database */
-int wish_save_identity_entry_bson(uint8_t *identity_doc);
+int wish_save_identity_entry_bson(const uint8_t *identity_doc);
 
 /** Get the the list of local identities, that is an array of id database entries which can be used for opening Wish connections, meaning that the privkey is also in the database.  
  * @param pointer to a caller-allocated list where result will be placed
@@ -103,12 +103,12 @@ int wish_has_privkey(uint8_t *uid);
 bool wish_has_pubkey(uint8_t *uid);
 
 
-void wish_pubkey2uid(uint8_t *pubkey, uint8_t *uid);
+void wish_pubkey2uid(const uint8_t *pubkey, uint8_t *uid);
 
 /* Create a new "local" identity (i.e. complete with pubkey and privkey)
  * with the alias provided, saving the result in the pointer 'id'.
  * The uid field is also populated */
-void wish_create_local_identity(wish_identity_t *id, char *alias);
+void wish_create_local_identity(wish_identity_t *id, const char *alias);
 
 /* This is a helper function for loading pubkeys corresponding to uids.
  * Easier to use than wish_load_identity
@@ -132,8 +132,7 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer);
  * from
  * @return 0 for success
  */
-int wish_populate_id_from_cert(wish_identity_t *new_id, 
-    uint8_t *cert_doc);
+int wish_identity_from_bson(wish_identity_t *id, const bson* bs);
 
 /**
  * Remove an identity from the database 

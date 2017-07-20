@@ -5,7 +5,7 @@
 #include "wish_config.h"
 #include "wish_io.h"
 #include "wish_debug.h"
-#include "cbson.h"
+#include "bson.h"
 #include <string.h>
 #include "wish_dispatcher.h"
 #include "wish_connection_mgr.h"
@@ -29,12 +29,15 @@ void wish_core_send_pong(wish_core_t* core, wish_connection_t* ctx) {
     /* Enqueue a pong message as answer to ping */
     int32_t pong_msg_max_len = 50;
     uint8_t pong_msg[pong_msg_max_len];
-    bson_init_doc(pong_msg, pong_msg_max_len);
+    
+    bson bs;
+    bson_init_buffer(&bs, pong_msg, pong_msg_max_len);
+    
     /* Send: { pong: true } */
-    bson_write_boolean(pong_msg, pong_msg_max_len, 
-        "pong", true);
-    wish_core_send_message(core, ctx, pong_msg, bson_get_doc_len(pong_msg));
-
+    bson_append_bool(&bs, "pong", true);
+    bson_finish(&bs);
+    
+    wish_core_send_message(core, ctx, bson_data(&bs), bson_size(&bs));
 }
 
 
@@ -134,51 +137,46 @@ void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t b
     bson_finish(&bs);
 }
 
-/* Submit a BSON handshake message (extracted from the wire) to the Wish core.
+/**
+ * Submit a BSON handshake message (extracted from the wire) to the Wish core.
  *
  * Note that if you wish (heh-heh) to retain any part of the bson_doc for later
  * processing, you MUST explicitly make a copy of the data, as the parameter
- * bson_doc is allocated from stack! */
-void wish_core_process_handshake(wish_core_t* core, wish_connection_t* ctx, uint8_t* bson_doc) {
-    uint32_t doc_len = bson_get_doc_len(bson_doc);
-    WISHDEBUG(LOG_DEBUG, "In process handshake");
-    WISHDEBUG(LOG_DEBUG, "We obtained BSON document with len=%d", doc_len);
+ * bson_doc is allocated from stack! 
+ */
+void wish_core_process_handshake(wish_core_t* core, wish_connection_t* ctx, uint8_t* handshake) {
     /* We are primarly interested about the host identity, not much else
      * */
-    uint8_t* host_id = NULL;
-    int32_t host_id_len = 0;
-    if (bson_get_binary(bson_doc, "host", &host_id, &host_id_len)
-                == BSON_FAIL) {
+    
+    bson_iterator it;
+    
+    bson_iterator_from_buffer(&it, handshake);
+    
+    if (bson_find_fieldpath_value("host", &it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "We could not get the host field");
         return;
     }
-    if (host_id_len == WISH_WHID_LEN) {
-        memcpy(ctx->rhid, host_id, WISH_WHID_LEN);
-    }
-    else {
+    
+    const uint8_t* host_id = bson_iterator_bin_data(&it);
+    int32_t host_id_len = bson_iterator_bin_len(&it);
+    
+    if (host_id_len != WISH_WHID_LEN) {
         WISHDEBUG(LOG_CRITICAL, "Bad hostid length");
         return;
     }
+    
+    memcpy(ctx->rhid, host_id, WISH_WHID_LEN);
 
     /* Now create our own "wish handshake message" */
     const int max_handshake_len = 500;
     uint8_t handshake_msg[max_handshake_len];
     
     wish_core_create_handshake_msg(core, handshake_msg, max_handshake_len);
-    WISHDEBUG(LOG_DEBUG, "We have generated BSON message of len %d", 
-        bson_get_doc_len(handshake_msg));
+    
+    bson bs;
+    bson_init_with_data(&bs, handshake_msg);
 
-    uint8_t* recovered_ptr;
-    int32_t recovered_len;
-    uint8_t recovered_type;
-    bson_get_elem_by_name(handshake_msg, "host", &recovered_type, 
-        &recovered_ptr, &recovered_len);
-    if (recovered_len != WISH_WHID_LEN) {
-        WISHDEBUG(LOG_CRITICAL, "Recover hostid of incorrect length");
-    }
-
-    wish_core_send_message(core, ctx, handshake_msg, bson_get_doc_len(handshake_msg));
- 
+    wish_core_send_message(core, ctx, bson_data(&bs), bson_size(&bs));
 }
 
 /* Generate an id for service messages */
@@ -190,67 +188,55 @@ int32_t generate_service_msg_id(void) {
 }
 
 
-void wish_core_process_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* bson_doc) {
-    uint32_t doc_len = bson_get_doc_len(bson_doc);
-    WISHDEBUG(LOG_DEBUG, "We obtained BSON document with len=%d\n\r", doc_len);
-
+void wish_core_process_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* msg) {
     /* If you want to print out the on-wire message, now would be the
      * time */
     bool wire_debug = false;
     if (wire_debug) {
-        bson_visit("Incoming message", bson_doc);
+        bson_visit("Incoming message", msg);
     }
 
     /* Read the top-level and 'req'(uest), 'res'(ponse)
      * If 'req', then feed to an instance of wish-rpc server
      * if 'res', then feed to the corresponding instance of wish-client
      */
-
-    uint8_t *core_lvl_pl = NULL;
-    int32_t core_lvl_pl_len = 0;
-    if (bson_get_document(bson_doc, "req", &core_lvl_pl,
-            &core_lvl_pl_len) == BSON_SUCCESS) {
-        /* Request. Feed to core RPC server */
+    
+    bson_iterator it;
+    
+    if (bson_find_from_buffer(&it, msg, "req") == BSON_OBJECT) {
         WISHDEBUG(LOG_DEBUG, "Core RPC req found!");
-        wish_core_feed_to_rpc_server(core, ctx, core_lvl_pl, core_lvl_pl_len);
-
-    }
-    else if (bson_get_document(bson_doc, "res", &core_lvl_pl,
-            &core_lvl_pl_len) == BSON_SUCCESS) {
-        /* Response. Feed to core RPC client */
+        // FIXME: We send 0 as length, works only because it is not used
+        wish_core_feed_to_rpc_server(core, ctx, bson_iterator_value(&it), 0);
+    } else if (bson_find_from_buffer(&it, msg, "res") == BSON_OBJECT) {
         WISHDEBUG(LOG_DEBUG, "Core RPC res found!");
-        wish_core_feed_to_rpc_client(core, ctx, core_lvl_pl, core_lvl_pl_len);
-
-    }
-    else {
-        bool ping_val = false;
-        if (bson_get_boolean(bson_doc, "ping", &ping_val) 
-                == BSON_SUCCESS) {
-            wish_core_send_pong(core, ctx);
-       }
-        else if (bson_get_boolean(bson_doc, "pong", &ping_val) 
-                == BSON_SUCCESS) {
-            WISHDEBUG(LOG_DEBUG, "Got pong");
-        }
-        else {
-            WISHDEBUG(LOG_CRITICAL, "Neither req or res found!");
-        }
+        // FIXME: We send 0 as length, works only because it is not used
+        wish_core_feed_to_rpc_client(core, ctx, bson_iterator_value(&it), 0);
+    } else if (bson_find_from_buffer(&it, msg, "ping") == BSON_BOOL) {
+        wish_core_send_pong(core, ctx);
+    } else if (bson_find_from_buffer(&it, msg, "pong") == BSON_BOOL) {
+        // received a pong, but won't do much with it here.
+    } else {
+        WISHDEBUG(LOG_CRITICAL, "Unknown message on wire!");
     }
 }
 
 /* Route an incoming message (from app) */
-void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LEN], uint8_t *data, size_t len) {
+void wish_core_handle_app_to_core(wish_core_t* core, const uint8_t src_wsid[WISH_ID_LEN], const uint8_t* data, size_t len) {
     //WISHDEBUG(LOG_CRITICAL, "Incoming message from app to core len %d", len);
     //bson_visit("Incoming message from app to core", data);
 
     /* Determine if it is login or what */
-    uint8_t *recovered_wsid = NULL;
+    const uint8_t *recovered_wsid = NULL;
     int32_t recovered_wsid_len = 0;
     
     /* If the incoming message is a 'ready' from the service, the state is saved here */
     bool app_ready = false;
     
-    if (bson_get_binary(data, "wsid", &recovered_wsid, &recovered_wsid_len) == BSON_SUCCESS) {
+    bson_iterator it;
+    if (bson_find_from_buffer(&it, data, "wsid") == BSON_BINDATA) {
+        recovered_wsid = bson_iterator_bin_data(&it);
+        recovered_wsid_len = bson_iterator_bin_len(&it);
+        
         /* Most likely a login message */
         WISHDEBUG(LOG_DEBUG, "Service-to-core login detected");
         if (recovered_wsid_len != WISH_WSID_LEN) {
@@ -262,37 +248,50 @@ void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
             return;
         }
 
-        char *name = 0;
-        int32_t name_len = 0;
-        if (bson_get_string(data, "name", &name, &name_len) == BSON_FAIL) {
+        if (bson_find_from_buffer(&it, data, "name") != BSON_STRING) {
             WISHDEBUG(LOG_CRITICAL, "Cannot get service name");
             return;
         }
-        uint8_t *protocols_array = 0;
-        int32_t protocols_array_len = 0;
-        if (bson_get_array(data, "protocols", &protocols_array,
-                &protocols_array_len) == BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "No protocols get protocols array");
+        
+        const char *name = bson_iterator_string(&it);
+        int32_t name_len = bson_iterator_string_len(&it);
+        
+        if (name_len > 32) {
+            WISHDEBUG(LOG_CRITICAL, "Service name too long");
+            return;
         }
-        uint8_t *permissions_array = 0;
-        int32_t permissions_array_len = 0;
-        if (bson_get_array(data, "permissions", &permissions_array,
-                &permissions_array_len) == BSON_FAIL) {
+
+        if (bson_find_from_buffer(&it, data, "protocols") != BSON_ARRAY) {
+            WISHDEBUG(LOG_CRITICAL, "Cannot get protocols array");
+            return;
+        }
+        
+        const uint8_t *protocols = bson_iterator_value(&it);
+        
+        if (bson_find_from_buffer(&it, data, "permissions") != BSON_ARRAY) {
             WISHDEBUG(LOG_CRITICAL, "Cannot get permissions array");
             return;
         }
 
-        wish_service_register_add(core, src_wsid, name, protocols_array, permissions_array);
+        const uint8_t *permissions = bson_iterator_value(&it);
+
+        wish_service_register_add(core, src_wsid, name, protocols, permissions);
 
         /* Send 'signal: "ready" to App */
         const size_t ready_signal_max_len = 100;
         uint8_t ready_signal[ready_signal_max_len];
-        bson_init_doc(ready_signal, ready_signal_max_len);
-        bson_write_string(ready_signal, ready_signal_max_len, "type", "signal");
-        bson_write_string(ready_signal, ready_signal_max_len, "signal", "ready");
-        send_core_to_app(core, src_wsid, ready_signal, bson_get_doc_len(ready_signal));
+        
+        bson bs;
+        bson_init_buffer(&bs, ready_signal, ready_signal_max_len);
+        bson_append_string(&bs, "type", "signal");
+        bson_append_string(&bs, "signal", "ready");
+        bson_finish(&bs);
+        
+        send_core_to_app(core, src_wsid, bson_data(&bs), bson_size(&bs));
     }
-    else if (bson_get_boolean(data, "ready", &app_ready) == BSON_SUCCESS) {
+    else if (bson_find_from_buffer(&it, data, "ready") == BSON_BOOL) {
+        app_ready = bson_iterator_bool(&it);
+        
         /* Detected a 'ready' signal from the service. App sends 'ready: true' when it is ready to start accepting frames from other peers. */
         if (!app_ready) {
             WISHDEBUG(LOG_CRITICAL, "'ready: false' from service, what does that mean?!");

@@ -7,7 +7,6 @@
 #include "wish_core.h"
 #include "wish_protocol.h"
 //#include "wish_acl.h"
-#include "cbson.h"
 #include "wish_debug.h"
 #include "wish_core_rpc_func.h"
 #include "wish_core_app_rpc_func.h"
@@ -24,7 +23,7 @@ bool wish_service_entry_is_valid(wish_core_t* core, struct wish_service_entry *e
     return retval;
 }
 
-void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name, uint8_t *protocols_array, uint8_t *permissions_array) {
+void wish_service_register_add(wish_core_t* core, const uint8_t* src_wsid, const char* name, const uint8_t* protocols, const uint8_t* permissions) {
     WISHDEBUG(LOG_DEBUG, "%s", "wish_service_register_add");
 
     int i = 0;
@@ -41,8 +40,7 @@ void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name,
     }
     /* Service was not in the service register. */
     for (i = 0; i < WISH_MAX_SERVICES; i++) {
-        if (wish_service_entry_is_valid(core, &(core->service_registry[i]))
-                == false) {
+        if (wish_service_entry_is_valid(core, &(core->service_registry[i])) == false) {
             /* Found free service slot */
             memcpy(core->service_registry[i].wsid, src_wsid, WISH_WSID_LEN);
             strncpy(core->service_registry[i].name, name, WISH_APP_NAME_MAX_LEN);
@@ -52,16 +50,16 @@ void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name,
                 /* FIXME horrible hack for array elem names here */
                 char elem_name[2] = "0";
                 elem_name[0] += j;
-                char *protocol_name = NULL;
-                int32_t protocol_name_len = 0;
-                if (bson_get_string(protocols_array, elem_name, 
-                        &protocol_name, &protocol_name_len) == BSON_SUCCESS) {
+                
+                bson_iterator it;
+                
+                if (bson_find_from_buffer(&it, protocols, elem_name) == BSON_STRING) {
+                   const char* protocol_name = bson_iterator_string(&it);
                     WISHDEBUG(LOG_DEBUG, "Registering protocol: %s", protocol_name);
-                    strncpy((char *) &(core->service_registry[i].protocols[j].name),
-                        protocol_name, WISH_PROTOCOL_NAME_MAX_LEN);
-                }
-                else {
+                    strncpy(core->service_registry[i].protocols[j].name, protocol_name, WISH_PROTOCOL_NAME_MAX_LEN);
+                } else {
                     WISHDEBUG(LOG_DEBUG, "No more protocols found for service %s", core->service_registry[i].name);
+                    break;
                 }
             }
             /* We now have registered all the protocols that the service
@@ -74,7 +72,7 @@ void wish_service_register_add(wish_core_t* core, uint8_t *src_wsid, char *name,
 
 }
 
-void wish_service_register_remove(wish_core_t* core, uint8_t *wsid) {
+void wish_service_register_remove(wish_core_t* core, const uint8_t* wsid) {
     /* A service as ceased to exist, and it must now be removed from Wish core's internal tables.
      * We must also notify remote peers that the service has died. Also local services? */
     struct wish_service_entry *service_entry_offline = wish_service_get_entry(core, wsid);
@@ -105,8 +103,8 @@ void wish_service_register_remove(wish_core_t* core, uint8_t *wsid) {
 }
 
 
-struct wish_service_entry *wish_service_get_entry(wish_core_t* core, uint8_t *wsid) {
-    struct wish_service_entry *retval = NULL;
+struct wish_service_entry* wish_service_get_entry(wish_core_t* core, const uint8_t *wsid) {
+    struct wish_service_entry* retval = NULL;
     int i = 0;
     for (i = 0; i < WISH_MAX_SERVICES; i++) {
         if (wish_service_entry_is_valid(core, &(core->service_registry[i]))) {

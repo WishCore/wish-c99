@@ -10,7 +10,7 @@ void wish_directory_init(wish_core_t* core) {
 }
 
 /* args: 'String alias' */
-void wish_api_directory_find(rpc_server_req* req, uint8_t* args) {
+void wish_api_directory_find(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     

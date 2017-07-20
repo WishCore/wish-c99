@@ -23,7 +23,6 @@
 #include "wish_dispatcher.h"
 #include "ed25519.h"
 #include "bson.h"
-#include "cbson.h"
 #include "bson_visitor.h"
 #include "utlist.h"
 
@@ -50,7 +49,7 @@ uint8_t nbuf[NBUFL];
 /* 
  * Enumerate available methods in RPC
  */
-static void methods(rpc_server_req* req, uint8_t* args) {
+static void methods(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     handler *h = core->app_api->list_head;
@@ -84,7 +83,7 @@ static void methods(rpc_server_req* req, uint8_t* args) {
  *   v0.6.8-alpha-37-g85643
  *   v0.6.8
  */
-static void version(rpc_server_req* req, uint8_t* args) {
+static void version(rpc_server_req* req, const uint8_t* args) {
     
     bson bs; 
     bson_init(&bs);
@@ -95,77 +94,102 @@ static void version(rpc_server_req* req, uint8_t* args) {
     bson_destroy(&bs);
 }
 
-/*
+/**
  * Request to send message to peer
+ * 
+ *     args: [
+ *         { luid: Buffer(32), ruid: Buffer(32), rhid: Buffer(32), rsid: Buffer(32), protocol: string  },
+ *         payload: Buffer
+ *     ]
  */
-static void services_send(rpc_server_req* req, uint8_t* args) {
+static void services_send(rpc_server_req* req, const uint8_t* args) {
     //bson_visit("Handling services.send", args);
     
     wish_core_t* core = (wish_core_t*) req->server->context;
+
+    bson_iterator it;
     
-    /* First, obtain the peer, as element "0" of args. This will
-     * define the routing of the message. */
-    uint8_t* peer = NULL;
-    int32_t peer_len = 0;
-    if (bson_get_document(args, "0", &peer, &peer_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get peer");
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("0.luid", &it) != BSON_BINDATA ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (luid not BSON_BINDATA)");
         return;
     }
-
-    /* Examine the 'rhid' element of the peer. If it matches our own
-     * host's rhid, then it for local delivery, and pass it directly to 
-     * "send core to app" function. We use the 'core app' RPC client for
-     * this. */
-    uint8_t *rhid = NULL;
-    int32_t rhid_len = 0;
-    if (bson_get_binary(peer, "rhid", &rhid, &rhid_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get rhid");
-        return;
-    }
-
-    //if (memcmp(rhid, this_host_rhid, WISH_WHID_LEN) == 0) { ... }
     
-    /* Else, find a wish context that has a matching rhid.
-     * Then, verify that luid and ruid also match the connection. If so,
-     * then we can send the payload using with that context.
-     * For this, use the 'core' RPC client. */
-    uint8_t *luid = NULL;
-    int32_t luid_len = 0;
-    if (bson_get_binary(peer, "luid", &luid, &luid_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get luid");
+    if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (luid length)");
         return;
     }
+    
+    const uint8_t* luid = bson_iterator_bin_data(&it);
+    
+    bson_iterator_from_buffer(&it, args);
 
-    uint8_t *ruid = NULL;
-    int32_t ruid_len = 0;
-    if (bson_get_binary(peer, "ruid", &ruid, &ruid_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get ruid");
+    if ( bson_find_fieldpath_value("0.ruid", &it) != BSON_BINDATA ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (ruid not BSON_BINDATA)");
         return;
     }
-
-    uint8_t *rsid = NULL;
-    int32_t rsid_len = 0;
-    if (bson_get_binary(peer, "rsid", &rsid, &rsid_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get rsid");
+    
+    if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (ruid length)");
         return;
     }
-    char *protocol = NULL;
-    int32_t protocol_len = 0;
-    if (bson_get_string(peer, "protocol", &protocol, &protocol_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get protocol");
+    
+    const uint8_t* ruid = bson_iterator_bin_data(&it);
+    
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("0.rhid", &it) != BSON_BINDATA ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (rhid not BSON_BINDATA)");
         return;
     }
-
-
-
-
-    uint8_t *payload = NULL;
-    int32_t payload_len = 0;
-    if (bson_get_binary(args, "1", &payload, &payload_len) 
-            == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get payload");
+    
+    if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (rhid length)");
         return;
     }
+    
+    const uint8_t* rhid = bson_iterator_bin_data(&it);
+    
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("0.rsid", &it) != BSON_BINDATA ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (rsid not BSON_BINDATA)");
+        return;
+    }
+    
+    if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (rsid length)");
+        return;
+    }
+    
+    const uint8_t* rsid = bson_iterator_bin_data(&it);
+    
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("0.protocol", &it) != BSON_STRING ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (protocol not BSON_STRING)");
+        return;
+    }
+    
+    int protocol_len = bson_iterator_bin_len(&it);
+    
+    if ( protocol_len > WISH_PROTOCOL_NAME_MAX_LEN ) {
+        wish_rpc_server_error(req, 311, "Invalid peer. (protocol name length)");
+        return;
+    }
+    
+    const uint8_t* protocol = bson_iterator_bin_data(&it);
+    
+    bson_iterator_from_buffer(&it, args);
+
+    if ( bson_find_fieldpath_value("1", &it) != BSON_BINDATA ) {
+        wish_rpc_server_error(req, 311, "Invalid payload.");
+        return;
+    }
+    
+    int payload_len = bson_iterator_bin_len(&it);
+    const uint8_t* payload = bson_iterator_bin_data(&it);
 
     /* First, check if message is to be delivered to some of our local services.
      * In this case we very if the message's rhid corresponds to our local core's rhid 
@@ -181,7 +205,7 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
          *  */
         
         /* FIXME this is wasting stack space again */
-        size_t upcall_doc_max_len = peer_len + payload_len + 100;
+        size_t upcall_doc_max_len = (5+4*32+10) + payload_len + 100;
         uint8_t upcall_doc[upcall_doc_max_len];
         bson bs;
         bson_init_buffer(&bs, upcall_doc, upcall_doc_max_len);
@@ -201,7 +225,7 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
             WISHDEBUG(LOG_CRITICAL, "Error creating frame to local service");
         } else {
             //bson_visit("About to send this to local service on local core:", upcall_doc);
-            send_core_to_app(core, rsid, upcall_doc, bson_get_doc_len(upcall_doc));
+            send_core_to_app(core, rsid, bson_data(&bs), bson_size(&bs));
         }
         return;
     }
@@ -273,7 +297,7 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
         //bson_visit("About to send this to the remote core (should be req: { op, args[, id] }):", req_buf);
         
         
-        int send_ret = wish_core_send_message(core, dst_ctx, req_buf, bson_get_doc_len(req_buf));
+        int send_ret = wish_core_send_message(core, dst_ctx, bson_data(&b), bson_size(&b));
         if (send_ret != 0) {
             /* Sending failed. Propagate RPC error */
             WISHDEBUG(LOG_CRITICAL, "Core app RPC: Sending not possible at this time");
@@ -295,9 +319,9 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
     }
     else {
         WISHDEBUG(LOG_CRITICAL, "Could not find a suitable wish context to send with");
-        wish_debug_print_array(LOG_DEBUG, "should be luid:", luid, WISH_ID_LEN);
-        wish_debug_print_array(LOG_DEBUG, "should be ruid:", ruid, WISH_ID_LEN);
-        wish_debug_print_array(LOG_DEBUG, "should be rhid:", rhid, WISH_ID_LEN);
+        //wish_debug_print_array(LOG_DEBUG, "should be luid:", luid, WISH_ID_LEN);
+        //wish_debug_print_array(LOG_DEBUG, "should be ruid:", ruid, WISH_ID_LEN);
+        //wish_debug_print_array(LOG_DEBUG, "should be rhid:", rhid, WISH_ID_LEN);
     }
 }
 
@@ -309,7 +333,7 @@ static void services_send(rpc_server_req* req, uint8_t* args) {
  *   { name: 'GPS',      sid: <Buffer 47 50 ... 6a 73>, protocols: ['ucp'] }
  * ]
  */
-static void services_list(rpc_server_req* req, uint8_t* args) {
+static void services_list(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -369,7 +393,7 @@ static void services_list(rpc_server_req* req, uint8_t* args) {
  *       }
  *
  */
-static void identity_export(rpc_server_req* req, uint8_t* args) {
+static void identity_export(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -420,9 +444,8 @@ static void identity_export(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
-/* This is the Call-back function invoked by the core's "app" RPC
- * server, when identity.import is received from a Wish app 
- *
+/**
+ * Identity import RPC handler
  *
  * Request:
  * identity.import(Buffer<the identity document as binary>,
@@ -446,57 +469,22 @@ static void identity_export(rpc_server_req* req, uint8_t* args) {
  *   The first arg is alias and second argument is the uid of the imported id
  *
  */
-static void identity_import(rpc_server_req* req, uint8_t* args) {
-    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
-    uint8_t buffer[buffer_len];
-
+static void identity_import(rpc_server_req* req, const uint8_t* args) {
     WISHDEBUG(LOG_DEBUG, "Core app RPC: identity_import");
-    bson_init_doc(buffer, buffer_len);
 
-    /* Get the identity document to import, the doc is argument "0" in
-     * args */
-    uint8_t *new_id_doc = 0;
-    int32_t new_id_doc_len = 0;
-    if (bson_get_binary(args, "0", &new_id_doc, &new_id_doc_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get argument 0: id doc");
-        wish_rpc_server_error(req, 70, "Could not get argument 0: identity doc");
-        return;
-    }
-
-    /* Start to examine the imported identity doc */
+    bson b;
+    bson_init_with_data(&b, args);
     
-    int32_t bson_doc_len = bson_get_doc_len(new_id_doc);
-    if (bson_get_doc_len(new_id_doc) != new_id_doc_len) {
-        WISHDEBUG(LOG_CRITICAL, "Malformed doc, len %d", bson_doc_len);
-        wish_rpc_server_error(req, 75, "Malformed bson document.");
-        return;
-    }
-    
-    /* FIXME make other sanity checks... like the existence of different
-     * elements: pubkey, alias, ... */
-
-    char *new_id_alias = NULL;
-    int32_t new_id_alias_len = 0;
-    if (bson_get_string(new_id_doc, "alias", &new_id_alias, &new_id_alias_len) 
-            != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get alias element");
-        wish_rpc_server_error(req, 76, "Could not get alias element");
-        return;
-    }
-    else {
-        WISHDEBUG(LOG_CRITICAL, "Importing alias %s", new_id_alias);
-    }
-
-    wish_identity_t new_id;
-    memset(&new_id, 0, sizeof (wish_identity_t));
-    if (wish_populate_id_from_cert(&new_id, new_id_doc)) {
+    wish_identity_t id;
+    memset(&id, 0, sizeof (wish_identity_t));
+    if (wish_identity_from_bson(&id, &b)) {
         /* ...it failed somehow.. */
         WISHDEBUG(LOG_CRITICAL, "There was an error when populating the new id struct");
         wish_rpc_server_error(req, 76, "There was an error when populating the new id struct");
         return;
     }
 
-    if (wish_identity_exists(new_id.uid)>0) {
+    if (wish_identity_exists(id.uid)>0) {
         // it already exists, bail!
         wish_rpc_server_error(req, 202, "Identity already exists.");
         return;
@@ -506,40 +494,26 @@ static void identity_import(rpc_server_req* req, uint8_t* args) {
 
     /* Save the new identity to database */
     //wish_save_identity_entry_bson(new_id_doc);
-    int ret = wish_save_identity_entry(&new_id);
+    int ret = wish_save_identity_entry(&id);
     
     if( ret != 0 ) {
         wish_rpc_server_error(req, 201, "Too many identities.");
         return;
     }
 
-    /* Form the reply message in 'buffer' */
-
-    int32_t data_doc_max_len = WISH_ID_LEN + 20 + WISH_MAX_ALIAS_LEN + 20;
-    uint8_t data_doc[data_doc_max_len];
-    bson_init_doc(data_doc, data_doc_max_len);
+    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
+    uint8_t buffer[buffer_len];
     
-    if (bson_write_string(data_doc, data_doc_max_len, "alias", new_id_alias)
-            != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Failed to add alias to data doc");
-        wish_rpc_server_error(req, 76, "Failed to add alias to data doc");
-        return;
-    }
+    bson bs;
+    bson_init_buffer(&bs, buffer, buffer_len);
 
-    if (bson_write_binary(data_doc, data_doc_max_len, "uid", new_id.uid, WISH_ID_LEN) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Failed to to add id to data doc");
-        wish_rpc_server_error(req, 76, "Failed to to add id to data doc");
-        return;
-    }
+    bson_append_start_object(&bs, "data");
+    bson_append_string(&bs, "alias", id.alias);
+    bson_append_binary(&bs, "uid", id.uid, WISH_UID_LEN);
+    bson_append_finish_object(&bs);
+    bson_finish(&bs);
     
-    if (bson_write_embedded_doc_or_array(buffer, buffer_len, 
-            "data", data_doc, BSON_KEY_DOCUMENT) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Failed to to add data doc to response");
-        wish_rpc_server_error(req, 76, "Failed to to add data doc to response");
-        return;
-    }
-
-    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 /* This is the Call-back function invoked by the core's "app" RPC
@@ -561,7 +535,7 @@ static void identity_import(rpc_server_req* req, uint8_t* args) {
  *       ]
  *
  */
-static void identity_list(rpc_server_req* req, uint8_t* args) {
+static void identity_list(rpc_server_req* req, const uint8_t* args) {
     
     int num_uids_in_db = wish_get_num_uid_entries();
     wish_uid_list_elem_t uid_list[num_uids_in_db];
@@ -576,48 +550,19 @@ static void identity_list(rpc_server_req* req, uint8_t* args) {
         char num_str[8];
         bson_numstr(num_str, i);
         bson_append_start_object(&bs, num_str);
-        /* For each uid in DB, copy the uid, alias and privkey fields */
-        size_t id_bson_doc_max_len = sizeof (wish_identity_t) + 100;
-        uint8_t id_bson_doc[id_bson_doc_max_len];
-        int ret = wish_load_identity_bson(uid_list[i].uid, id_bson_doc,
-            id_bson_doc_max_len);
+        
+        wish_identity_t identity;
 
-        if (ret == 1) {
-
-            int32_t uid_len = 0;
-            uint8_t *uid = NULL;
-            if (bson_get_binary(id_bson_doc, "uid", &uid, &uid_len) 
-                    == BSON_FAIL) {
-                WISHDEBUG(LOG_CRITICAL, "Unexpected: no uid");
-                break;
-            }
-            bson_append_binary(&bs, "uid", uid, uid_len);
-
-            int32_t alias_len = 0;
-            char *alias = NULL;
-            if (bson_get_string(id_bson_doc, "alias", &alias, &alias_len)
-                    == BSON_FAIL) {
-                WISHDEBUG(LOG_CRITICAL, "Unexpected: no alias");
-                break;
-            }
-            bson_append_string(&bs, "alias", alias);
-
-            int32_t privkey_len = 0;
-            uint8_t *privkey = NULL;
-            bool privkey_status = false;
-            if (bson_get_binary(id_bson_doc, "privkey", &privkey,
-                    &privkey_len) == BSON_SUCCESS) {
-                /* Privkey exists in database */
-                privkey_status = true;
-            }
-            else {
-                /* Privkey not in database */
-                privkey_status = false;
-            }
-            bson_append_bool(&bs, "privkey", privkey_status);
-
-            bson_append_finish_object(&bs);
+        if ( RET_SUCCESS != wish_identity_load(uid_list[i].uid, &identity) ) {
+            WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+            wish_rpc_server_error(req, 997, "Could not load identity");
         }
+
+        bson_append_binary(&bs, "uid", identity.uid, WISH_UID_LEN);
+        bson_append_string(&bs, "alias", identity.alias);
+        bson_append_bool(&bs, "privkey", identity.has_privkey);
+        
+        bson_append_finish_object(&bs);
     }
     
     bson_append_finish_array(&bs);
@@ -627,9 +572,81 @@ static void identity_list(rpc_server_req* req, uint8_t* args) {
         WISHDEBUG(LOG_CRITICAL, "BSON error in identity_list_handler");
         wish_rpc_server_error(req, 997, "BSON error in identity_list_handler");
     } else {
+        wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    }
+    
+    bson_destroy(&bs);
+}
 
-        //bson_visit("identity.list response bson", bs.data);
+/*
+ * identity.get
+ *
+ * App to core: { op: "identity.get", args: [ Buffer(32) uid ], id: 5 }
+ * Response core to App:
+ *  { ack: 5, data: {
+ *          alias: "Moster Greta",
+ *          uid: <binary buffer containing the new wish user id>,
+ *          privkey: true,
+ *          pubkey: Buffer
+ *      }
+ *  }
+ *
+ *  Note that privkey is always returned as 'true' when doing
+ *  identity.create (An identity creation always involves creation of
+ *  private key and public key)
+ */
+static void identity_get(rpc_server_req* req, const uint8_t* args) {
+    WISHDEBUG(LOG_DEBUG, "In identity_get_handler");
 
+    bson bs; 
+    bson_init(&bs);
+    bson_append_start_object(&bs, "data");
+    
+    bson_iterator it;
+    bson_iterator_from_buffer(&it, args);
+    
+    if (bson_find_fieldpath_value("0", &it) != BSON_BINDATA) {
+        wish_rpc_server_error(req, 308, "Argument 1 must be Buffer");
+        return;
+    }
+    
+    if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
+        wish_rpc_server_error(req, 308, "Argument 1 must be Buffer(32)");
+        return;
+    }
+    
+    const uint8_t *arg_uid = bson_iterator_bin_data(&it);
+
+    wish_identity_t identity;
+
+    if ( RET_SUCCESS != wish_identity_load(arg_uid, &identity) ) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+        wish_rpc_server_error(req, 997, "Could not load identity");
+    }
+
+    bson_append_binary(&bs, "uid", identity.uid, WISH_UID_LEN);
+    bson_append_string(&bs, "alias", identity.alias);
+    bson_append_bool(&bs, "privkey", identity.has_privkey);
+    bson_append_binary(&bs, "pubkey", identity.pubkey, WISH_PUBKEY_LEN);
+
+    // TODO: Support multiple transports
+    if ( strnlen(&identity.transports[0][0], 64) % 64 != 0 ) {
+        bson_append_start_array(&bs, "hosts");
+        bson_append_start_object(&bs, "0");
+        bson_append_start_array(&bs, "transports");
+        bson_append_string(&bs, "0", &identity.transports[0][0]);
+        bson_append_finish_array(&bs);
+        bson_append_finish_object(&bs);
+        bson_append_finish_array(&bs);
+    }
+            
+    bson_append_finish_object(&bs);
+    bson_finish(&bs);
+
+    if (bs.err) {
+        WISHDEBUG(LOG_CRITICAL, "BSON error in identity_get_handler");
+        wish_rpc_server_error(req, 997, "BSON error in identity_get_handler");
+    } else {
         wish_rpc_server_send(req, bs.data, bson_size(&bs));
     }
     bson_destroy(&bs);
@@ -651,61 +668,44 @@ static void identity_list(rpc_server_req* req, uint8_t* args) {
  *  identity.create (An identity creation always involves creation of
  *  private key and public key)
  */
-static void identity_create(rpc_server_req* req, uint8_t* args) {
+static void identity_create(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
-    uint8_t buffer[buffer_len];
-
-    bson_init_doc(buffer, buffer_len);
-
     /* Get the new identity's alias, it is element 0 of array 'args' */
-    char *alias_str = NULL;
-    int32_t alias_str_len = 0;
-    bson_get_string(args, "0", &alias_str, &alias_str_len);
+    bson_iterator it;
+    bson_iterator_from_buffer(&it, args);
+    
+    if ( bson_find_fieldpath_value("0", &it) != BSON_STRING ) {
+        wish_rpc_server_error(req, 309, "Argument 1 must be string");
+        return;
+    }
+    
+    const char *alias_str = bson_iterator_string(&it);
 
     WISHDEBUG(LOG_DEBUG, "Core app RPC: identity_create for alias %s", alias_str);
 
     /* Create the identity */
-    wish_identity_t new_id;
-    wish_create_local_identity(&new_id, alias_str);
-    int ret = wish_save_identity_entry(&new_id);
+    wish_identity_t id;
+    wish_create_local_identity(&id, alias_str);
+    int ret = wish_save_identity_entry(&id);
 
-    /* There is something wrong with this. Returns error while saving. Should be <= 0?
-    if( ret != 0 ) {
-        return write_bson_error(req, req_id, 201, "Too many identities.");
-    }
-    */
+    
+    int buf_len = 128;
+    uint8_t buf[buf_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_append_binary(&bs, "0", id.uid, WISH_UID_LEN);
+    bson_finish(&bs);
 
-    size_t data_doc_max_len = sizeof (wish_identity_t) + 100;
-    uint8_t data_doc[data_doc_max_len];
-    ret = wish_load_identity_bson(new_id.uid, data_doc, data_doc_max_len);
-    if (ret == 1) {
-        /* Filter out the actual "privkey" element */
-        size_t filtered_doc_max_len = bson_get_doc_len(data_doc);
-        uint8_t filtered_doc[filtered_doc_max_len];
-        if (bson_filter_out_elem("privkey", data_doc, filtered_doc)
-                == BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Could not filter out privkey!");
-        }
-        else {
-            if (bson_write_boolean(filtered_doc, filtered_doc_max_len, 
-                    "privkey", true) == BSON_FAIL) {
-                WISHDEBUG(LOG_CRITICAL, "Could not add bool privkey!");
-            }
-        }
-
-        bson_write_embedded_doc_or_array(buffer, buffer_len, 
-            "data", filtered_doc, BSON_KEY_DOCUMENT);
-    }
-
-    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
-
+    // pass to identity get handler with uid as parameter
+    identity_get(req, (char*) bson_data(&bs));
+    
     WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
     wish_core_update_identities(core);
 
-    wish_ldiscover_advertize(core, new_id.uid);
-    wish_report_identity_to_local_services(core, &new_id, true);
+    wish_ldiscover_advertize(core, id.uid);
+    wish_report_identity_to_local_services(core, &id, true);
 
     wish_core_signals_emit_string(core, "identity");
 }
@@ -720,7 +720,7 @@ static void identity_create(rpc_server_req* req, uint8_t* args) {
  *  identity.create (An identity creation always involves creation of
  *  private key and public key)
  */
-static void identity_remove(rpc_server_req* req, uint8_t* args) {
+static void identity_remove(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -755,7 +755,7 @@ static void identity_remove(rpc_server_req* req, uint8_t* args) {
         }
 
         wish_core_update_identities(core);
-        wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+        wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
         
         wish_core_signals_emit_string(core, "identity");
     } else {
@@ -769,7 +769,7 @@ static void identity_remove(rpc_server_req* req, uint8_t* args) {
  *
  * App to core: { op: "identity.sign", args: [ <Buffer> uid, <Buffer> hash ], id: 5 }
  */
-static void identity_sign(rpc_server_req* req, uint8_t* args) {
+static void identity_sign(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -939,7 +939,7 @@ static void identity_sign(rpc_server_req* req, uint8_t* args) {
  *       sign: bool | null, // bool: verification result, null: unable to verify signature
  *       claim?: Buffer }] ] })
  */
-static void identity_verify(rpc_server_req* req, uint8_t* args) {
+static void identity_verify(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
@@ -1065,7 +1065,7 @@ static void identity_verify(rpc_server_req* req, uint8_t* args) {
     meta?: Buffer,
     signatures?: any[] }]
  */
-static void identity_friend_request(rpc_server_req* req, uint8_t* args) {
+static void identity_friend_request(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     bson_iterator it;
@@ -1204,7 +1204,7 @@ static void identity_friend_request(rpc_server_req* req, uint8_t* args) {
  *
  * App to core: { op: "identity.friendRequestList", args: [], id: 5 }
  */
-static void identity_friend_request_list(rpc_server_req* req, uint8_t* args) {
+static void identity_friend_request_list(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1238,7 +1238,7 @@ static void identity_friend_request_list(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
-    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 /*
@@ -1246,7 +1246,7 @@ static void identity_friend_request_list(rpc_server_req* req, uint8_t* args) {
  *
  * App to core: { op: "identity.friendRequestAccept", args: [ <Buffer> luid, <Buffer> ruid ], id: 5 }
  */
-static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
+static void identity_friend_request_accept(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
 
 
@@ -1399,7 +1399,7 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
         return;
     }
 
-    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     wish_platform_free(elt);
 }
 
@@ -1408,7 +1408,7 @@ static void identity_friend_request_accept(rpc_server_req* req, uint8_t* args) {
  *
  * App to core: { op: "identity.friendRequestDecline", args: [ <Buffer> luid, <Buffer> ruid ], id: 5 }
  */
-static void identity_friend_request_decline(rpc_server_req* req, uint8_t* args) {
+static void identity_friend_request_decline(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
 
 
@@ -1508,84 +1508,11 @@ static void identity_friend_request_decline(rpc_server_req* req, uint8_t* args) 
         return;
     }
 
-    wish_rpc_server_send(req, buffer, bson_get_doc_len(buffer));
+    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     wish_platform_free(elt);
 }
 
-/*
- * identity.get
- *
- * App to core: { op: "identity.get", args: [ Buffer(32) uid ], id: 5 }
- * Response core to App:
- *  { ack: 5, data: {
- *          alias: "Moster Greta",
- *          uid: <binary buffer containing the new wish user id>,
- *          privkey: true,
- *          pubkey: Buffer
- *      }
- *  }
- *
- *  Note that privkey is always returned as 'true' when doing
- *  identity.create (An identity creation always involves creation of
- *  private key and public key)
- */
-static void identity_get(rpc_server_req* req, uint8_t* args) {
-    WISHDEBUG(LOG_DEBUG, "In identity_get_handler");
-
-    bson bs; 
-    bson_init(&bs);
-    bson_append_start_object(&bs, "data");
-    
-    /* Get the uid of identity to get, the uid is argument "0" in
-     * args */
-    uint8_t *arg_uid = 0;
-    int32_t arg_uid_len = 0;
-    if (bson_get_binary(args, "0", &arg_uid, &arg_uid_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get argument: uid");
-        return;
-    }
-
-    if (arg_uid_len != WISH_ID_LEN) {
-        WISHDEBUG(LOG_CRITICAL, "argument uid has illegal length");
-        return;
-    }
-
-    wish_identity_t identity;
-
-    if ( RET_SUCCESS != wish_identity_load(arg_uid, &identity) ) {
-        WISHDEBUG(LOG_CRITICAL, "Could not load identity");
-        wish_rpc_server_error(req, 997, "Could not load identity");
-    }
-
-    bson_append_binary(&bs, "uid", identity.uid, WISH_UID_LEN);
-    bson_append_string(&bs, "alias", identity.alias);
-    bson_append_bool(&bs, "privkey", identity.has_privkey);
-    bson_append_binary(&bs, "pubkey", identity.pubkey, WISH_PUBKEY_LEN);
-
-    // TODO: Support multiple transports
-    if ( strnlen(&identity.transports[0][0], 64) % 64 != 0 ) {
-        bson_append_start_array(&bs, "hosts");
-        bson_append_start_object(&bs, "0");
-        bson_append_start_array(&bs, "transports");
-        bson_append_string(&bs, "0", &identity.transports[0][0]);
-        bson_append_finish_array(&bs);
-        bson_append_finish_object(&bs);
-        bson_append_finish_array(&bs);
-    }
-            
-    bson_append_finish_object(&bs);
-    bson_finish(&bs);
-
-    if (bs.err) {
-        WISHDEBUG(LOG_CRITICAL, "BSON error in identity_get_handler");
-        wish_rpc_server_error(req, 997, "BSON error in identity_get_handler");
-    } else {
-        wish_rpc_server_send(req, bs.data, bson_size(&bs));
-    }
-    bson_destroy(&bs);
-}
-
-static void connections_list(rpc_server_req* req, uint8_t* args) {
+static void connections_list(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1637,7 +1564,7 @@ static void connections_list(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-static void connections_disconnect(rpc_server_req* req, uint8_t* args) {
+static void connections_disconnect(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = 1400;
@@ -1674,7 +1601,7 @@ static void connections_disconnect(rpc_server_req* req, uint8_t* args) {
 /**
  *  
  */
-static void connections_check_connections(rpc_server_req* req, uint8_t* args) {
+static void connections_check_connections(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = 1400;
@@ -1709,7 +1636,7 @@ static void connections_check_connections(rpc_server_req* req, uint8_t* args) {
  * }
  * 
  */
-static void wld_list(rpc_server_req* req, uint8_t* args) {
+static void wld_list(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1758,7 +1685,7 @@ static void wld_list(rpc_server_req* req, uint8_t* args) {
  * Response core to App:
  *  { ack: 5, data: true }
  */
-static void wld_announce(rpc_server_req* req, uint8_t* args) {
+static void wld_announce(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
 
     wish_ldiscover_announce_all(core);
@@ -1793,7 +1720,7 @@ static void wld_announce(rpc_server_req* req, uint8_t* args) {
  * }
  * 
  */
-static void wld_clear(rpc_server_req* req, uint8_t* args) {
+static void wld_clear(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1814,7 +1741,7 @@ static void wld_clear(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-/*
+/**
  * Wish Local Discovery
  *
  * App to core: { op: "wld.list", args: [ <Buffer> uid ], id: 5 }
@@ -1828,55 +1755,60 @@ static void wld_clear(rpc_server_req* req, uint8_t* args) {
  * }
  * 
  */
-
-
-
-static void wld_friend_request(rpc_server_req* req, uint8_t* args) {
+static void wld_friend_request(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
 
-    /* Get the uid of identity to export, the uid is argument "0" in
-     * args */
-    uint8_t *luid = 0;
-    int32_t luid_len = 0;
-    if (bson_get_binary(args, "0", &luid, &luid_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get argument: luid");
+    bson_iterator it;
+    
+    bson_iterator_from_buffer(&it, args);
+    
+    if (bson_find_fieldpath_value("0", &it) != BSON_BINDATA) {
+        wish_rpc_server_error(req, 307, "Argument 1 not Buffer.");
+        return;
+    }
+    
+    if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
+        wish_rpc_server_error(req, 307, "Argument 1 not Buffer(32).");
+        return;
+    }
+    
+    /* Get the uid of identity to export, the uid is argument "0" in args */
+    const uint8_t* luid = bson_iterator_bin_data(&it);
+
+    bson_iterator_from_buffer(&it, args);
+
+    if (bson_find_fieldpath_value("1", &it) != BSON_BINDATA) {
+        wish_rpc_server_error(req, 307, "Argument 2 not Buffer.");
         return;
     }
 
-    if (luid_len != WISH_ID_LEN) {
-        WISHDEBUG(LOG_CRITICAL, "argument luid has illegal length");
+    if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
+        wish_rpc_server_error(req, 307, "Argument 2 not Buffer(32).");
         return;
     }
 
-    uint8_t *ruid = 0;
-    int32_t ruid_len = 0;
-    if (bson_get_binary(args, "1", &ruid, &ruid_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get argument: ruid");
+    /* Get the uid of identity to export, the uid is argument "0" in args */
+    const uint8_t* ruid = bson_iterator_bin_data(&it);
+
+    bson_iterator_from_buffer(&it, args);
+
+    if (bson_find_fieldpath_value("2", &it) != BSON_BINDATA) {
+        wish_rpc_server_error(req, 307, "Argument 3 not Buffer.");
         return;
     }
 
-    if (ruid_len != WISH_ID_LEN) {
-        WISHDEBUG(LOG_CRITICAL, "argument ruid has illegal length");
+    if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
+        wish_rpc_server_error(req, 307, "Argument 3 not Buffer(32).");
         return;
     }
 
-    uint8_t *rhid = 0;
-    int32_t rhid_len = 0;
-    if (bson_get_binary(args, "2", &rhid, &rhid_len) != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get argument: rhid");
-        return;
-    }
-
-    if (rhid_len != WISH_ID_LEN) {
-        WISHDEBUG(LOG_CRITICAL, "argument rhid has illegal length");
-        return;
-    }
+    /* Get the uid of identity to export, the uid is argument "0" in args */
+    const uint8_t* rhid = bson_iterator_bin_data(&it);
 
     // now check if we have the wld details for this entry
-    
     wish_ldiscover_t *db = wish_ldiscover_get(core);
 
     bool found = false;
@@ -1920,7 +1852,7 @@ static void wld_friend_request(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-static void host_config(rpc_server_req* req, uint8_t* args) {
+static void host_config(rpc_server_req* req, const uint8_t* args) {
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
     
@@ -1940,7 +1872,7 @@ static void host_config(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-static void relay_list(rpc_server_req* req, uint8_t* args) {
+static void relay_list(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
 
@@ -1979,7 +1911,7 @@ static void relay_list(rpc_server_req* req, uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-static void relay_add(rpc_server_req* req, uint8_t* args) {
+static void relay_add(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
 
@@ -2014,7 +1946,7 @@ static void relay_add(rpc_server_req* req, uint8_t* args) {
     wish_core_config_save(core);
 }
 
-static void relay_remove(rpc_server_req* req, uint8_t* args) {
+static void relay_remove(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
 
@@ -2253,15 +2185,16 @@ static void wish_core_app_rpc_send(void *ctx, uint8_t *data, int len) {
     send_core_to_app(core, wsid, data, len);
 }
 
-void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LEN], uint8_t *data) {
+void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH_ID_LEN], const uint8_t *data) {
     wish_app_entry_t* app = wish_service_get_entry(core, src_wsid);
-    
+
     int end = 0;
     
-    char *op = NULL;
-    int32_t op_str_len = 0;
-    if (bson_get_string(data, "op", &op, &op_str_len) == BSON_FAIL) {
-        if (bson_get_int32(data, "end", &end) == BSON_FAIL) {
+    bson_iterator it;
+    bson_iterator_from_buffer(&it, data);
+    
+    if (bson_find_fieldpath_value("op", &it) != BSON_STRING) {
+        if ( bson_find_fieldpath_value("end", &it) != BSON_INT ) {
             bson_visit("There was no 'op' or 'end':", data);
             return;
         } else {
@@ -2270,27 +2203,40 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, uint8_t src_wsid[WISH_ID_LE
             return;
         }
     }
+    
+    const char* op = bson_iterator_string(&it);
 
     if (app==NULL) {
         // failed to find app, deny service
         WISHDEBUG(LOG_CRITICAL, "DENY op %s from unknown app", op);
         return;
     }
-
-    //WISHDEBUG(LOG_CRITICAL, "op %s from app %s", op, app->service_name);
     
-    uint8_t *args = NULL;
-    int32_t args_len = 0;
-    if (bson_get_array(data, "args", &args, &args_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_DEBUG, "Could not get args of incoming RPC message");
+    //WISHDEBUG(LOG_CRITICAL, "op %s from app %s", op, app->service_name);
+
+    bson_iterator_from_buffer(&it, data);
+
+    const uint8_t* args = NULL;
+    
+    if (bson_find_fieldpath_value("args", &it) != BSON_ARRAY) {
+        int empty_args_len = 32;
+        uint8_t empty_args[empty_args_len];
+        bson bs;
+        bson_init_buffer(&bs, empty_args, empty_args_len);
+        bson_append_start_array(&bs, "args");
+        bson_append_finish_array(&bs);
+    } else {
+        args = bson_iterator_value(&it);
     }
 
+    bson_iterator_from_buffer(&it, data);
 
-    bool ack_required = false;
-    int32_t id = 0;
-    if (bson_get_int32(data, "id", &id)) {
-        ack_required = true;
+    if (bson_find_fieldpath_value("id", &it) != BSON_INT) {
+        WISHDEBUG(LOG_CRITICAL, "op %s has no id", op);
+        return;
     }
+    
+    int32_t id = bson_iterator_int(&it);
 
     struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->app_api);
     if (list_elem == NULL) {
@@ -2340,10 +2286,10 @@ void wish_core_app_rpc_cleanup_requests(wish_core_t* core, struct wish_service_e
     }
 }
 
-void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct wish_service_entry *service_entry, bool online) {
+void wish_send_peer_update_locals(wish_core_t* core, const uint8_t* sid, struct wish_service_entry *service_entry, bool online) {
     //WISHDEBUG(LOG_CRITICAL, "In update locals");
     
-    if (memcmp(dst_wsid, service_entry->wsid, WISH_ID_LEN) == 0) {
+    if (memcmp(sid, service_entry->wsid, WISH_ID_LEN) == 0) {
         /* Don't send any peer online/offline messages regarding service itself */
         return;
     }
@@ -2388,7 +2334,7 @@ void wish_send_peer_update_locals(wish_core_t* core, uint8_t *dst_wsid, struct w
             }
             else {
                 //WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_func: wish_send_peer_update_locals: online");
-                send_core_to_app(core, dst_wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
+                send_core_to_app(core, sid, (uint8_t *) bson_data(&bs), bson_size(&bs));
             }
         }
     }

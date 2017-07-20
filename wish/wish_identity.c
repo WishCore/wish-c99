@@ -8,7 +8,6 @@
 #include "mbedtls/sha256.h"
 #include "wish_debug.h"
 #include "wish_fs.h"
-#include "cbson.h"
 #include "bson_visitor.h"
 #include "wish_port_config.h"
 #include "wish_connection_mgr.h"
@@ -29,29 +28,30 @@ int wish_save_identity_entry(wish_identity_t *identity) {
     const uint32_t identity_doc_max_len = sizeof (wish_identity_t) + 100;
     uint8_t identity_doc[identity_doc_max_len];
     /* Create the new BSON document in memory */
-    bson_init_doc(identity_doc, identity_doc_max_len);
-    bson_write_string(identity_doc, identity_doc_max_len, "alias", identity->alias);
-    bson_write_binary(identity_doc, identity_doc_max_len, "uid", identity->uid, WISH_ID_LEN);
-    bson_write_binary(identity_doc, identity_doc_max_len, "pubkey", identity->pubkey, WISH_PUBKEY_LEN);
+    
+    bson bs;
+    bson_init_buffer(&bs, identity_doc, identity_doc_max_len);
+    
+    bson_append_string(&bs, "alias", identity->alias);
+    bson_append_binary(&bs, "uid", identity->uid, WISH_ID_LEN);
+    bson_append_binary(&bs, "pubkey", identity->pubkey, WISH_PUBKEY_LEN);
 
     if (identity->has_privkey) {
-        bson_write_binary(identity_doc, identity_doc_max_len, "privkey", identity->privkey, WISH_PRIVKEY_LEN);
+        bson_append_binary(&bs, "privkey", identity->privkey, WISH_PRIVKEY_LEN);
     }
 
-    size_t transports_doc_max_len = 100;
-    uint8_t transports_doc[transports_doc_max_len];
-    /* FIXME For now, just encode a single transport */
+    /** \fixme For now, just encode a single transport */
     if (strnlen(&(identity->transports[0][0]), WISH_MAX_TRANSPORT_LEN) > 0) {
-        bson_init_doc(transports_doc, transports_doc_max_len);
-        bson_write_string(transports_doc, transports_doc_max_len,
-            "0", &(identity->transports[0][0]));
-        bson_write_embedded_doc_or_array(identity_doc, identity_doc_max_len,
-            "transports", transports_doc, BSON_KEY_ARRAY);
+        bson_append_start_array(&bs, "transports");
+        bson_append_string(&bs, "0", &(identity->transports[0][0]));
+        bson_append_finish_array(&bs);
     }
+    
+    bson_finish(&bs);
 
     /* FIXME add the rest of the fields */
 
-    int ret = wish_save_identity_entry_bson(identity_doc);
+    int ret = wish_save_identity_entry_bson(bson_data(&bs));
     if (ret <= 0) {
         WISHDEBUG(LOG_CRITICAL, "Failed to save identity entry");
     }
@@ -59,7 +59,7 @@ int wish_save_identity_entry(wish_identity_t *identity) {
 }
 
 /* Save identity, expressed in BSON format, to the identity database */
-int wish_save_identity_entry_bson(uint8_t *identity_doc) {
+int wish_save_identity_entry_bson(const uint8_t* identity) {
     wish_file_t fd;
     int32_t io_retval = 0;
     fd = wish_fs_open(WISH_ID_DB_NAME);
@@ -80,8 +80,10 @@ int wish_save_identity_entry_bson(uint8_t *identity_doc) {
         return 0;
     }
 
-
-    io_retval = wish_fs_write(fd, identity_doc, bson_get_doc_len(identity_doc));
+    bson bs;
+    bson_init_with_data(&bs, identity);
+    
+    io_retval = wish_fs_write(fd, bson_data(&bs), bson_size(&bs));
     if (io_retval <= 0) {
         /* error */
         WISHDEBUG(LOG_CRITICAL, "error writing");
@@ -90,7 +92,6 @@ int wish_save_identity_entry_bson(uint8_t *identity_doc) {
     wish_fs_close(fd);
 
     return io_retval;
-
 }
 
 /** This function returns the number of entries in the identity database (number of true identities + contacts),
@@ -127,7 +128,11 @@ int wish_get_num_uid_entries(void) {
             break;
         }
 
-        int32_t elem_len = bson_get_doc_len(peek_buf);
+        bson bs;
+        
+        bson_init_with_data(&bs, peek_buf);
+        
+        int32_t elem_len = bson_size(&bs);
         if (elem_len < 4 || elem_len > peek_len) {
             WISHDEBUG(LOG_CRITICAL, "BSON Read error");
             retval =  -1;
@@ -137,14 +142,14 @@ int wish_get_num_uid_entries(void) {
          * stream */
         prev_offset+=elem_len;
 
-        uint8_t* uid = 0;
-        int32_t uid_len = 0;
-        if (bson_get_binary(peek_buf, "uid", &uid, &uid_len) ==
-                BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Could not get uid");
+        bson_iterator it;
+        
+        if ( bson_find_from_buffer(&it, peek_buf, "uid") != BSON_BINDATA ) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (a)");
             retval = -1;
             break;
         }
+        
         WISHDEBUG(LOG_DEBUG, "Found identity!");
         num_ids++;
         
@@ -197,7 +202,11 @@ int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len ) {
             return -1;
         }
 
-        int32_t elem_len = bson_get_doc_len(peek_buf);
+        
+        bson bs;
+        bson_init_with_data(&bs, peek_buf);
+        
+        int32_t elem_len = bson_size(&bs);
         if (elem_len < 4 || elem_len > peek_len) {
             WISHDEBUG(LOG_CRITICAL, "BSON Read error");
             return -1;
@@ -206,13 +215,21 @@ int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len ) {
          * stream */
         prev_offset+=elem_len;
 
-        uint8_t* uid = 0;
-        int32_t uid_len = 0;
-        if (bson_get_binary(peek_buf, "uid", &uid, &uid_len) ==
-                BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Could not get uid");
+        bson_iterator it;
+        
+        if (bson_find_from_buffer(&it, peek_buf, "uid") != BSON_BINDATA) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (b)");
             return -1;
         }
+
+        const uint8_t* uid = bson_iterator_bin_data(&it);
+        int32_t uid_len = bson_iterator_bin_len(&it);
+        
+        if (uid_len != WISH_UID_LEN) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (c)");
+            return -1;
+        }
+        
         WISHDEBUG(LOG_DEBUG, "Found identity!");
         /* Add element to uid list */
         memcpy(list[i].uid, uid, WISH_ID_LEN);
@@ -255,7 +272,10 @@ return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
             break;
         }
 
-        int32_t elem_len = bson_get_doc_len(peek_buf);
+        bson bs;
+        bson_init_with_data(&bs, peek_buf);
+        
+        int32_t elem_len = bson_size(&bs);
         if (elem_len < 4 || elem_len > peek_len) {
             WISHDEBUG(LOG_CRITICAL, "BSON Read error");
             break;
@@ -264,68 +284,67 @@ return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
          * stream */
         prev_offset+=elem_len;
 
-        uint8_t* peek_uid = 0;
-        int32_t peek_uid_len = 0;
-        if (bson_get_binary(peek_buf, "uid", &peek_uid, &peek_uid_len) ==
-                BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Could not get uid");
+        bson_iterator it;
+        
+        if (bson_find_from_buffer(&it, peek_buf, "uid") != BSON_BINDATA) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (d)");
             break;
         }
+
+        const uint8_t* peek_uid = bson_iterator_bin_data(&it);
+        
+        if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
+            WISHDEBUG(LOG_CRITICAL, "Invalid uid.");
+            break;
+        }
+        
         if (memcmp(peek_uid, uid, WISH_ID_LEN) == 0) {
             WISHDEBUG(LOG_DEBUG, "Found identity (2)!");
             memcpy(&(identity->uid), peek_uid, WISH_ID_LEN);
 
-            uint8_t* pubkey = 0;
-            int32_t len = 0;
-            if (bson_get_binary(peek_buf, "pubkey", &pubkey, &len) 
-                    == BSON_FAIL) {
+            
+            if (bson_find_from_buffer(&it, peek_buf, "pubkey") != BSON_BINDATA) {
                 WISHDEBUG(LOG_CRITICAL, "Could not load pubkey");
                 break;
             }
+            
+            const uint8_t* pubkey = bson_iterator_bin_data(&it);
+            int32_t len = 0;
+            
             memcpy(&(identity->pubkey), pubkey, WISH_PUBKEY_LEN);
  
-            uint8_t* privkey = 0;
-            if (bson_get_binary(peek_buf, "privkey", &privkey, &len) 
-                    == BSON_FAIL) {
+            if (bson_find_from_buffer(&it, peek_buf, "privkey") != BSON_BINDATA) {
                 WISHDEBUG(LOG_DEBUG, "No privkey for this identity");
                 identity->has_privkey = false;
-            }
-            else {
+            } else {
                 WISHDEBUG(LOG_DEBUG, "Found privkey for identity");
-                memcpy(&(identity->privkey), privkey, WISH_PRIVKEY_LEN);
+                if (bson_iterator_bin_len(&it) != WISH_PRIVKEY_LEN) {
+                    WISHDEBUG(LOG_CRITICAL, "Could not load privkey, invalid len");
+                    break;
+                }
+                memcpy(&(identity->privkey), bson_iterator_bin_data(&it), WISH_PRIVKEY_LEN);
                 identity->has_privkey = true;
             }
-            
-            char* alias = NULL;
-            if (bson_get_string(peek_buf, "alias", &alias, &len) 
-                    == BSON_FAIL) {
+
+            if (bson_find_from_buffer(&it, peek_buf, "alias") != BSON_STRING) {
                 WISHDEBUG(LOG_CRITICAL, "Could not get alias");
                 break;
             }
+            
+            const char* alias = bson_iterator_string(&it);
+            
             strncpy(&(identity->alias[0]), alias, WISH_MAX_ALIAS_LEN);
 
             /* When we got this far, we are satisfied with import, the
              * rest is optional */
             retval = RET_SUCCESS;
 
-            uint8_t *transports_doc = NULL;
-            int32_t transports_doc_len = 0;
-            if (bson_get_array(peek_buf, "transports", &transports_doc,
-                &transports_doc_len) == BSON_FAIL) {
-                /* No transports found, but exit with success */
-                break;
+            bson_iterator_init(&it, &bs);
+            
+            if (bson_find_fieldpath_value("transports.0", &it) == BSON_STRING) {
+                strncpy(&(identity->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
             }
-            /* FIXME Just get the first transport */
-            char *url = NULL;
-            int32_t url_len = 0;
-            if (bson_get_string(transports_doc, "0", &url, &url_len)
-                    == BSON_FAIL) {
-                /* No contents in transports, but exit with success
-                 * anyway */
-                break;
-            }
-            strncpy(&(identity->transports[0][0]), url, WISH_MAX_ALIAS_LEN);
-
+            
             break;
         }
     } while (1); 
@@ -368,7 +387,10 @@ int wish_identity_exists(uint8_t *uid) {
             break;
         }
 
-        int32_t elem_len = bson_get_doc_len(peek_buf);
+        bson bs;
+        bson_init_with_data(&bs, peek_buf);
+        
+        int32_t elem_len = bson_size(&bs);
         if (elem_len < 4 || elem_len > peek_len) {
             WISHDEBUG(LOG_CRITICAL, "BSON Read error");
             break;
@@ -377,14 +399,13 @@ int wish_identity_exists(uint8_t *uid) {
          * stream */
         prev_offset+=elem_len;
 
-        uint8_t* peek_uid = 0;
-        int32_t peek_uid_len = 0;
-        if (bson_get_binary(peek_buf, "uid", &peek_uid, &peek_uid_len) ==
-                BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Could not get uid");
+        bson_iterator it;
+        
+        if (bson_find_from_buffer(&it, peek_buf, "uid") != BSON_BINDATA) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (e)");
             break;
         }
-        if (memcmp(peek_uid, uid, WISH_ID_LEN) == 0) {
+        if (memcmp(bson_iterator_bin_data(&it), uid, WISH_ID_LEN) == 0) {
             WISHDEBUG(LOG_DEBUG, "Found identity (2)!");
             retval = 1;
             break;
@@ -428,7 +449,10 @@ int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc, size_t ide
             break;
         }
 
-        int32_t elem_len = bson_get_doc_len(peek_buf);
+        bson bs;
+        bson_init_with_data(&bs, peek_buf);
+        
+        int32_t elem_len = bson_size(&bs);
         if (elem_len < 4 || elem_len > peek_len) {
             WISHDEBUG(LOG_CRITICAL, "BSON Read error");
             break;
@@ -437,14 +461,13 @@ int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc, size_t ide
          * stream */
         prev_offset+=elem_len;
 
-        uint8_t* peek_uid = 0;
-        int32_t peek_uid_len = 0;
-        if (bson_get_binary(peek_buf, "uid", &peek_uid, &peek_uid_len) ==
-                BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Could not get uid");
+        bson_iterator it;
+        
+        if (bson_find_from_buffer(&it, peek_buf, "uid") != BSON_BINDATA) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (f)");
             break;
         }
-        if (memcmp(peek_uid, uid, WISH_ID_LEN) == 0) {
+        if (memcmp(bson_iterator_bin_data(&it), uid, WISH_ID_LEN) == 0) {
             WISHDEBUG(LOG_DEBUG, "Found identity (3)!");
             if (identity_bson_doc_max_len >= elem_len) {
                 memcpy(identity_bson_doc, peek_buf, elem_len);
@@ -467,7 +490,7 @@ int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc, size_t ide
  * This function calculates the uid and stores the uid matching the
  * pubkey. 
  */
-void wish_pubkey2uid(uint8_t *pubkey, uint8_t *uid) {
+void wish_pubkey2uid(const uint8_t *pubkey, uint8_t *uid) {
     mbedtls_sha256_context sha256_ctx;
     mbedtls_sha256_init(&sha256_ctx);
     mbedtls_sha256_starts(&sha256_ctx, 0); 
@@ -498,15 +521,14 @@ static void wish_create_keypair(uint8_t *pubkey, uint8_t *privkey) {
 }
 
 
-void wish_create_local_identity(wish_identity_t *id, char *alias) {
+void wish_create_local_identity(wish_identity_t *id, const char *alias) {
     wish_create_keypair(&(id->pubkey[0]), &(id->privkey[0]));
     id->has_privkey = true;
     wish_pubkey2uid(&(id->pubkey[0]), &(id->uid[0]));
     strncpy(&(id->alias[0]), alias, WISH_MAX_ALIAS_LEN);
 
     /* Encode our preferred relay server as first transport */
-    wish_relay_get_preferred_server_url(&(id->transports[0][0]),
-            WISH_MAX_TRANSPORT_LEN);
+    wish_relay_get_preferred_server_url(&(id->transports[0][0]), WISH_MAX_TRANSPORT_LEN);
  
 }
 
@@ -564,53 +586,36 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer) {
  * from
  * @return 0 for success
  */
-int wish_populate_id_from_cert(wish_identity_t *new_id, 
-    uint8_t *cert_doc) {
+int wish_identity_from_bson(wish_identity_t *id, const bson* bs) {
 
-    if (new_id == NULL) {
+    if (id == NULL) {
         WISHDEBUG(LOG_CRITICAL, "new_id is null");
         return 1;
     }
 
-    int32_t pubkey_len = 0;
-    uint8_t *pubkey = NULL;
-    if (bson_get_binary(cert_doc, "pubkey", &pubkey, &pubkey_len) 
-            != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not extract pubkey from cert");
-        return 1;
-    }
+    bson_iterator it;
+    
+    if ( bson_find(&it, bs, "pubkey") != BSON_BINDATA ) { return 1; }
+    
+    const uint8_t* pubkey = bson_iterator_bin_data(&it);
 
-    int32_t alias_len = 0;
-    char *alias = NULL;
-    if (bson_get_string(cert_doc, "alias", &alias, &alias_len)
-            != BSON_SUCCESS) {
-        WISHDEBUG(LOG_CRITICAL, "Could not extract alias from cert");
-        return 1;
+    if ( bson_find(&it, bs, "alias") != BSON_STRING ) { return 1; }
+    
+    const char* alias = bson_iterator_string(&it);
 
-    }
-
-    wish_pubkey2uid(pubkey, new_id->uid);
-    memcpy(new_id->pubkey, pubkey, WISH_PUBKEY_LEN);
-    memcpy(new_id->alias, alias, strnlen(alias, WISH_MAX_ALIAS_LEN));
-    new_id->has_privkey = false;
-    memset(new_id->privkey, 0, WISH_PRIVKEY_LEN);
+    wish_pubkey2uid(pubkey, id->uid);
+    memcpy(id->pubkey, pubkey, WISH_PUBKEY_LEN);
+    memcpy(id->alias, alias, strnlen(alias, WISH_MAX_ALIAS_LEN));
+    id->has_privkey = false;
+    memset(id->privkey, 0, WISH_PRIVKEY_LEN);
 
     /* FIXME copy transports */
 
-    int32_t transports_len = 0;
-    uint8_t *transports = NULL;
-    if (bson_get_array(cert_doc, "transports", &transports, &transports_len)
-            == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not extract transports from cert");
+    if ( bson_find_fieldpath_value("transports.0", &it) != BSON_STRING ) {
+        return 1;
     }
-    bson_visit("wish_populate_id_from_cert: transports:", transports);
-    /* FIXME copy just the first transport */
-    char *url = NULL;
-    int32_t url_len = 0;
-    if (bson_get_string(transports, "0", &url, &url_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not extract first url from transports");
-    }
-    strncpy(&(new_id->transports[0][0]), url, url_len);
+    
+    strncpy(&(id->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
 
     /* FIXME update contacts */
 
@@ -667,19 +672,22 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
             break;
         }
 
-        int32_t elem_len = bson_get_doc_len(peek_buf);
+        bson bs;
+        bson_init_with_data(&bs, peek_buf);
+        
+        int32_t elem_len = bson_size(&bs);
         if (elem_len < 4 || elem_len > peek_len) {
             WISHDEBUG(LOG_CRITICAL, "BSON Read error");
             break;
         }
-        uint8_t* peek_uid = 0;
-        int32_t peek_uid_len = 0;
-        if (bson_get_binary(peek_buf, "uid", &peek_uid, &peek_uid_len) ==
-                BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Could not get uid");
+        
+        bson_iterator it;
+        
+        if (bson_find_from_buffer(&it, peek_buf, "uid") != BSON_BINDATA) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (g)");
             break;
         }
-        if (memcmp(peek_uid, uid, WISH_ID_LEN) == 0) {
+        if (memcmp(bson_iterator_bin_data(&it), uid, WISH_ID_LEN) == 0) {
             WISHDEBUG(LOG_DEBUG, "Remove: Found identity (2)!");
             retval = 1;
         }
@@ -697,6 +705,7 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
          * stream */
         prev_offset+=elem_len;
     } while (1);
+    
     wish_fs_close(new_fd);
     wish_fs_close(old_fd);
 

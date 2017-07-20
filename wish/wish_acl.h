@@ -38,21 +38,21 @@ typedef struct wish_acl {
     
     /* Acl API */
     
-    void wish_api_acl_check(rpc_server_req* req, uint8_t* args);
+    void wish_api_acl_check(rpc_server_req* req, const uint8_t* args);
     
-    void wish_api_acl_allow(rpc_server_req* req, uint8_t* args);
+    void wish_api_acl_allow(rpc_server_req* req, const uint8_t* args);
     
-    void wish_api_acl_remove_allow(rpc_server_req* req, uint8_t* args);
+    void wish_api_acl_remove_allow(rpc_server_req* req, const uint8_t* args);
     
-    void wish_api_acl_add_user_roles(rpc_server_req* req, uint8_t* args);
+    void wish_api_acl_add_user_roles(rpc_server_req* req, const uint8_t* args);
     
-    void wish_api_acl_remove_user_roles(rpc_server_req* req, uint8_t* args);
+    void wish_api_acl_remove_user_roles(rpc_server_req* req, const uint8_t* args);
     
-    void wish_api_acl_user_roles(rpc_server_req* req, uint8_t* args);
+    void wish_api_acl_user_roles(rpc_server_req* req, const uint8_t* args);
     
-    void wish_api_acl_what_resources(rpc_server_req* req, uint8_t* args);
+    void wish_api_acl_what_resources(rpc_server_req* req, const uint8_t* args);
     
-    void wish_api_acl_allowed_permissions(rpc_server_req* req, uint8_t* args);
+    void wish_api_acl_allowed_permissions(rpc_server_req* req, const uint8_t* args);
 
     /* Acl internals */
     

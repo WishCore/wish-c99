@@ -17,7 +17,6 @@
 #include "wish_local_discovery.h"
 #include "wish_acl.h"
 #include "ed25519.h"
-#include "cbson.h"
 #include "bson.h"
 #include "bson_visitor.h"
 #include "wish_platform.h"
@@ -100,8 +99,7 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
  * yet ready for use, because it is e.g. just being created.
  */
 wish_connection_t* 
-wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t *ruid,
-        uint8_t *rhid) {
+wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid) {
     wish_connection_t *connection = NULL;
     int i = 0;
 
@@ -1068,15 +1066,15 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             uint8_t handshake_msg[max_handshake_len];
 
             wish_core_create_handshake_msg(core, handshake_msg, max_handshake_len);
-           
-            WISHDEBUG(LOG_DEBUG, "We have generated BSON message of len %d", 
-                bson_get_doc_len(handshake_msg));
 
-            if (wish_core_send_message(core, connection, handshake_msg, 
-                    bson_get_doc_len(handshake_msg))) {
+            bson bs;
+            bson_init_with_data(&bs, handshake_msg);
+            
+            WISHDEBUG(LOG_DEBUG, "We have generated BSON message of len %d", bson_size(&bs));
+
+            if (wish_core_send_message(core, connection, handshake_msg, bson_size(&bs))) {
                 /* Send error. Skip sending this time */
-                WISHDEBUG(LOG_CRITICAL, "Send fails in server state \
-wish send handshake");
+                WISHDEBUG(LOG_CRITICAL, "Send fails in server state wish send handshake");
                 break;
             }
             /* Sending OK */
@@ -1102,8 +1100,7 @@ wish send handshake");
                 auth_tag, AES_GCM_AUTH_TAG_LEN, plaintxt, len);
 
             if (ret) {
-                WISHDEBUG(LOG_CRITICAL, 
-                    "There was an error while decrypting Wish message");
+                WISHDEBUG(LOG_CRITICAL, "There was an error while decrypting Wish message");
                 wish_platform_free(plaintxt);
                 wish_close_connection(core, connection);
                 break;
@@ -1111,44 +1108,36 @@ wish send handshake");
 
             wish_debug_print_array(LOG_TRIVIAL, "Got handshake reply OK", plaintxt, len);
 
+            bson_iterator it;
+            
             /* Recover the Host id of the client */
-            uint8_t* host_id = NULL;
-            int32_t host_id_len = 0;
-            if (bson_get_binary(plaintxt, "host", &host_id, &host_id_len)
-                        == BSON_FAIL) {
+            if (bson_find_from_buffer(&it, plaintxt, "host") == BSON_BINDATA) {
                 WISHDEBUG(LOG_CRITICAL, "We could not get the host field from client handshake");
                 return;
             }
-
-            uint8_t *transports_doc = NULL;
-            int32_t transports_doc_len = 0;
-            if (bson_get_array(plaintxt, "transports", &transports_doc, &transports_doc_len) == BSON_SUCCESS) {
-                char *url = NULL;
-                int32_t url_len = 0;
-                char index[21];
-                int i = 0;
-                
-                for (i=0; i<10; i++) {
-                    BSON_NUMSTR(index, i);
-
-                    if (bson_get_string(transports_doc, index, &url, &url_len) == BSON_FAIL) {
-                        continue;
-                    }
-                    
-                    WISHDEBUG(LOG_CRITICAL, "Transport reported on connection %s", url);
-                }
-            } else {
-                // no transport reported by remote peer
-            }
             
-            if (host_id_len == WISH_WHID_LEN) {
-                memcpy(connection->rhid, host_id, WISH_WHID_LEN);
-            }
-            else {
-                WISHDEBUG(LOG_CRITICAL, "Bad hostid length in client handshake");
+            if (bson_iterator_bin_len(&it) != WISH_WHID_LEN) {
+                WISHDEBUG(LOG_CRITICAL, "We could not get the host field from client handshake, invalid len");
                 return;
             }
 
+            const uint8_t* host_id = bson_iterator_bin_data(&it);
+            int32_t host_id_len = bson_iterator_bin_len(&it);
+
+            if (host_id_len == WISH_WHID_LEN) {
+                memcpy(connection->rhid, host_id, WISH_WHID_LEN);
+            } else {
+                WISHDEBUG(LOG_CRITICAL, "Bad hostid length in client handshake");
+                return;
+            }
+            
+            // Check transports
+            bson_iterator_from_buffer(&it, plaintxt);
+            
+            if (bson_find_fieldpath_value("transports.0", &it) == BSON_STRING) {
+                WISHDEBUG(LOG_CRITICAL, "FIXME: Not stored, but transport reported on connection %s", bson_iterator_string(&it));
+            }
+            
             /* Finished processing the handshake */
             wish_platform_free(plaintxt);
 
@@ -1189,7 +1178,7 @@ uint16_t uint16_native2be(uint16_t in) {
 /**
  * @return 0, if sending succeeds, else non-zero for an error
  */
-int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, uint8_t* payload_clrtxt, int payload_len) {
+int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, const uint8_t* payload_clrtxt, int payload_len) {
     mbedtls_gcm_context aes_gcm_ctx;
     mbedtls_gcm_init(&aes_gcm_ctx);
     WISHDEBUG(LOG_DEBUG, "send payload len %d", payload_len);

@@ -204,7 +204,7 @@ size_t plaintxt_len );
  * @return 0, if sending succeeded, non-zero if fail. This is directly
  * the return value of the platform-specific sending function
  */
-int wish_core_send_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* payload_clrtxt, int payload_len);
+int wish_core_send_message(wish_core_t* core, wish_connection_t* ctx, const uint8_t* payload_clrtxt, int payload_len);
     
 uint16_t uint16_native2be(uint16_t);
 
@@ -230,8 +230,7 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
  * Please note: The context returned here could a countext which is not
  * yet ready for use, because it is e.g. just being created.
  */
-wish_connection_t* wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, uint8_t *luid, uint8_t *ruid,
-        uint8_t *rhid);
+wish_connection_t* wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid);
 
 /* returns true if there is any connection form luid to ruid */
 bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t *ruid);

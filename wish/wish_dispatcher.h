@@ -23,7 +23,7 @@ int32_t generate_service_msg_id(void);
 
 
 /* Route an incoming message (from app) */
-void wish_core_handle_app_to_core(wish_core_t* core, uint8_t src_wsid[WISH_ID_LEN], uint8_t *data, size_t len);
+void wish_core_handle_app_to_core(wish_core_t* core, const uint8_t src_wsid[WISH_ID_LEN], const uint8_t *data, size_t len);
 
 /** Create a Wish host identity based on seed bytes. Host identity
  * generation is a deterministic process, yeilding the same pubkey and

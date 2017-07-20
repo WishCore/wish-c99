@@ -24,7 +24,7 @@ typedef struct wish_directory {
     
     /* Directory API */
     
-    void wish_api_directory_find(rpc_server_req* req, uint8_t* args);
+    void wish_api_directory_find(rpc_server_req* req, const uint8_t* args);
     
     /* Acl internals */
     

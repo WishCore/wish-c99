@@ -9,11 +9,9 @@
 
 void wish_core_init_rpc(wish_core_t* core);
 
-void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *ctx, 
-    uint8_t *data, size_t len);
+void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *ctx, const uint8_t *data, size_t len);
 
-void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t *ctx, 
-    uint8_t *data, size_t len);
+void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t *ctx, const uint8_t *data, size_t len);
 
 /* Helper function for simply sending a 'peers' request e.g. when new
  * core connection is established */

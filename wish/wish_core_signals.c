@@ -1,6 +1,6 @@
 #include "wish_core_signals.h"
 
-void wish_core_signals(rpc_server_req* req, uint8_t* args) {
+void wish_core_signals(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
 
     int buffer_len = 300;

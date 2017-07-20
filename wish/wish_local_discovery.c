@@ -14,7 +14,6 @@
 #include "wish_utils.h"
 #include "wish_local_discovery.h"
 #include "wish_debug.h"
-#include "cbson.h"
 #include "bson.h"
 #include "bson_visitor.h"
 #include "wish_connection_mgr.h"
@@ -85,70 +84,81 @@ size_t buffer_len) {
      * peer wishes to be claimed)
      */
 
-    uint8_t *ruid = 0;
-    int32_t uid_len = 0;
-    if (bson_get_binary(msg, "wuid", &ruid, &uid_len) == BSON_FAIL) {
+    bson_iterator it;
+    
+    if (bson_find_from_buffer(&it, msg, "wuid") != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (no uid)");
         return;
     }
 
-    if (uid_len != WISH_ID_LEN) {
+    const uint8_t* ruid = bson_iterator_bin_data(&it);
+
+    if (bson_iterator_bin_len(&it) != WISH_ID_LEN) {
         WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (uid len mismatch)");
         return;
     }
 
     /* Test if we already have a connection the said identity (using my identity) and host */
 
-    uint8_t *rhid = 0;  /* The candidate remote host identity */
-    int32_t rhid_len = 0;
-    if (bson_get_binary(msg, "whid", &rhid, &rhid_len) == BSON_FAIL) {
+    if (bson_find_from_buffer(&it, msg, "whid") != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (no whid)");
         return;
     }
 
-    uint8_t *pubkey_ptr = 0;
-    int32_t pubkey_len = 0;
-    if (bson_get_binary(msg, "pubkey", &pubkey_ptr, &pubkey_len) == BSON_FAIL) {
+    if (bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (whid len mismatch)");
+        return;
+    }
+    
+    const uint8_t* rhid = bson_iterator_bin_data(&it);  /* The candidate remote host identity */
+
+    if (bson_find_from_buffer(&it, msg, "pubkey") != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (no pubkey)");
         return;
     }
 
-    char *alias = 0;
-    int32_t alias_len = 0;
-    if (bson_get_string(msg, "alias", &alias, &alias_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (no alias)");
+    if (bson_iterator_bin_len(&it) != WISH_PUBKEY_LEN) {
+        WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (pubkey len mismatch)");
         return;
     }
+    
+    const uint8_t *pubkey_ptr = bson_iterator_bin_data(&it);
+
+
+    if (bson_find_from_buffer(&it, msg, "alias") != BSON_STRING) {
+        WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (no pubkey)");
+        return;
+    }
+    
+    const char* alias = bson_iterator_string(&it);
 
     bool claim = false;
-    bson_get_boolean(msg, "claim", &claim);
-
+    
+    if (bson_find_from_buffer(&it, msg, "claim") == BSON_BOOL) {
+        claim = bson_iterator_bool(&it);
+    }
+    
     /** The port number of the remote wish core will be saved here */
     uint16_t tcp_port = 0;
 
-    uint8_t *transports = 0;
-    int32_t transports_len = 0;
-    if (bson_get_array(msg, "transports", &transports, &transports_len)
-            == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (no transports)");
-        return;
-    }
-    else {
-        char *url = 0;
-        int32_t url_len = 0;
-        if (bson_get_string(transports, "0", &url, &url_len) == BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Malformed ldiscover message (transports yes, but no contents)");
+
+    bson_iterator_from_buffer(&it, msg);
+
+    // FIXME: Only first transport is read
+    
+    if (bson_find_fieldpath_value("transports.0", &it) == BSON_STRING) {
+        const char* url = bson_iterator_string(&it);
+        int url_len = bson_iterator_string_len(&it);
+        
+        if (wish_parse_transport_port(url, url_len, &tcp_port)) {
+            WISHDEBUG(LOG_CRITICAL, "wld: Error while parsing port");
             return;
         }
-        else {
-            WISHDEBUG(LOG_DEBUG, "wld: Extracted from transports url: %s", url);
-            if (wish_parse_transport_port(url, url_len, &tcp_port)) {
-                WISHDEBUG(LOG_CRITICAL, "wld: Error while parsing port");
-                return;
-            }
-        }
+    } else {
+        WISHDEBUG(LOG_CRITICAL, "No transport in local discovery message");
+        return;
     }
-
+    
     //WISHDEBUG(LOG_CRITICAL, "LocalDiscovery checking cache. ruid: %02x %02x %02x %02x", ruid[0], ruid[1], ruid[2], ruid[3]);
     
     uint32_t current_time = wish_time_get_relative(core);
@@ -287,12 +297,10 @@ size_t buffer_len) {
  * @param transports_array_max_len The maxmimum allowed length of the document
  * @return Value 0, if no error
  */
-static int create_transports_array(wish_core_t* core, uint8_t *transports_array, 
-        size_t transports_array_max_len) {
-    if (bson_init_doc(transports_array, transports_array_max_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Failed initting transports doc");
-        return 1;
-    }
+static int append_transports_array(wish_core_t* core, bson* bs) {
+    
+    bson_append_start_array(bs, "transports");
+    
     char transport_url[WISH_MAX_TRANSPORT_LEN];
     char host_part[WISH_MAX_TRANSPORT_LEN];
     
@@ -311,19 +319,13 @@ static int create_transports_array(wish_core_t* core, uint8_t *transports_array,
             //printf("Interface: %s\tAddress: %s\n", ifa->ifa_name, addr);
             wish_platform_sprintf(transport_url, "wish://%s:%d", addr, wish_get_host_port(core));
             
-            if (bson_write_string(transports_array, transports_array_max_len,
-                                  "0", transport_url) == BSON_FAIL) {
-                WISHDEBUG(LOG_CRITICAL, "Failed writing to transports doc");
-                freeifaddrs(ifap);
-                return 1;
-            }
+            bson_append_string(bs, "0", transport_url);
             
             freeifaddrs(ifap);
             return 0;
             break;
         }
     }
-    return 0;
 #else
     if (wish_get_host_ip_str(core, host_part, WISH_MAX_TRANSPORT_LEN)) {
         WISHDEBUG(LOG_CRITICAL, "Could not get Host IP addr");
@@ -331,13 +333,12 @@ static int create_transports_array(wish_core_t* core, uint8_t *transports_array,
     }
     wish_platform_sprintf(transport_url, "wish://%s:%d", host_part, wish_get_host_port(core));
 
-    if (bson_write_string(transports_array, transports_array_max_len, "0", transport_url) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Failed writing to transports doc");
-        return 1;
-    }
-
-    return 0;
+    bson_append_string(bs, "0", transport_url);
+    
 #endif
+    bson_append_finish_array(bs);
+    
+    return 0;
 }
 
 /* Send out one "advertizement" message for wish identity my_uid */
@@ -353,51 +354,42 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
 
     // Local discovery will not advertise if we don't have a private key
     if (!my_identity.has_privkey) { return; }
+
+    const size_t msg_len = 2 + 2*(20 + WISH_ID_LEN) + 20 + WISH_PUBKEY_LEN + 10 + WISH_MAX_TRANSPORT_LEN + WISH_MAX_ALIAS_LEN;
+    uint8_t msg[msg_len];
+
+    msg[0] = 'W';
+    msg[1] = '.';
+
+    bson bs;
+    bson_init_buffer(&bs, msg+2, msg_len-2);
     
-    const size_t transports_array_max_len = 50;
-    uint8_t transports_array[transports_array_max_len];
-    if (create_transports_array(core, transports_array, transports_array_max_len)) {
-        WISHDEBUG(LOG_CRITICAL, "Failed to create transports array");
-        return;
-    }
-
-    const size_t advert_msg_max_len = 2*(20 + WISH_ID_LEN) + 20 + WISH_PUBKEY_LEN + 10 + bson_get_doc_len(transports_array) + WISH_MAX_ALIAS_LEN;
-    uint8_t advert_msg[advert_msg_max_len];
-
-    bson_init_doc(advert_msg, advert_msg_max_len);
-    bson_write_binary(advert_msg, advert_msg_max_len, "wuid", my_uid, WISH_ID_LEN);
+    bson_append_string(&bs, "alias", my_identity.alias);
+    bson_append_binary(&bs, "wuid", my_uid, WISH_ID_LEN);
 
     uint8_t host_id[WISH_WHID_LEN];
     wish_core_get_host_id(core, host_id);
-    bson_write_binary(advert_msg, advert_msg_max_len, "whid", host_id, WISH_ID_LEN);
+    bson_append_binary(&bs, "whid", host_id, WISH_ID_LEN);
 
     uint8_t pubkey[WISH_PUBKEY_LEN] = { 0 };
 
     if (wish_load_pubkey(my_uid, pubkey)) {
-        bson_visit("failed to load pubkey for uid", advert_msg);
+        bson_visit("failed to load pubkey for uid", bson_data(&bs));
         return;
     }
 
-    bson_write_binary(advert_msg, advert_msg_max_len, "pubkey", pubkey, WISH_PUBKEY_LEN);
-    bson_write_embedded_doc_or_array(advert_msg, advert_msg_max_len, "transports", transports_array, BSON_KEY_ARRAY);
-    bson_write_string(advert_msg, advert_msg_max_len, "alias", my_identity.alias);
+    bson_append_binary(&bs, "pubkey", pubkey, WISH_PUBKEY_LEN);
+    append_transports_array(core, &bs);
     
     if (core->config_skip_connection_acl) {
-        bson_write_boolean(advert_msg, advert_msg_max_len, "claim", true);
+        bson_append_bool(&bs, "claim", true);
     }
 
-    /* Send away the advert message, but first add the magic bytes in
-     * front of the message */
+    bson_finish(&bs);
 
-    uint8_t advert_with_magic[2 + advert_msg_max_len];
-    advert_with_magic[0] = 'W';
-    advert_with_magic[1] = '.';
-    memcpy(advert_with_magic + 2, advert_msg, bson_get_doc_len(advert_msg));
-    size_t advert_with_magic_len = 2 + bson_get_doc_len(advert_msg);
+    //bson_visit("Advertisement message going out from core:", bson_data(&bs));
     
-    //bson_visit("Advertisement message going out from core:", advert_msg);
-    
-    wish_send_advertizement(core, advert_with_magic, advert_with_magic_len);
+    wish_send_advertizement(core, msg, 2 + bson_size(&bs));
 }
 
 void wish_ldiscover_clear(wish_core_t* core) {

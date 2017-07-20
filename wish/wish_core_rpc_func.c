@@ -6,7 +6,6 @@
 #include "wish_core.h"
 #include "wish_debug.h"
 #include "wish_rpc.h"
-#include "cbson.h"
 #include "bson.h"
 #include "wish_io.h"
 #include "wish_core_rpc_func.h"
@@ -53,10 +52,10 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
     }
 }
 
-static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_array) {
+static void peers_op_handler(rpc_server_req* req, const uint8_t *args) {
     WISHDEBUG(LOG_DEBUG, "Handling peers request!");
-    wish_core_t* core = (wish_core_t*) rpc_ctx->server->context;
-    wish_connection_t* connection = (wish_connection_t*) rpc_ctx->ctx;
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    wish_connection_t* connection = (wish_connection_t*) req->ctx;
 
     int buffer_len = 300;
     uint8_t buffer[buffer_len];
@@ -102,10 +101,7 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
                 bson bs;
                 bson_init_buffer(&bs, buffer, buffer_len);
                 bson_append_start_object(&bs, "res");
-                bson_append_int(&bs, "sig", rpc_ctx->id);
-                bson_append_start_object(&bs, "data");
-                bson_append_bool(&bs, "N", true);
-                bson_append_string(&bs, "type", "N");
+                bson_append_int(&bs, "sig", req->id);
                 bson_append_start_object(&bs, "data");
                 bson_append_binary(&bs, "rsid", registry[i].wsid, WISH_WSID_LEN);
 
@@ -114,7 +110,6 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
                 bson_append_string(&bs, "protocol", (char*) registry[i].protocols[0].name);
                 
                 bson_append_bool(&bs, "online", true);
-                bson_append_finish_object(&bs);
                 bson_append_finish_object(&bs);
                 bson_append_finish_object(&bs);
 
@@ -136,8 +131,7 @@ static void peers_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arr
  * This function adds information (rsid and protocol) about a remote
  * service to the wish connection context, but checks first if it exists
  * in the list or not. */
-static void wish_core_add_remote_service(wish_connection_t *ctx, 
-        uint8_t rsid[WISH_WSID_LEN], char *protocol) {
+static void wish_core_add_remote_service(wish_connection_t *ctx, const uint8_t rsid[WISH_WSID_LEN], const char *protocol) {
     struct wish_remote_service *tmp;
     /* Find out if we already know this peer */
     LL_FOREACH(ctx->rsid_list_head, tmp) {
@@ -163,9 +157,17 @@ static void wish_core_add_remote_service(wish_connection_t *ctx,
     LL_APPEND(ctx->rsid_list_head, new_service);
 }
 
-/** Client callback function for 'peers' RPC request send by core RPC
+/** 
+ * Client callback function for 'peers' RPC request send by core RPC
+ * 
+ *     data: {
+ *         rsid: Buffer(32),
+ *         protocol: string
+ *         online: boolean
+ *     }
+ * 
  * client to a remote core */
-void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t payload_len) {
+void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, size_t payload_len) {
     wish_connection_t *connection = context;
     wish_core_t* core = req->client->context;
     
@@ -176,52 +178,36 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
      */
     /* FIXME should we be infact be supplying only "data" element to this the cb function?? */
 
-    uint8_t *outer_data_doc = NULL;
-    int32_t outer_data_doc_len = 0;
-    if (bson_get_document(payload, "data", &outer_data_doc, &outer_data_doc_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "No outer 'data' document");
-        return;
-    }
-
-    char *type_str = NULL;
-    int32_t type_str_len = 0;
-    if (bson_get_string(outer_data_doc, "type", &type_str, &type_str_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "No 'type' in peer document");
+    bson_visit("peers_callback (refactored):", payload);
+    
+    bson_iterator it;
+    
+    bson_iterator_from_buffer(&it, payload);
+    
+    if (bson_find_fieldpath_value("data.protocol", &it) == BSON_STRING) {
+        WISHDEBUG(LOG_CRITICAL, "No data.protocol in peers_callback!");
         return;
     }
     
-    uint8_t *inner_data_doc = NULL;
-    int32_t inner_data_doc_len = 0;
-    if (bson_get_document(outer_data_doc, "data", &inner_data_doc, &inner_data_doc_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "No inner 'data' document");
+    const char* protocol = bson_iterator_string(&it);
+
+    bson_iterator_from_buffer(&it, payload);
+    
+    if (bson_find_fieldpath_value("data.rsid", &it) == BSON_BINDATA) {
+        WISHDEBUG(LOG_CRITICAL, "No data.rsid in peers_callback!");
+        return;
+    }
+    
+    const uint8_t *rsid = bson_iterator_bin_data(&it);
+
+    bson_iterator_from_buffer(&it, payload);
+    
+    if (bson_find_fieldpath_value("data.online", &it) == BSON_BOOL) {
+        WISHDEBUG(LOG_CRITICAL, "No data.online in peers_callback!");
         return;
     }
 
-    uint8_t *rsid = NULL;
-    int32_t rsid_len = 0;
-    if (bson_get_binary(inner_data_doc, "rsid", &rsid, &rsid_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "No rsid in inner 'data' document");
-        return;
-    }
-
-    char *protocol = NULL;
-    int32_t protocol_len = 0;
-    if (bson_get_string(inner_data_doc, "protocol", &protocol, &protocol_len) == BSON_FAIL) {
-        bson_visit("peers_callback: No protocol in inner 'data' document", payload);
-        return;
-    }
-
-    bool online = false;
-    if ( strncmp(type_str, "D", 2) == 0 ) {
-        // this peer has been deleted (not only offline)
-    } else {
-        if (bson_get_boolean(inner_data_doc, "online", &online)
-                == BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "No online information");
-            return;
-
-        }
-    }
+    bool online = bson_iterator_bool(&it);
 
     /* Add information about the new peer (but check first if we knew it
      * from before). This is information needs to be saved here so that
@@ -277,40 +263,72 @@ void peers_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t
 
 }
 
-static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_array) {
+/**
+ * Core to core send handler
+ * 
+ * Handles messages from another core, going towards a WishApp
+ * 
+ * args: BSON([rsid: Buffer(32), lsid: Buffer(32), payload: Buffer])
+ * 
+ * @param rpc_ctx
+ * @param args_array
+ */
+static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     //bson_visit("Handling send request from remote core!", args_array);
-    wish_core_t* core = rpc_ctx->server->context;
+    wish_core_t* core = req->server->context;
 
+    bson_iterator it;
+    
+    bson_iterator_from_buffer(&it, args);
+    
+    if (bson_find_fieldpath_value("0", &it) != BSON_BINDATA) {
+        WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get rsid");
+        return;
+    }
+    
+    if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
+        WISHDEBUG(LOG_CRITICAL, "send_op_handler: rsid not Buffer(32)");
+        return;
+    }
    
     /* The remote wsid, the originator of this message, is element "0" */
-    uint8_t *rsid = NULL;
-    int32_t rsid_len = 0;
-    if (bson_get_binary(args_array, "0", &rsid, &rsid_len)
-            == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get rsid");
+    const uint8_t *rsid = bson_iterator_bin_data(&it);
+    
+    bson_iterator_from_buffer(&it, args);
+    
+    if (bson_find_fieldpath_value("1", &it) != BSON_BINDATA) {
+        WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get lsid");
         return;
     }
-
+    
+    if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
+        WISHDEBUG(LOG_CRITICAL, "send_op_handler: lsid not Buffer(32)");
+        return;
+    }
+   
     /* Take element 1 of args_array. That is the destination wsid */
-    uint8_t *dst_wsid = NULL;
-    int32_t dst_wsid_len = 0;
-    if (bson_get_binary(args_array, "1", &dst_wsid, &dst_wsid_len) 
-            == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get destination wsid");
-        return;
-
-    }
- 
+    const uint8_t *lsid = bson_iterator_bin_data(&it);
 
     /* The protocol is element 2 */
-    char *protocol = NULL;
-    int32_t protocol_len = 0;
-    if (bson_get_string(args_array, "2", &protocol, &protocol_len)
-            == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get protocol");
+    bson_iterator_from_buffer(&it, args);
+    
+    if (bson_find_fieldpath_value("2", &it) != BSON_STRING) {
+        WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get protocol");
         return;
     }
+    
+    const char* protocol = bson_iterator_string(&it);
 
+    bson_iterator_from_buffer(&it, args);
+    
+    if (bson_find_fieldpath_value("3", &it) != BSON_BINDATA) {
+        WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get payload");
+        return;
+    }
+    
+    const uint8_t* payload = bson_iterator_bin_data(&it);
+    int32_t payload_len = bson_iterator_bin_len(&it);
+    
     /* Create new document 
      * Add a type:frame element, and build a peer document:
      * { luid, ruid, rhid, rsid, protocol } and add it add peer element.
@@ -318,43 +336,32 @@ static void send_op_handler(struct wish_rpc_context *rpc_ctx, uint8_t *args_arra
      * "data".
      */
 
+    size_t buf_len = 4*WISH_ID_LEN + WISH_PROTOCOL_NAME_MAX_LEN + 100 + payload_len;
+    uint8_t buf[buf_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, buf, buf_len);
+
+    wish_connection_t* ctx = req->ctx;
+    
+    bson_append_string(&bs, "type", "frame");
+
     /* luid, ruid, rhid are obtained from the wish_context */
-    size_t peer_doc_max_len = 2*WISH_ID_LEN + WISH_WSID_LEN + WISH_WHID_LEN
-        + WISH_PROTOCOL_NAME_MAX_LEN + 100;
-    uint8_t peer_doc[peer_doc_max_len];
-    bson_init_doc(peer_doc, peer_doc_max_len);
-
-    wish_connection_t* ctx = rpc_ctx->ctx;
+    bson_append_start_object(&bs, "peer");
+    bson_append_binary(&bs, "luid", ctx->luid, WISH_ID_LEN);
+    bson_append_binary(&bs, "ruid", ctx->ruid, WISH_ID_LEN);
+    bson_append_binary(&bs, "rhid", ctx->rhid, WISH_WHID_LEN);
+    bson_append_binary(&bs, "rsid", rsid, WISH_WSID_LEN);
+    bson_append_string(&bs, "protocol", protocol);
+    bson_append_finish_object(&bs);
     
-    bson_write_binary(peer_doc, peer_doc_max_len, "luid", ctx->luid, WISH_ID_LEN);
-    bson_write_binary(peer_doc, peer_doc_max_len, "ruid", ctx->ruid, WISH_ID_LEN);
-    bson_write_binary(peer_doc, peer_doc_max_len, "rhid", ctx->rhid, WISH_WHID_LEN);
-    bson_write_binary(peer_doc, peer_doc_max_len, "rsid", rsid, WISH_WSID_LEN);
-    bson_write_string(peer_doc, peer_doc_max_len, "protocol", protocol);
-
-    uint8_t *payload = NULL;
-    int32_t payload_len = 0;
-    if (bson_get_binary(args_array, "3", &payload, &payload_len) 
-            == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not get payload");
-        return;
-    }
+    bson_append_binary(&bs, "data", payload, payload_len); 
     
-    size_t upcall_doc_max_len = peer_doc_max_len + payload_len + 100;
-    uint8_t upcall_doc[upcall_doc_max_len];
-    bson_init_doc(upcall_doc, upcall_doc_max_len);
-    
-    bson_write_string(upcall_doc, upcall_doc_max_len, "type", "frame");
-    bson_write_embedded_doc_or_array(upcall_doc, upcall_doc_max_len,
-        "peer", peer_doc, BSON_KEY_DOCUMENT);
-
-    bson_write_binary(upcall_doc, upcall_doc_max_len, "data", payload, payload_len); 
-    
-    send_core_to_app(core, dst_wsid, upcall_doc, bson_get_doc_len(upcall_doc));
+    send_core_to_app(core, lsid, bson_data(&bs), bson_size(&bs));
 }
 
 
-static void core_directory(rpc_server_req* req, uint8_t* args) {
+static void core_directory(rpc_server_req* req, const uint8_t* args) {
     wish_rpc_server_error(req, 500, "Not implemented.");
 }
 
@@ -364,7 +371,7 @@ static void core_directory(rpc_server_req* req, uint8_t* args) {
  * @param req
  * @param args a BSON object, like this: [ 0: { data: <Buffer> cert, meta: <Buffer> transports, signatures: { } } ]
  */
-static void core_friend_req(rpc_server_req* req, uint8_t* args) {
+static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     wish_connection_t *connection = req->send_context;
     wish_core_t *core = req->server->context;
     
@@ -436,7 +443,10 @@ static void core_friend_req(rpc_server_req* req, uint8_t* args) {
     wish_identity_t* new_id = &rel.id;
     memset(new_id, 0, sizeof (wish_identity_t));
 
-    wish_populate_id_from_cert(new_id, cert);
+    bson b;
+    bson_init_with_data(&b, cert);
+    
+    wish_identity_from_bson(new_id, &b);
 
     wish_relationship_req_add(core, &rel);
 
@@ -469,7 +479,7 @@ static void core_friend_req(rpc_server_req* req, uint8_t* args) {
 
 }
 
-static void friend_req_callback(rpc_client_req* req, void *context, uint8_t *payload, size_t payload_len) {
+static void friend_req_callback(rpc_client_req* req, void* context, const uint8_t* payload, size_t payload_len) {
     bson_visit("Friend req callback, payload: ", payload);
     
     bson_iterator data_it;
@@ -488,7 +498,10 @@ static void friend_req_callback(rpc_client_req* req, void *context, uint8_t *pay
     wish_identity_t new_friend_id;
     memset(&new_friend_id, 0, sizeof (wish_identity_t));
 
-    wish_populate_id_from_cert(&new_friend_id, cert_data);
+    bson b;
+    bson_init_with_data(&b, cert_data);
+    
+    wish_identity_from_bson(&new_friend_id, &b);
     
     // Check if identity is already in db
 
@@ -561,16 +574,20 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
 
     rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
     mreq->cb_context = ctx;
+
+    bson req;
+    bson_init_with_data(&req, buffer);
     
     size_t request_max_len = 1024;
     uint8_t request[request_max_len];
     
-    bson_init_doc(request, request_max_len);
-    bson_write_embedded_doc_or_array(request, request_max_len, "req", buffer, BSON_KEY_DOCUMENT);
-    wish_core_send_message(core, ctx, request, bson_get_doc_len(request));
+    bson bs;
+    bson_init_buffer(&bs, request, request_max_len);
+    bson_append_bson(&bs, "req", &req);
+    bson_finish(&bs);
+    
+    wish_core_send_message(core, ctx, bson_data(&bs), bson_size(&bs));
 }
-
-
 
 
 typedef struct wish_rpc_server_handler handler;
@@ -639,31 +656,36 @@ void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
 /* Feed to core's RPC server. You should feed the document which is as the
  * element 'req' 
  */
-void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connection, uint8_t *data, size_t len) {
+void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connection, const uint8_t *data, size_t len) {
+    bson_iterator it;
 
-    char *op_str = NULL;
-    int32_t op_str_len = 0;
-    if (bson_get_string(data, "op", &op_str, &op_str_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Unexpected: no op");
+    bson_iterator_from_buffer(&it, data);
+    
+    if (bson_find_fieldpath_value("op", &it) != BSON_STRING) {
+        WISHDEBUG(LOG_CRITICAL, "wish_core_feed_to_rpc_server: no op");
         return;
     }
-
-    uint8_t *args = NULL;
-    int32_t args_len = 0;
-    if (bson_get_array(data, "args", &args, &args_len) == BSON_FAIL) {
-        WISHDEBUG(LOG_CRITICAL, "Unexpected: no args");
+    
+    const char* op_str = bson_iterator_string(&it);
+    int op_str_len = bson_iterator_string_len(&it);
+    
+    bson_iterator_from_buffer(&it, data);
+    
+    if (bson_find_fieldpath_value("args", &it) != BSON_ARRAY) {
+        WISHDEBUG(LOG_CRITICAL, "wish_core_feed_to_rpc_server: no args");
         return;
     }
+    
+    const uint8_t *args = bson_iterator_value(&it);
 
-    int32_t id = 0;
-    bool ack_needed = false;
-    if (bson_get_int32(data, "id", &id) == BSON_SUCCESS) {
-        ack_needed = true;
+    bson_iterator_from_buffer(&it, data);
+    
+    if (bson_find_fieldpath_value("id", &it) != BSON_INT) {
+        WISHDEBUG(LOG_CRITICAL, "wish_core_feed_to_rpc_server: no id");
+        return;
     }
-    else {
-        /* We could not get the id, no ack is requested */
-        ack_needed = false;
-    }
+    
+    int32_t id = bson_iterator_int(&it);
 
     struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->core_api);
     if (list_elem == NULL) {
@@ -695,25 +717,32 @@ void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connecti
  * You should feed the document which is as the element 'res' 
  */
 
-void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t *ctx, uint8_t *data, size_t len) {
+void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t *ctx, const uint8_t *data, size_t len) {
     wish_rpc_client_handle_res(core->core_rpc_client, ctx, data, len);
 }
 
 
 void wish_core_send_peers_rpc_req(wish_core_t* core, wish_connection_t *ctx) {
-    size_t request_max_len = 100;
-    uint8_t request[request_max_len];
     size_t buffer_max_len = 75;
     uint8_t buffer[buffer_max_len];
-    wish_rpc_id_t id = wish_rpc_client(core->core_rpc_client, "peers", NULL, 0, peers_callback, buffer, buffer_max_len);
+    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "peers", NULL, 0, peers_callback, buffer, buffer_max_len);
 
     rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
     mreq->cb_context = ctx;
     
+
+    bson req;
+    bson_init_with_data(&req, buffer);
     
-    bson_init_doc(request, request_max_len);
-    bson_write_embedded_doc_or_array(request, request_max_len, "req", buffer, BSON_KEY_DOCUMENT);
-    wish_core_send_message(core, ctx, request, bson_get_doc_len(request));
+    size_t request_max_len = 256;
+    uint8_t request[request_max_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, request, request_max_len);
+    bson_append_bson(&bs, "req", &req);
+    bson_finish(&bs);
+    
+    wish_core_send_message(core, ctx, bson_data(&bs), bson_size(&bs));
 }
 
 /**
@@ -757,61 +786,25 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
         /* Build Core-to-App message indicating the severed link */
         int32_t core_to_app_max_len = 288;
         uint8_t core_to_app[core_to_app_max_len];
-        bson_init_doc(core_to_app, core_to_app_max_len);
         
-        /*
-        if (online) {
-            WISHDEBUG(LOG_CRITICAL, "Building upstream online peer message");
-        }
-        else {
-            WISHDEBUG(LOG_CRITICAL, "Building upstream offline peer message");
-        }
-        */
+        bson bs;
+        bson_init_buffer(&bs, core_to_app, core_to_app_max_len);
         
-        bson_write_string(core_to_app, core_to_app_max_len, "type", "peer");
-        int32_t peer_info_max_len = 256;
-        uint8_t peer_info[peer_info_max_len];
-
-
-        bson_init_doc(peer_info, peer_info_max_len);
+        bson_append_string(&bs, "type", "peer");
+        
         /* luid, ruid and rhid come from the wish context */
-        bson_write_binary(peer_info, peer_info_max_len, "luid", ctx->luid, WISH_ID_LEN);
-        bson_write_binary(peer_info, peer_info_max_len, "ruid", ctx->ruid, WISH_ID_LEN);
-        bson_write_binary(peer_info, peer_info_max_len, "rhid", ctx->rhid, WISH_WHID_LEN);
-        /* rsid and protocol are from the rsid list of the context */
-        if (bson_write_binary(peer_info, peer_info_max_len,
-                "rsid", service->rsid, WISH_WSID_LEN) == BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Failed writing rsid to upstream peer message");
-            return;
-        }
-        if (bson_write_string(peer_info, peer_info_max_len,
-                "protocol", service->protocol) == BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Failed writing service to upstream peer message");
-            return;
-        }
-
-        /* Depending on if it is an online or offline, set typecode to 
-         * N (signifying "new") or D (signifying "delete") */
-        char *type_code = "N";
-        if (online == false) {
-            type_code = "D";
-        }
-        if (bson_write_string(peer_info, peer_info_max_len,
-                "type", type_code) == BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "Failed writing type to upstream peer message");
-
-            return;
-        }
-        /* Encode 'online' as indicated to indicate peer online/offline message */
-        if (bson_write_boolean(peer_info, peer_info_max_len,
-                "online", online) == BSON_FAIL) {
-
-            WISHDEBUG(LOG_CRITICAL, "peer info buffer is too small!");
-            return;
-        }
-        if (bson_write_embedded_doc_or_array(core_to_app, core_to_app_max_len,
-                "peer", peer_info, BSON_KEY_DOCUMENT) == BSON_FAIL) {
-            WISHDEBUG(LOG_CRITICAL, "core to app buffer is too small!");
+        bson_append_start_object(&bs, "peer");
+        bson_append_binary(&bs, "luid", ctx->luid, WISH_ID_LEN);
+        bson_append_binary(&bs, "ruid", ctx->ruid, WISH_ID_LEN);
+        bson_append_binary(&bs, "rhid", ctx->rhid, WISH_WHID_LEN);
+        bson_append_binary(&bs, "rsid", service->rsid, WISH_WSID_LEN);
+        bson_append_string(&bs, "protocol", service->protocol);
+        bson_append_bool(&bs, "online", online);
+        bson_append_finish_object(&bs);
+        bson_finish(&bs);
+        
+        if(bs.err) {
+            WISHDEBUG(LOG_CRITICAL, "wish_send_online_offline_signal_to_apps: error encoding bson: %s", bs.errstr);
             return;
         }
 
@@ -821,15 +814,13 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
             WISHDEBUG(LOG_CRITICAL, "App registry is null");
             return;
         }
-        else {
-            WISHDEBUG(LOG_DEBUG, "Registry seems valid");
-        }
+
         int i = 0;
         for (i = 0; i < WISH_MAX_SERVICES; i++) {
             if (wish_service_entry_is_valid(core, &(registry[i]))) {
                 //bson_visit("This is peer info", peer_info);
-                WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_online_offline_signal_to_apps: (len %d)", bson_get_doc_len(core_to_app));
-                send_core_to_app(core, registry[i].wsid, core_to_app, bson_get_doc_len(core_to_app));
+                WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_online_offline_signal_to_apps: (len %d)", bson_size(&bs));
+                send_core_to_app(core, registry[i].wsid, bson_data(&bs), bson_size(&bs));
             }
         }
 

@@ -16,7 +16,7 @@ void wish_acl_init(wish_core_t* core) {
  *   //     alice@host/service?mist#model.battery.status read bob@host/service
  *   //     alice@localhost/requestingService
  */
-void wish_api_acl_check(rpc_server_req* req, uint8_t* args) {
+void wish_api_acl_check(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -24,7 +24,7 @@ void wish_api_acl_check(rpc_server_req* req, uint8_t* args) {
 }
 
 /* args: 'String(Hex) luid, String role, String resource, Object permission' */
-void wish_api_acl_allow(rpc_server_req* req, uint8_t* args) {
+void wish_api_acl_allow(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -32,7 +32,7 @@ void wish_api_acl_allow(rpc_server_req* req, uint8_t* args) {
 }
 
 /* args: 'String(Hex) luid, String role, String resource, Object permission' */
-void wish_api_acl_remove_allow(rpc_server_req* req, uint8_t* args) {
+void wish_api_acl_remove_allow(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -40,7 +40,7 @@ void wish_api_acl_remove_allow(rpc_server_req* req, uint8_t* args) {
 }
 
 /* args: 'Buffer(32) luid, String role' */
-void wish_api_acl_add_user_roles(rpc_server_req* req, uint8_t* args) {
+void wish_api_acl_add_user_roles(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -75,7 +75,7 @@ void wish_api_acl_add_user_roles(rpc_server_req* req, uint8_t* args) {
 }
 
 /* args: 'String(Hex) luid, String role, String resource, Object permission' */
-void wish_api_acl_remove_user_roles(rpc_server_req* req, uint8_t* args) {
+void wish_api_acl_remove_user_roles(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -83,7 +83,7 @@ void wish_api_acl_remove_user_roles(rpc_server_req* req, uint8_t* args) {
 }
 
 /* args: 'String(Hex) luid, String role, String resource, Object permission' */
-void wish_api_acl_user_roles(rpc_server_req* req, uint8_t* args) {
+void wish_api_acl_user_roles(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
 
@@ -112,7 +112,7 @@ void wish_api_acl_user_roles(rpc_server_req* req, uint8_t* args) {
 }
 
 /* args: 'String(Hex) luid, String role' */
-void wish_api_acl_what_resources(rpc_server_req* req, uint8_t* args) {
+void wish_api_acl_what_resources(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
@@ -120,7 +120,7 @@ void wish_api_acl_what_resources(rpc_server_req* req, uint8_t* args) {
 }
 
 /* args: 'resource, peer' */
-void wish_api_acl_allowed_permissions(rpc_server_req* req, uint8_t* args) {
+void wish_api_acl_allowed_permissions(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     

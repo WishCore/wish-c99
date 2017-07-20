@@ -111,7 +111,7 @@ void setup_app_server(wish_core_t* core, uint16_t app_port) {
     }
 }
 
-bool is_app_via_tcp(wish_core_t* core, uint8_t wsid[WISH_WSID_LEN]) {
+bool is_app_via_tcp(wish_core_t* core, const uint8_t wsid[WISH_WSID_LEN]) {
     bool retval = false;
     int i = 0;
     for (i = 0; i < NUM_APP_CONNECTIONS; i++) {
@@ -125,7 +125,7 @@ bool is_app_via_tcp(wish_core_t* core, uint8_t wsid[WISH_WSID_LEN]) {
     return retval;
 }
 
-void send_core_to_app_via_tcp(wish_core_t* core, uint8_t wsid[WISH_ID_LEN], uint8_t *data, size_t len) {
+void send_core_to_app_via_tcp(wish_core_t* core, const uint8_t wsid[WISH_ID_LEN], const uint8_t *data, size_t len) {
     /* Find app index */
     int i = 0;
     for (i = 0; i < NUM_APP_CONNECTIONS; i++) {

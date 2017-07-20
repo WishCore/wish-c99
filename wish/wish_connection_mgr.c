@@ -7,7 +7,6 @@
 #include "wish_debug.h"
 #include "wish_io.h"
 #include "bson.h"
-#include "cbson.h"
 #include "bson_visitor.h"
 #include "wish_connection_mgr.h"
 #include "string.h"
@@ -95,12 +94,14 @@ void check_connection_liveliness(wish_core_t* core, void* ctx) {
                 WISHDEBUG(LOG_DEBUG, "Pinging connection %d", i);
  
                 /* Enqueue a ping message */
-                int32_t ping_msg_max_len = 50;
-                uint8_t ping_msg[ping_msg_max_len];
-                bson_init_doc(ping_msg, ping_msg_max_len);
-                /* Send: { ping: true } */
-                bson_write_boolean(ping_msg, ping_msg_max_len, "ping", true);
-                wish_core_send_message(core, connection, ping_msg, bson_get_doc_len(ping_msg));
+                bson ping;
+                bson_init(&ping);
+                
+                bson_append_bool(&ping, "ping", true);
+                
+                bson_finish(&ping);
+                
+                wish_core_send_message(core, connection, bson_data(&ping), bson_size(&ping));
                 connection->ping_sent_timestamp = core->core_time;
             }
 
