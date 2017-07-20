@@ -160,7 +160,7 @@ int bson_init_finished_data(bson *b, const char *data) {
 
 int bson_size(const bson *b) {
     int i;
-    if (!b || !b->data)
+    if (!b || !b->data || !b->finished)
         return 0;
     bson_little_endian32(&i, b->data);
     return i;
