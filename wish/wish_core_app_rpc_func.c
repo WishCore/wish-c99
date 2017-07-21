@@ -2194,6 +2194,7 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH
     bson_iterator_from_buffer(&it, data);
     
     if (bson_find_fieldpath_value("op", &it) != BSON_STRING) {
+        bson_iterator_from_buffer(&it, data);
         if ( bson_find_fieldpath_value("end", &it) != BSON_INT ) {
             bson_visit("There was no 'op' or 'end':", data);
             return;
