@@ -172,14 +172,14 @@ static void services_send(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     
-    int protocol_len = bson_iterator_bin_len(&it);
+    int protocol_len = bson_iterator_string_len(&it);
     
     if ( protocol_len > WISH_PROTOCOL_NAME_MAX_LEN ) {
         wish_rpc_server_error(req, 311, "Invalid peer. (protocol name length)");
         return;
     }
     
-    const uint8_t* protocol = bson_iterator_bin_data(&it);
+    const uint8_t* protocol = bson_iterator_string(&it);
     
     bson_iterator_from_buffer(&it, args);
 
@@ -2231,12 +2231,11 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH
 
     bson_iterator_from_buffer(&it, data);
 
-    if (bson_find_fieldpath_value("id", &it) != BSON_INT) {
-        WISHDEBUG(LOG_CRITICAL, "op %s has no id", op);
-        return;
-    }
+    int32_t id = 0;
     
-    int32_t id = bson_iterator_int(&it);
+    if (bson_find_fieldpath_value("id", &it) == BSON_INT) {
+        id = bson_iterator_int(&it);
+    }
 
     struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->app_api);
     if (list_elem == NULL) {
