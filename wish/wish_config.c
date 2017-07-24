@@ -8,7 +8,7 @@
 
 #include "utlist.h"
 
-#include "bson_visitor.h"
+#include "bson_visit.h"
 
 int wish_core_config_load(wish_core_t* core) {
     wish_file_t fd = wish_fs_open(WISH_CORE_CONFIG_DB_NAME);

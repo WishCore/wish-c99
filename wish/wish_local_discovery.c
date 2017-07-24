@@ -15,7 +15,7 @@
 #include "wish_local_discovery.h"
 #include "wish_debug.h"
 #include "bson.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 #include "wish_connection_mgr.h"
 #include "wish_identity.h"
 #include "wish_dispatcher.h"

@@ -13,7 +13,7 @@
 #include "wish_event.h"
 #include "wish_core_rpc_func.h"
 #include "wish_identity.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 #include "wish_service_registry.h"
 #include "wish_core_app_rpc_func.h"
 #include "core_service_ipc.h"

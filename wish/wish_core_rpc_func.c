@@ -11,7 +11,7 @@
 #include "wish_core_rpc_func.h"
 #include "wish_service_registry.h"
 #include "core_service_ipc.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 #include "wish_relationship.h"
 #include "wish_event.h"
 #include "wish_core_signals.h"

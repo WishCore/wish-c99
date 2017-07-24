@@ -12,8 +12,7 @@
 #include "wish_app.h"
 //#include "app_service_ipc.h"
 #include "core_service_ipc.h"
-#include "cbson.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 #include "wish_debug.h"
 #include "wish_dispatcher.h"
 #include "wish_port_config.h"
@@ -37,21 +36,15 @@ void send_app_to_core(uint8_t *wsid, uint8_t *data, size_t len) {
 
     /* Snatch the "wsid" field from login */
     if (login == false) {
-        int login_wsid_len = 0;
-        uint8_t *login_wsid = 0;
-        if (bson_get_binary(data, "wsid", &login_wsid, &login_wsid_len)
-                == BSON_SUCCESS) {
-            if (login_wsid_len == WISH_WSID_LEN) {
-                memcpy(wsid, login_wsid, WISH_WSID_LEN);
-            }
-            else {
-                WISHDEBUG(LOG_CRITICAL, "wsid len mismatch");
-            }
+        bson_iterator it;
+
+        if (bson_find_from_buffer(&it, data, "wsid") == BSON_BINDATA 
+                && bson_iterator_bin_len(&it) == WISH_WSID_LEN) 
+        {
+            memcpy(wsid, bson_iterator_bin_data(&it), WISH_WSID_LEN);
             login = true;
-        }
-        else {
-            WISHDEBUG(LOG_CRITICAL, "Could not snatch wsid from login");
-            return;
+        } else {
+            bson_visit("Bad login message!", data);
         }
     }
 

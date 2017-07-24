@@ -26,8 +26,7 @@
 //#include "wish_service_registry.h"
 
 #include "bson.h"
-#include "cbson.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 
 #include "wish_local_discovery.h"
 #include "wish_connection_mgr.h"
@@ -226,23 +225,17 @@ again:
             
             if (app_login_complete[i] == false) {
                 /* Snatch WSID */
-                uint8_t *wsid;
-                int32_t wsid_len;
-                if (bson_get_binary(payload, "wsid", &wsid, &wsid_len)
-                        == BSON_SUCCESS) {
-                    if (wsid_len == WISH_WSID_LEN) {
-                        //printf("Found wsid from login message!");
-                        memcpy(apps[i].wsid, wsid, WISH_WSID_LEN);
-                        app_login_complete[i] = true;
-                    }
-                    else {
-                        printf("Wsid len mismatch in login message!");
-                    }
-                }
-                else {
+
+                bson_iterator it;
+                
+                if (bson_find_from_buffer(&it, payload, "wsid") == BSON_BINDATA 
+                        && bson_iterator_bin_len(&it) == WISH_WSID_LEN) 
+                {
+                    memcpy(apps[i].wsid, bson_iterator_bin_data(&it), WISH_WSID_LEN);
+                    app_login_complete[i] = true;
+                } else {
                     bson_visit("Bad login message!", payload);
                 }
-
             }
 
             receive_app_to_core(core, apps[i].wsid, payload, expect_len);

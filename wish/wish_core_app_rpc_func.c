@@ -23,7 +23,7 @@
 #include "wish_dispatcher.h"
 #include "ed25519.h"
 #include "bson.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 #include "utlist.h"
 
 #include "mbedtls/sha256.h"

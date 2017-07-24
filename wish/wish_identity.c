@@ -8,7 +8,7 @@
 #include "mbedtls/sha256.h"
 #include "wish_debug.h"
 #include "wish_fs.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 #include "wish_port_config.h"
 #include "wish_connection_mgr.h"
 

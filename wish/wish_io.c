@@ -18,7 +18,7 @@
 #include "wish_acl.h"
 #include "ed25519.h"
 #include "bson.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 #include "wish_platform.h"
 #include "wish_dispatcher.h"
 #include <limits.h>

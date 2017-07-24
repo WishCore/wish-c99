@@ -7,7 +7,7 @@
 #include "wish_debug.h"
 #include "wish_io.h"
 #include "bson.h"
-#include "bson_visitor.h"
+#include "bson_visit.h"
 #include "wish_connection_mgr.h"
 #include "string.h"
 
