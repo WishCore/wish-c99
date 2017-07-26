@@ -106,6 +106,8 @@ static void services_send(rpc_server_req* req, const uint8_t* args) {
     //bson_visit("Handling services.send", args);
     
     wish_core_t* core = (wish_core_t*) req->server->context;
+    wish_app_entry_t* app = (wish_app_entry_t*) req->context;
+    uint8_t* wsid = app->wsid;    
 
     bson_iterator it;
     
@@ -216,7 +218,7 @@ static void services_send(rpc_server_req* req, const uint8_t* args) {
         bson_append_binary(&bs, "ruid", luid, WISH_ID_LEN);
         bson_append_binary(&bs, "rhid", rhid, WISH_WHID_LEN);
         /* rsid is */
-        bson_append_binary(&bs, "rsid", req->local_wsid, WISH_WSID_LEN);
+        bson_append_binary(&bs, "rsid", wsid, WISH_WSID_LEN);
         bson_append_string(&bs, "protocol", protocol);
         bson_append_finish_object(&bs);
         bson_append_binary(&bs, "data", payload, payload_len);
@@ -245,7 +247,7 @@ static void services_send(rpc_server_req* req, const uint8_t* args) {
     bson bs; 
     bson_init_buffer(&bs, args_buffer, args_buffer_len);
     bson_append_start_array(&bs, "args");
-    bson_append_binary(&bs, "0", req->local_wsid, WISH_WSID_LEN);
+    bson_append_binary(&bs, "0", wsid, WISH_WSID_LEN);
     bson_append_binary(&bs, "1", rsid, WISH_WSID_LEN);
     bson_append_string(&bs, "2", protocol);
     bson_append_binary(&bs, "3", payload, payload_len);
@@ -307,7 +309,6 @@ static void services_send(rpc_server_req* req, const uint8_t* args) {
         }
         else {
             /* Sending successful */
-        
             if(req->id != 0) {
                 // Client expecting response. Send ack to client
                 wish_rpc_server_send(req, NULL, 0);
@@ -447,37 +448,34 @@ static void identity_export(rpc_server_req* req, const uint8_t* args) {
 /**
  * Identity import RPC handler
  *
- * Request:
- * identity.import(Buffer<the identity document as binary>,
- * Buffer<contactForWuid>, 'binary')
- * RPC app to core 
- * { op: 'identity.import',
- *  args: [ 
- *   <buffer 342ef... (The identity BSON document in a binary *   buffer)>,
- *   <buffer 342ef67c822662174e67689b8b1f1ef761c8085129561372adeb9ccf6ec30c86>,
- *   'binary'
- *   ],
- *   id: 3 }
- *
- * The second argument is the "befriend with" argument
- *
- * Core to app Reply:
- * { ack: 3,
- *   data: { alias: 'Stina', uid: <Buffer 04735247b938c585df04d4fbaab68a1f766f00195839a36087eaa1299c491449> } 
- *   } 
- *
- *   The first arg is alias and second argument is the uid of the imported id
- *
+ *     { alias: String,
+ *       pubkey: Buffer(32)
  */
 static void identity_import(rpc_server_req* req, const uint8_t* args) {
     WISHDEBUG(LOG_DEBUG, "Core app RPC: identity_import");
 
+    
     bson b;
     bson_init_with_data(&b, args);
     
+    bson_iterator it;
+    
+    bson_find(&it, &b, "0");
+    
+    if ( bson_iterator_type(&it) != BSON_BINDATA) {
+        WISHDEBUG(LOG_CRITICAL, "Expected argument 1 to be Buffer");
+        wish_rpc_server_error(req, 76, "Expected argument 1 to be Buffer");
+        return;
+    }
+
+    bson_visit("import args:", bson_iterator_bin_data(&it));
+    
+    bson i;
+    bson_init_with_data(&i, bson_iterator_bin_data(&it));
+    
     wish_identity_t id;
     memset(&id, 0, sizeof (wish_identity_t));
-    if (wish_identity_from_bson(&id, &b)) {
+    if (wish_identity_from_bson(&id, &i)) {
         /* ...it failed somehow.. */
         WISHDEBUG(LOG_CRITICAL, "There was an error when populating the new id struct");
         wish_rpc_server_error(req, 76, "There was an error when populating the new id struct");
@@ -497,6 +495,7 @@ static void identity_import(rpc_server_req* req, const uint8_t* args) {
     int ret = wish_save_identity_entry(&id);
     
     if( ret != 0 ) {
+        WISHDEBUG(LOG_CRITICAL, "wish_save_identity_entry return other than success (0): %d", ret);
         wish_rpc_server_error(req, 201, "Too many identities.");
         return;
     }
@@ -578,7 +577,7 @@ static void identity_list(rpc_server_req* req, const uint8_t* args) {
     bson_destroy(&bs);
 }
 
-/*
+/**
  * identity.get
  *
  * App to core: { op: "identity.get", args: [ Buffer(32) uid ], id: 5 }
@@ -652,7 +651,7 @@ static void identity_get(rpc_server_req* req, const uint8_t* args) {
     bson_destroy(&bs);
 }
 
-/*
+/**
  * identity.create
  *
  * App to core: { op: "identity.create", args: [ "Moster Greta" ], id: 5 }
@@ -709,7 +708,8 @@ static void identity_create(rpc_server_req* req, const uint8_t* args) {
 
     wish_core_signals_emit_string(core, "identity");
 }
-/*
+
+/**
  * identity.remove
  *
  * App to core: { op: "identity.remove", args: [ <Buffer> uid ], id: 5 }
@@ -764,7 +764,7 @@ static void identity_remove(rpc_server_req* req, const uint8_t* args) {
     }
 }
 
-/*
+/**
  * identity.sign
  *
  * App to core: { op: "identity.sign", args: [ <Buffer> uid, <Buffer> hash ], id: 5 }
@@ -918,7 +918,7 @@ static void identity_sign(rpc_server_req* req, const uint8_t* args) {
     }
 }
 
-/*
+/**
  * identity.verify
  *
  * args: BSON(
@@ -1057,7 +1057,7 @@ static void identity_verify(rpc_server_req* req, const uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
-/*
+/**
  * identity.friendRequest
  *
  * args: [{ 
@@ -1199,7 +1199,7 @@ static void identity_friend_request(rpc_server_req* req, const uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
-/*
+/**
  * identity.friendRequestList
  *
  * App to core: { op: "identity.friendRequestList", args: [], id: 5 }
@@ -1241,7 +1241,7 @@ static void identity_friend_request_list(rpc_server_req* req, const uint8_t* arg
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-/*
+/**
  * identity.friendRequestAccept
  *
  * App to core: { op: "identity.friendRequestAccept", args: [ <Buffer> luid, <Buffer> ruid ], id: 5 }
@@ -1403,7 +1403,7 @@ static void identity_friend_request_accept(rpc_server_req* req, const uint8_t* a
     wish_platform_free(elt);
 }
 
-/*
+/**
  * identity.friendRequestDecline
  *
  * App to core: { op: "identity.friendRequestDecline", args: [ <Buffer> luid, <Buffer> ruid ], id: 5 }
@@ -1622,7 +1622,7 @@ static void connections_check_connections(rpc_server_req* req, const uint8_t* ar
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-/*
+/**
  * Wish Local Discovery
  *
  * App to core: { op: "wld.list", args: [ <Buffer> uid ], id: 5 }
@@ -1706,7 +1706,7 @@ static void wld_announce(rpc_server_req* req, const uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-/*
+/**
  * Wish Local Discovery
  *
  * App to core: { op: "wld.list", args: [ <Buffer> uid ], id: 5 }
@@ -1872,6 +1872,12 @@ static void host_config(rpc_server_req* req, const uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
+/**
+ * relay.list
+ * 
+ * @param req
+ * @param args
+ */
 static void relay_list(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
@@ -1911,6 +1917,12 @@ static void relay_list(rpc_server_req* req, const uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
+/**
+ * relay.add
+ * 
+ * @param req
+ * @param args
+ */
 static void relay_add(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
@@ -2110,20 +2122,26 @@ handler wld_friend_request_h =                        { .op_str = "wld.friendReq
 
 handler host_config_h =                               { .op_str = "host.config",                       .handler = host_config };
 
+static void wish_core_app_rpc_send(rpc_server_req* req, const bson* bs) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    wish_app_entry_t* app = (wish_app_entry_t*) req->context;
+    uint8_t* wsid = app->wsid;
+    
+    WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_send app name:", app->name);
+    
+    //bson_visit("wish_core_app_rpc_send:", bson_data(bs));
+    
+    send_core_to_app(core, wsid, bson_data(bs), bson_size(bs));
+}
+
 /**
  * Init the Core App RPC
  * 
  * @param core
  */
 void wish_core_app_rpc_init(wish_core_t* core) {
-    core->app_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
-    memset(core->app_api, 0, sizeof(wish_rpc_server_t));
-    core->app_api->request_list_head = NULL;
-    core->app_api->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*WISH_PORT_APP_RPC_POOL_SZ);
-    memset(core->app_api->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*WISH_PORT_APP_RPC_POOL_SZ);
-    core->app_api->rpc_ctx_pool_num_slots = WISH_PORT_APP_RPC_POOL_SZ;
-    strncpy(core->app_api->server_name, "core-from-app", 16);
-    core->app_api->context = core;
+    core->app_api = wish_rpc_server_init_size(core, wish_core_app_rpc_send, WISH_PORT_APP_RPC_POOL_SZ);
+    wish_rpc_server_set_name(core->app_api, "core-from-app");
     
     wish_rpc_server_register(core->app_api, &methods_h);
     wish_rpc_server_register(core->app_api, &signals_h);
@@ -2174,79 +2192,32 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     //wish_rpc_server_add_handler(core->core_app_rpc_server, "debug.disable", debug_disable);
 }
 
-static void wish_core_app_rpc_send(void *ctx, uint8_t *data, int len) {
-    rpc_server_req* req = (rpc_server_req*) ctx;
-
-    uint8_t* wsid = req->local_wsid;
-    wish_core_t* core = (wish_core_t*) req->server->context;
-    
-    //bson_visit("wish_core_app_rpc_send:", data);
-    
-    send_core_to_app(core, wsid, data, len);
-}
-
 void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH_ID_LEN], const uint8_t *data) {
     wish_app_entry_t* app = wish_service_get_entry(core, src_wsid);
 
-    int end = 0;
-    
-    bson_iterator it;
-    bson_iterator_from_buffer(&it, data);
-    
-    if (bson_find_fieldpath_value("op", &it) != BSON_STRING) {
-        bson_iterator_from_buffer(&it, data);
-        if ( bson_find_fieldpath_value("end", &it) != BSON_INT ) {
-            bson_visit("There was no 'op' or 'end':", data);
-            return;
-        } else {
-            WISHDEBUG(LOG_CRITICAL, "%s sent end signal for request %i", app->name, end);
-            wish_rpc_server_end(core->app_api, end);
-            return;
-        }
-    }
-    
-    const char* op = bson_iterator_string(&it);
-
     if (app==NULL) {
         // failed to find app, deny service
-        WISHDEBUG(LOG_CRITICAL, "DENY op %s from unknown app", op);
+        bson_visit("wish_core_app_rpc_handle_req: DENY from unknown service", data);
         return;
     }
     
-    //WISHDEBUG(LOG_CRITICAL, "op %s from app %s", op, app->service_name);
-
-    bson_iterator_from_buffer(&it, data);
-
-    const uint8_t* args = NULL;
+    bson bs;
+    bson_init_with_data(&bs, data);
     
-    if (bson_find_fieldpath_value("args", &it) != BSON_ARRAY) {
-        int empty_args_len = 32;
-        uint8_t empty_args[empty_args_len];
-        bson bs;
-        bson_init_buffer(&bs, empty_args, empty_args_len);
-        bson_append_start_array(&bs, "args");
-        bson_append_finish_array(&bs);
-    } else {
-        args = bson_iterator_value(&it);
-    }
-
-    bson_iterator_from_buffer(&it, data);
-
-    int32_t id = 0;
+    wish_rpc_server_receive(core->app_api, NULL, app, &bs);
     
-    if (bson_find_fieldpath_value("id", &it) == BSON_INT) {
-        id = bson_iterator_int(&it);
-    }
-
-    struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->app_api);
+    /*
+    struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(server);
+    
     if (list_elem == NULL) {
-        WISHDEBUG(LOG_CRITICAL, "Core app RPC: Could not save the rpc context. Failing in wish_core_app_rpc_func.");
+        WISHDEBUG(LOG_CRITICAL, "wish_rpc_server_receive: out of memory (%s)", server->name);
         
         rpc_server_req err_req;
-        err_req.server = core->app_api;
-        err_req.send = wish_core_app_rpc_send;
+        err_req.server = server;
+        //err_req.send = wish_core_app_rpc_send; // This was moved to server->send
         err_req.send_context = &err_req;
         err_req.id = id;
+        err_req.ctx = NULL;
         err_req.context = app;
         memcpy(err_req.local_wsid, src_wsid, WISH_WSID_LEN);
         
@@ -2254,20 +2225,23 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH
         return;
     } else {
         rpc_server_req* req = &(list_elem->request_ctx);
-        req->server = core->app_api;
-        req->send = wish_core_app_rpc_send;
+        req->server = server;
+        //req->send = wish_core_app_rpc_send; // This was moved to server->send
         req->send_context = req;
         memcpy(req->op_str, op, MAX_RPC_OP_LEN);
         req->id = id;
+        req->ctx = NULL;
         req->context = app;
         memcpy(req->local_wsid, src_wsid, WISH_WSID_LEN);
     
-        if (wish_rpc_server_handle(core->app_api, req, args)) {
+        if (wish_rpc_server_handle(server, req, args)) {
             WISHDEBUG(LOG_DEBUG, "RPC server fail: wish_core_app_rpc_func");
         }
-    }
+    }     
+    */
 }
 
+// Move implementation to wish-rpc-c99, just call it from here
 void wish_core_app_rpc_cleanup_requests(wish_core_t* core, struct wish_service_entry *service_entry_offline) {
     //WISHDEBUG(LOG_CRITICAL, "App rpc server clean up starting");
     struct wish_rpc_context_list_elem *list_elem = NULL;

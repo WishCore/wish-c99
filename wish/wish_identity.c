@@ -52,13 +52,21 @@ int wish_save_identity_entry(wish_identity_t *identity) {
     /* FIXME add the rest of the fields */
 
     int ret = wish_save_identity_entry_bson(bson_data(&bs));
-    if (ret <= 0) {
-        WISHDEBUG(LOG_CRITICAL, "Failed to save identity entry");
+    if (ret == 0) {
+        return -2;
+    } else {
+        return 0;
     }
-    return ret;
 }
 
-/* Save identity, expressed in BSON format, to the identity database */
+/**
+ * Save identity, expressed in BSON format, to the identity database 
+ * 
+ * Returns 0 on error, and bytes written on success
+ * 
+ * @param identity
+ * @return 
+ */
 int wish_save_identity_entry_bson(const uint8_t* identity) {
     wish_file_t fd;
     int32_t io_retval = 0;
@@ -611,8 +619,10 @@ int wish_identity_from_bson(wish_identity_t *id, const bson* bs) {
 
     /* FIXME copy transports */
 
-    if ( bson_find_fieldpath_value("transports.0", &it) != BSON_STRING ) {
-        return 1;
+    if ( bson_find_fieldpath_value("hosts.0.transports.0", &it) != BSON_STRING ) {
+        if ( bson_find_fieldpath_value("transports.0", &it) != BSON_STRING ) {
+            return 1;
+        }
     }
     
     strncpy(&(id->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);

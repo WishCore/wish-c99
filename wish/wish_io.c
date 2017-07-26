@@ -1111,13 +1111,15 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             bson_iterator it;
             
             /* Recover the Host id of the client */
-            if (bson_find_from_buffer(&it, plaintxt, "host") == BSON_BINDATA) {
+            if (bson_find_from_buffer(&it, plaintxt, "host") != BSON_BINDATA) {
                 WISHDEBUG(LOG_CRITICAL, "We could not get the host field from client handshake");
+                bson_visit("We could not get the host field from client handshake", plaintxt);
                 return;
             }
             
             if (bson_iterator_bin_len(&it) != WISH_WHID_LEN) {
                 WISHDEBUG(LOG_CRITICAL, "We could not get the host field from client handshake, invalid len");
+                bson_visit("We could not get the host field from client handshake, invalid len", plaintxt);
                 return;
             }
 

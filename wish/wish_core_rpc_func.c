@@ -184,7 +184,7 @@ void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, 
     
     bson_iterator_from_buffer(&it, payload);
     
-    if (bson_find_fieldpath_value("data.protocol", &it) == BSON_STRING) {
+    if (bson_find_fieldpath_value("data.protocol", &it) != BSON_STRING) {
         WISHDEBUG(LOG_CRITICAL, "No data.protocol in peers_callback!");
         return;
     }
@@ -193,7 +193,7 @@ void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, 
 
     bson_iterator_from_buffer(&it, payload);
     
-    if (bson_find_fieldpath_value("data.rsid", &it) == BSON_BINDATA) {
+    if (bson_find_fieldpath_value("data.rsid", &it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "No data.rsid in peers_callback!");
         return;
     }
@@ -202,7 +202,7 @@ void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, 
 
     bson_iterator_from_buffer(&it, payload);
     
-    if (bson_find_fieldpath_value("data.online", &it) == BSON_BOOL) {
+    if (bson_find_fieldpath_value("data.online", &it) != BSON_BOOL) {
         WISHDEBUG(LOG_CRITICAL, "No data.online in peers_callback!");
         return;
     }
@@ -372,7 +372,7 @@ static void core_directory(rpc_server_req* req, const uint8_t* args) {
  * @param args a BSON object, like this: [ 0: { data: <Buffer> cert, meta: <Buffer> transports, signatures: { } } ]
  */
 static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
-    wish_connection_t *connection = req->send_context;
+    wish_connection_t *connection = req->context;
     wish_core_t *core = req->server->context;
     
     /* Get the recepient identity of the friend request */
@@ -592,57 +592,36 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
 
 typedef struct wish_rpc_server_handler handler;
 
+handler core_peers_h =                                 { .op_str = "peers",                               .handler = peers_op_handler };
+handler core_send_h =                                  { .op_str = "send",                                .handler = send_op_handler };
 handler core_directory_h =                             { .op_str = "directory",                           .handler = core_directory };
 handler core_friend_req_h =                            { .op_str = "friendRequest",                       .handler = core_friend_req };
 
-void wish_core_init_rpc(wish_core_t* core) {
-    core->core_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
-    memset(core->core_api, 0, sizeof(wish_rpc_server_t));
+static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
+    wish_connection_t* connection = (wish_connection_t*) req->ctx;
     
-    core->core_api->request_list_head = NULL;
-    core->core_api->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
-    memset(core->core_api->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
-    core->core_api->rpc_ctx_pool_num_slots = 10;
+    if (connection == NULL) {
+        WISHDEBUG(LOG_CRITICAL, "wish_core_connection_send: The connection is null, bailing.");
+        return;
+    }
     
-    strncpy(core->core_api->server_name, "core-to-core", 13);
-    core->core_api->context = core;
+    wish_core_t* core = connection->core;
     
-    wish_rpc_server_add_handler(core->core_api, "peers", peers_op_handler);
-    wish_rpc_server_add_handler(core->core_api, "send", send_op_handler);
-    wish_rpc_server_register(core->core_api, &core_directory_h);
-    
-    /* Initialize core "friend request API" RPC server */
-    core->friend_req_api = wish_platform_malloc(sizeof(wish_rpc_server_t));
-    memset(core->friend_req_api, 0, sizeof(wish_rpc_server_t));
-  
-    core->friend_req_api->request_list_head = NULL;
-    
-    core->friend_req_api->rpc_ctx_pool = wish_platform_malloc(sizeof(struct wish_rpc_context_list_elem)*10);
-    memset(core->friend_req_api->rpc_ctx_pool, 0, sizeof(struct wish_rpc_context_list_elem)*10);
-    core->friend_req_api->rpc_ctx_pool_num_slots = 10;
-    
-    strncpy(core->friend_req_api->server_name, "c2c unsecure", 13);
-    core->friend_req_api->context = core;
-    
-    wish_rpc_server_register(core->friend_req_api, &core_friend_req_h);
-}
-
-void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
-    wish_connection_t* wish_ctx = ctx;
-    wish_core_t* core = wish_ctx->core;
+    const uint8_t* payload = bson_data(bs);
+    int payload_len = bson_size(bs);
 
     bson bp;
-    bson_init_buffer(&bp, payload, payload_len);
+    bson_init_with_data(&bp, payload);
     
     int buffer_len = payload_len + 128;
     uint8_t buffer[buffer_len];
     
-    bson bs;
-    bson_init_buffer(&bs, buffer, buffer_len);
-    bson_append_bson(&bs, "res", &bp);
-    bson_finish(&bs);
+    bson res;
+    bson_init_buffer(&res, buffer, buffer_len);
+    bson_append_bson(&res, "res", &bp);
+    bson_finish(&res);
     
-    if (bs.err) {
+    if (res.err) {
         WISHDEBUG(LOG_CRITICAL, "BSON write error, buffer in wish_core_connection_send");
         return;
     }
@@ -650,57 +629,40 @@ void wish_core_connection_send(void* ctx, uint8_t *payload, int payload_len) {
     //bson_visit("actual outgoing data:", (uint8_t*)bson_data(&bs));
     //WISHDEBUG(LOG_CRITICAL, "(end)");
 
-    wish_core_send_message(core, wish_ctx, (uint8_t*)bson_data(&bs), bson_size(&bs));
+    wish_core_send_message(core, connection, bson_data(&res), bson_size(&res));
+}
+
+void wish_core_init_rpc(wish_core_t* core) {
+    core->core_api = wish_rpc_server_init(core, wish_core_connection_send);
+    wish_rpc_server_set_name(core->core_api, "core-to-core");
+    wish_rpc_server_register(core->core_api, &core_peers_h);
+    wish_rpc_server_register(core->core_api, &core_send_h);
+    wish_rpc_server_register(core->core_api, &core_directory_h);
+    
+    /* Initialize core "friend request API" RPC server */
+    core->friend_req_api = wish_rpc_server_init(core, wish_core_connection_send);
+    wish_rpc_server_set_name(core->friend_req_api, "c2c insecure");
+    wish_rpc_server_register(core->friend_req_api, &core_friend_req_h);
 }
 
 /* Feed to core's RPC server. You should feed the document which is as the
  * element 'req' 
  */
 void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connection, const uint8_t *data, size_t len) {
-    bson_iterator it;
-
-    bson_iterator_from_buffer(&it, data);
     
-    if (bson_find_fieldpath_value("op", &it) != BSON_STRING) {
-        WISHDEBUG(LOG_CRITICAL, "wish_core_feed_to_rpc_server: no op");
-        return;
-    }
+    bson bs;
+    bson_init_with_data(&bs, data);
     
-    const char* op_str = bson_iterator_string(&it);
-    int op_str_len = bson_iterator_string_len(&it);
-    
-    bson_iterator_from_buffer(&it, data);
-    
-    if (bson_find_fieldpath_value("args", &it) != BSON_ARRAY) {
-        WISHDEBUG(LOG_CRITICAL, "wish_core_feed_to_rpc_server: no args");
-        return;
-    }
-    
-    const uint8_t *args = bson_iterator_value(&it);
-
-    bson_iterator_from_buffer(&it, data);
-    
-    if (bson_find_fieldpath_value("id", &it) != BSON_INT) {
-        WISHDEBUG(LOG_CRITICAL, "wish_core_feed_to_rpc_server: no id");
-        return;
-    }
-    
-    int32_t id = bson_iterator_int(&it);
-
-    struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(core->core_api);
-    if (list_elem == NULL) {
-        WISHDEBUG(LOG_CRITICAL, "Could not save the rpc context. Failing in wish_core_rpc_func.");
-        return;
+    if (connection->friend_req_connection) {
+        /* Friend request connection: Feed to the message to the special untrusted friend request RPC server */
+        wish_rpc_server_receive(core->friend_req_api, connection, NULL, &bs);
     } else {
-        rpc_server_req *req = &(list_elem->request_ctx);
-        if (connection->friend_req_connection) {
-            /* Friend request connection: Feed to the message to the special untrusted friend request RPC server */
-            req->server = core->friend_req_api;
-        } else {
-            /* Normal Wish connection: feed the message to the normal "core to core" RPC server */
-            req->server = core->core_api;
-        }
-        req->send = wish_core_connection_send;
+        /* Normal Wish connection: feed the message to the normal "core to core" RPC server */
+        wish_rpc_server_receive(core->core_api, connection, NULL, &bs);
+    }
+    
+    /*
+        //req->send = wish_core_connection_send; // this was moved to server->send
         req->send_context = connection;
         memset(req->op_str, 0, MAX_RPC_OP_LEN);
         strncpy(req->op_str, op_str, op_str_len);
@@ -710,7 +672,7 @@ void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connecti
         if (wish_rpc_server_handle(core->core_api, req, args)) {
             WISHDEBUG(LOG_CRITICAL, "RPC server fail: wish_core_rpc_func");
         }
-    }
+    */
 }
 
 /* Feed to core's RPC client response handler. 
