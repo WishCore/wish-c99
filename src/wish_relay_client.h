@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include "wish_ip_addr.h"
 #include "wish_time.h"
-
+#include "wish_utils.h"
 
 /* Define Relay server IP and port: */
 #define RELAY_SERVER_HOST "193.65.54.131:40000"

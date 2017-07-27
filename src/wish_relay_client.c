@@ -9,7 +9,6 @@
 
 #include "wish_relay_client.h"
 #include "wish_time.h"
-#include "wish_utils.h"
 
 #include "utlist.h"
 

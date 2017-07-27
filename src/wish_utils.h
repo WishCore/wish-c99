@@ -1,5 +1,4 @@
-#ifndef WISH_UTILS_H
-#define WISH_UTILS_H
+#pragma once
 
 #include <stdint.h>
 #include <stddef.h>
@@ -34,6 +33,4 @@ int wish_parse_transport_ip(const char *url, size_t url_len, wish_ip_addr_t *ip)
  * @return the duplicate string, or NULL if fail
  */
 char* my_strdup(char* str);
-
-#endif  // WISH_UTILS_H
 
