@@ -11,7 +11,7 @@ VERSION_STRING = $(shell git describe --abbrev=4 --dirty --always --tags)
 #endif
 
 # which modules (subdirectories) of the project to include in compiling
-MODULES		= wish deps/mbedtls-2.1.2/library deps/ed25519/src port port/unix ed25519/src deps/wish-rpc-c99/src deps/bson
+MODULES		= src deps/mbedtls-2.1.2/library deps/ed25519/src port port/unix ed25519/src deps/wish-rpc-c99/src deps/bson
 
 # Disabled Mist Apps in linux build
 # MODULES:       mist apps/mist-modbus apps/mist-example apps/mist-modbus/mbmaster apps/mist-modbus/mbmaster/rtu apps/mist-modbus/mbmaster/functions apps/mist-modbus/mbmaster/common apps/mist-modbus/mbmaster_port
