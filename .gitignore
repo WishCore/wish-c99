@@ -16,3 +16,8 @@
 
 # the binary output from Makefile.app
 /wish_app_standalone_c99
+
+# sphinx output
+/doc/html
+/doc/latex
+
