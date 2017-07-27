@@ -372,7 +372,7 @@ static void core_directory(rpc_server_req* req, const uint8_t* args) {
  * @param args a BSON object, like this: [ 0: { data: <Buffer> cert, meta: <Buffer> transports, signatures: { } } ]
  */
 static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
-    wish_connection_t *connection = req->context;
+    wish_connection_t *connection = req->ctx;
     wish_core_t *core = req->server->context;
     
     /* Get the recepient identity of the friend request */
