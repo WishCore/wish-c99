@@ -47,7 +47,7 @@ int wish_core_config_load(wish_core_t* core) {
     
     wish_fs_close(fd);
     
-    bson_visit("Configuration loaded this bson", (char*) bson_data(&bs));
+    //bson_visit("Configuration loaded this bson", bson_data(&bs));
     
     // read host id
     bson_iterator it;

@@ -117,8 +117,8 @@ static void peers_op_handler(rpc_server_req* req, const uint8_t *args) {
 
                 //bson_visit("sending peers response:", (uint8_t*)bson_data(&bs));
 
-                WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_op_handler: online", core->id[0], core->id[1]);
-                wish_core_send_message(core, connection, (char*)bson_data(&bs), bson_size(&bs));
+                //WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_op_handler: online", core->id[0], core->id[1]);
+                wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
             } else {
                 // no protocol, no peer
                 //WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_peer_update, no protocol no peer: %s", registry[i].name);

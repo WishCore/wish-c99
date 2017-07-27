@@ -136,7 +136,9 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
                 RELAY_SESSION_ID_LEN);
             /* Advance state */
             relay->curr_state = WISH_RELAY_CLIENT_WAIT;
-            WISHDEBUG(LOG_CRITICAL, "Relay provided by: %i.%i.%i.%i:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+            
+            //WISHDEBUG(LOG_CRITICAL, "Relay provided by: %i.%i.%i.%i:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+            
             /* This a convenient place to make a first connection check, because we know at this point that we have a working Internet connection */
             wish_connections_check(core); 
         }

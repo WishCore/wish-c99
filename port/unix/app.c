@@ -232,19 +232,19 @@ static void process_cmdline_opts(int argc, char** argv) {
     while ((opt = getopt(argc, argv, "hbilc:C:R:sp:ra:")) != -1) {
         switch (opt) {
         case 'b':
-            printf("Would start as advertizer\n");
+            //printf("Would start as advertizer\n");
             advertize_own_uid = true;
             break;
         case 'i':
-            printf("Skip connection acl (Core is Claimable)\n");
+            //printf("Skip connection acl (Core is Claimable)\n");
             skip_connection_acl = true;
             break;
         case 'l':
-            printf("Would start as ad listener\n");
+            //printf("Would start as ad listener\n");
             listen_to_adverts = true;
             break;
         case 'c':
-            printf("Would start as client to ip %s\n", optarg);
+            //printf("Would start as client to ip %s\n", optarg);
             if (inet_pton(AF_INET, optarg, &peer_addr) == 0) {
                 printf("Badly formmet IP addr\n");
                 exit(1);
@@ -257,27 +257,27 @@ static void process_cmdline_opts(int argc, char** argv) {
         case 'R':
             /* -R is to be used mainly with -c so that the remote ID can
              * be provided */ 
-            printf("Remote identity %s\n", optarg);
+            //printf("Remote identity %s\n", optarg);
             remote_id_alias = strdup(optarg);
             break;
         case 's':
-            printf("Would start as server\n");
+            //printf("Would start as server\n");
             as_server = true;
             break;
         case 'p':
             port = atoi(optarg);
             wish_set_host_port(core, port);
-            printf("Would use port %hu\n", port);
+            //printf("Would use port %hu\n", port);
             break;
         case 'r':
-            printf("Acting as relay client to relay server\n");
+            //printf("Acting as relay client to relay server\n");
             //inet_pton(AF_INET, optarg, &relay_server_addr);
             as_relay_client = true;
             break;
         case 'a':
 #ifdef WITH_APP_TCP_SERVER
             app_port = atoi(optarg);
-            printf("Starting the app port at %hu\n", app_port);
+            //printf("Starting the app port at %hu\n", app_port);
             as_app_server = true;
 #else // WITH_APP_TCP_SERVER
             printf("App tcp server not included in build!\n");
@@ -510,7 +510,7 @@ int main(int argc, char** argv) {
 
     /* Process command line options */
     if (argc >= 2) {
-        printf("Parsing command line options.\n");
+        //printf("Parsing command line options.\n");
         process_cmdline_opts(argc, argv);
     } else {
         printf("Using default parameters. Start with -h for options.\n");
@@ -739,19 +739,19 @@ int main(int argc, char** argv) {
                         /* Existing App connection has become readable */
                         size_t buffer_len = 100;
                         uint8_t buffer[buffer_len];
+                        
                         int read_len = read(app_fds[i], buffer, buffer_len);
+                        
                         if (read_len > 0) {
                             /* App data can be read */
                             app_connection_feed(core, i, buffer, read_len);
-                        }
-                        else if (read_len == 0) {
+                        } else if (read_len == 0) {
                             /* App has disconnected. Do clean-up */
                             //printf("App has disconnected\n");
                             app_connection_cleanup(core, i);
                             close(app_fds[i]);
-                        }
-                        else {
-                            perror("app connection read()");
+                        } else {
+                            //perror("app connection read()");
                             app_connection_cleanup(core, i);
                             close(app_fds[i]);
                         }

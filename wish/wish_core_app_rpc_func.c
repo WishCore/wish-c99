@@ -2127,8 +2127,7 @@ static void wish_core_app_rpc_send(rpc_server_req* req, const bson* bs) {
     wish_app_entry_t* app = (wish_app_entry_t*) req->context;
     uint8_t* wsid = app->wsid;
     
-    WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_send app name:", app->name);
-    
+    //WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_send app name: %s", app->name);
     //bson_visit("wish_core_app_rpc_send:", bson_data(bs));
     
     send_core_to_app(core, wsid, bson_data(bs), bson_size(bs));
