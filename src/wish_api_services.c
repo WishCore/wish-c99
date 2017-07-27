@@ -6,10 +6,6 @@
 #include "wish_debug.h"
 #include "string.h"
 
-/* FIXME each Wish connection must have its own RCP client, so this has to be moved to ctx */
-wish_rpc_client_t core2remote_rpc_client;
-
-
 /**
  * Request to send message to peer
  * 
@@ -148,7 +144,7 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     /* Destination is determined to be a remote service on a remote core. */
-    wish_connection_t *dst_ctx = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
+    wish_connection_t* connection = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
 
     /* Build the actual on-wire message:
      *
@@ -178,13 +174,13 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     size_t client_req_len = args_buffer_len + MAX_RPC_OP_LEN + 128;
     uint8_t client_req[client_req_len];
     
-    wish_rpc_client_bson(&core2remote_rpc_client, "send", (char*)bson_data(&bs), bson_size(&bs), NULL, client_req, client_req_len);
+    wish_rpc_client_bson(core->core_rpc_client, "send", (char*)bson_data(&bs), bson_size(&bs), NULL, client_req, client_req_len);
 
     //bson_visit("About to send this to the remote core (should be req: { op, args, id }):", client_req);
 
     
     //WISHDEBUG(LOG_CRITICAL, "Sending services.send");
-    if (dst_ctx != NULL && dst_ctx->context_state == WISH_CONTEXT_CONNECTED) {
+    if (connection != NULL && connection->context_state == WISH_CONTEXT_CONNECTED) {
         
         size_t req_len = client_req_len + 128;
         uint8_t req_buf[req_len];
@@ -215,7 +211,7 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
         //bson_visit("About to send this to the remote core (should be req: { op, args[, id] }):", req_buf);
         
         
-        int send_ret = wish_core_send_message(core, dst_ctx, bson_data(&b), bson_size(&b));
+        int send_ret = wish_core_send_message(core, connection, bson_data(&b), bson_size(&b));
         if (send_ret != 0) {
             /* Sending failed. Propagate RPC error */
             WISHDEBUG(LOG_CRITICAL, "Core app RPC: Sending not possible at this time");
@@ -235,7 +231,7 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
         }
     }
     else {
-        WISHDEBUG(LOG_CRITICAL, "Could not find a suitable wish context to send with");
+        WISHDEBUG(LOG_CRITICAL, "Could not find a suitable wish connection to send data.");
         //wish_debug_print_array(LOG_DEBUG, "should be luid:", luid, WISH_ID_LEN);
         //wish_debug_print_array(LOG_DEBUG, "should be ruid:", ruid, WISH_ID_LEN);
         //wish_debug_print_array(LOG_DEBUG, "should be rhid:", rhid, WISH_ID_LEN);

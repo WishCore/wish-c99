@@ -3,6 +3,7 @@
 /* Wish C - I/O functions for driving the Wish on-wire protocol */
 
 #include "rb.h"
+#include "wish_rpc.h"
 #include "wish_port_config.h"
 
 #define WISH_CORE_DECRYPT_FAIL 1
@@ -98,6 +99,7 @@ typedef struct wish_context {
      * network transport connection, for example */
     wish_core_t* core;
     wish_connection_id_t connection_id;
+    /** Connection state */
     enum wish_context_state context_state;
     /* Function used by wish core to send TCP data */
     int (*send)(void *, unsigned char*, int);
