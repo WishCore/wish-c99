@@ -18,7 +18,6 @@
 
 #include "utlist.h"
 
-
 void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service_entry, bool online) {
     int buffer_len = 300;
     uint8_t buffer[buffer_len];
@@ -52,6 +51,19 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
     }
 }
 
+/**
+ * Handle peers request
+ * 
+ * 
+ * 
+ *     data: {
+ *          rsid: Buffer(0x16 2e 9d 73 ...)
+ *          protocol: 'ucp'
+ *          online: true }
+ *   
+ * @param req
+ * @param args
+ */
 static void peers_op_handler(rpc_server_req* req, const uint8_t *args) {
     WISHDEBUG(LOG_DEBUG, "Handling peers request!");
     wish_core_t* core = (wish_core_t*) req->server->context;
@@ -59,34 +71,6 @@ static void peers_op_handler(rpc_server_req* req, const uint8_t *args) {
 
     int buffer_len = 300;
     uint8_t buffer[buffer_len];
-    
-    /* Get list of wish_apps (services) on this node */
-
-#if 0
-    /* For each identity: */
-    struct wish_service_entry *registry = wish_service_get_registry();
-    int i = 0;
-    for (i = 0; i < WISH_MAX_SERVICES; i++) {
-        if (wish_service_entry_is_valid(&(registry[i]))) {
-            const size_t data_doc_max_len = 50;
-            uint8_t data_doc[peer_data_doc_max_len];
-            WISHDEBUG(LOG_CRITICAL, "Adding service");
-            bson_init_doc(data_doc, data_doc_max_len);
-
-        }
-    }
-    
-    res: {
-        sig: 0
-        data: {
-            N: true
-            type: 'N'
-            data: {
-                rsid: Buffer(0x16 2e 9d 73 ...)
-                protocol: 'ucp'
-                online: true
-    
-#endif
 
     struct wish_service_entry *registry = wish_service_get_registry(core);
 
@@ -127,10 +111,11 @@ static void peers_op_handler(rpc_server_req* req, const uint8_t *args) {
     }
 }
 
-/** 
+/**
  * This function adds information (rsid and protocol) about a remote
  * service to the wish connection context, but checks first if it exists
- * in the list or not. */
+ * in the list or not. 
+ */
 static void wish_core_add_remote_service(wish_connection_t *ctx, const uint8_t rsid[WISH_WSID_LEN], const char *protocol) {
     struct wish_remote_service *tmp;
     /* Find out if we already know this peer */
@@ -166,7 +151,8 @@ static void wish_core_add_remote_service(wish_connection_t *ctx, const uint8_t r
  *         online: boolean
  *     }
  * 
- * client to a remote core */
+ * client to a remote core 
+ */
 void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, size_t payload_len) {
     wish_connection_t *connection = context;
     wish_core_t* core = req->client->context;
@@ -476,7 +462,6 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
 
     wish_core_signals_emit(core, &bs);
-
 }
 
 static void friend_req_callback(rpc_client_req* req, void* context, const uint8_t* payload, size_t payload_len) {
@@ -645,8 +630,8 @@ void wish_core_init_rpc(wish_core_t* core) {
     wish_rpc_server_register(core->friend_req_api, &core_friend_req_h);
 }
 
-/* Feed to core's RPC server. You should feed the document which is as the
- * element 'req' 
+/**
+ * Feed to core's RPC server. You should feed the document which is as the element 'req' 
  */
 void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connection, const uint8_t *data, size_t len) {
     
@@ -660,29 +645,15 @@ void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connecti
         /* Normal Wish connection: feed the message to the normal "core to core" RPC server */
         wish_rpc_server_receive(core->core_api, connection, NULL, &bs);
     }
-    
-    /*
-        //req->send = wish_core_connection_send; // this was moved to server->send
-        req->send_context = connection;
-        memset(req->op_str, 0, MAX_RPC_OP_LEN);
-        strncpy(req->op_str, op_str, op_str_len);
-        req->id = id;
-        req->ctx = connection;
-    
-        if (wish_rpc_server_handle(core->core_api, req, args)) {
-            WISHDEBUG(LOG_CRITICAL, "RPC server fail: wish_core_rpc_func");
-        }
-    */
 }
 
-/* Feed to core's RPC client response handler. 
+/**
+ * Feed to core's RPC client response handler. 
  * You should feed the document which is as the element 'res' 
  */
-
 void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t *ctx, const uint8_t *data, size_t len) {
     wish_rpc_client_handle_res(core->core_rpc_client, ctx, data, len);
 }
-
 
 void wish_core_send_peers_rpc_req(wish_core_t* core, wish_connection_t *ctx) {
     size_t buffer_max_len = 75;

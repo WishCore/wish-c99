@@ -28,8 +28,6 @@
 
 #include "mbedtls/sha256.h"
 
-//#include <netinet/in.h>
-#include <arpa/inet.h>
 #include "stdlib.h"
 
 #include "wish_debug.h"
@@ -2011,70 +2009,6 @@ static void relay_remove(rpc_server_req* req, const uint8_t* args) {
     wish_core_config_save(core);
 }
 
-/*
-static void debug_enable(struct wish_rpc_context* req, 
-                                uint8_t *args, wish_rpc_id_t req_id,
-                                uint8_t *buffer, size_t buffer_len) {
-    bool enable = true;
-    bson_iterator it;
-    bson_find_from_buffer(&it, args, "1");
-    if (bson_iterator_type(&it) == BSON_BOOL) {
-        if ( false == bson_iterator_bool(&it) ) {
-            enable = false;
-        }
-    }
-    bson_find_from_buffer(&it, args, "0");
-    
-    if (bson_iterator_type(&it) == BSON_INT) {
-
-        int stream = bson_iterator_int(&it);
-        
-        wish_debug_set_stream(stream, enable);
-        
-        bson bs;
-
-        bson_init_buffer(&bs, buffer, buffer_len);
-        bson_append_bool(&bs, "data", true);
-        bson_append_int(&bs, "ack", req_id);
-        bson_finish(&bs);
-
-        if(bs.err != 0) {
-            write_bson_error(req, req_id, 344, "Failed writing reponse.");
-        }
-    } else {
-        write_bson_error(req, req_id, 343, "Invalid argument. Int index.");
-    }
-}
-
-static void debug_disable(struct wish_rpc_context* req, 
-                                uint8_t *args, wish_rpc_id_t req_id,
-                                uint8_t *buffer, size_t buffer_len) {
-    bson_iterator it;
-    bson_find_from_buffer(&it, args, "0");
-    
-    if (bson_iterator_type(&it) == BSON_INT) {
-
-        int stream = bson_iterator_int(&it);
-        
-        wish_debug_set_stream(stream, false);
-        
-        bson bs;
-
-        bson_init_buffer(&bs, buffer, buffer_len);
-        bson_append_bool(&bs, "data", true);
-        bson_append_int(&bs, "ack", req_id);
-        bson_finish(&bs);
-
-        if(bs.err != 0) {
-            write_bson_error(req, req_id, 344, "Failed writing reponse.");
-        }
-    } else {
-        write_bson_error(req, req_id, 343, "Invalid argument. Int index.");
-    }
-}
-*/
-
-
 handler methods_h =                                   { .op_str = "methods",                           .handler = methods, .args = "(void): string" };
 handler signals_h =                                   { .op_str = "signals",                           .handler = wish_core_signals, .args = "(filter?: string): Signal" };
 handler version_h =                                   { .op_str = "version",                           .handler = version, .args = "(void): string", .doc = "Returns core version." };
@@ -2186,9 +2120,6 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     wish_rpc_server_register(core->app_api, &wld_friend_request_h);
     
     wish_rpc_server_register(core->app_api, &host_config_h);
-    
-    //wish_rpc_server_add_handler(core->core_app_rpc_server, "debug.enable", debug_enable);
-    //wish_rpc_server_add_handler(core->core_app_rpc_server, "debug.disable", debug_disable);
 }
 
 void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH_ID_LEN], const uint8_t *data) {
@@ -2204,40 +2135,6 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH
     bson_init_with_data(&bs, data);
     
     wish_rpc_server_receive(core->app_api, NULL, app, &bs);
-    
-    /*
-    struct wish_rpc_context_list_elem *list_elem = wish_rpc_server_get_free_rpc_ctx_elem(server);
-    
-    if (list_elem == NULL) {
-        WISHDEBUG(LOG_CRITICAL, "wish_rpc_server_receive: out of memory (%s)", server->name);
-        
-        rpc_server_req err_req;
-        err_req.server = server;
-        //err_req.send = wish_core_app_rpc_send; // This was moved to server->send
-        err_req.send_context = &err_req;
-        err_req.id = id;
-        err_req.ctx = NULL;
-        err_req.context = app;
-        memcpy(err_req.local_wsid, src_wsid, WISH_WSID_LEN);
-        
-        wish_rpc_server_error(&err_req, 63, "Core requests full for apps.");
-        return;
-    } else {
-        rpc_server_req* req = &(list_elem->request_ctx);
-        req->server = server;
-        //req->send = wish_core_app_rpc_send; // This was moved to server->send
-        req->send_context = req;
-        memcpy(req->op_str, op, MAX_RPC_OP_LEN);
-        req->id = id;
-        req->ctx = NULL;
-        req->context = app;
-        memcpy(req->local_wsid, src_wsid, WISH_WSID_LEN);
-    
-        if (wish_rpc_server_handle(server, req, args)) {
-            WISHDEBUG(LOG_DEBUG, "RPC server fail: wish_core_app_rpc_func");
-        }
-    }     
-    */
 }
 
 // Move implementation to wish-rpc-c99, just call it from here

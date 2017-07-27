@@ -1,0 +1,13 @@
+
+
+## Change peers_op_handler from
+
+    wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
+
+to using:
+
+    wish_rpc_server_emit(req, ...)
+
+Remove res: { data: {} }
+
+## 
