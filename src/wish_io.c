@@ -23,8 +23,8 @@
 #include "wish_dispatcher.h"
 #include <limits.h>
 #include "wish_event.h"
-#include "wish_core_rpc_func.h"
-#include "wish_core_app_rpc_func.h"
+#include "wish_core_rpc.h"
+#include "wish_core_app_rpc.h"
 #include "wish_connection_mgr.h"
 
 #include "utlist.h"

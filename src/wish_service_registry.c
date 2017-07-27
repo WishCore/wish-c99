@@ -8,8 +8,8 @@
 #include "wish_protocol.h"
 //#include "wish_acl.h"
 #include "wish_debug.h"
-#include "wish_core_rpc_func.h"
-#include "wish_core_app_rpc_func.h"
+#include "wish_core_rpc.h"
+#include "wish_core_app_rpc.h"
 
 struct wish_service_entry * wish_service_get_registry(wish_core_t* core) {
     return core->service_registry;

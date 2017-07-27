@@ -6,7 +6,7 @@
 #include "wish_debug.h"
 #include "wish_rpc.h"
 #include "wish_connection_mgr.h"
-#include "wish_core_rpc_func.h"
+#include "wish_core_rpc.h"
 #include "wish_identity.h"
 #include "wish_utils.h"
 

@@ -23,7 +23,7 @@
 #include "wish_core.h"
 #include "wish_local_discovery.h"
 #include "wish_connection_mgr.h"
-#include "wish_core_rpc_func.h"
+#include "wish_core_rpc.h"
 #include "wish_app.h"
 #include "wish_identity.h"
 #include "wish_time.h"

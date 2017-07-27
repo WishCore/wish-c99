@@ -11,11 +11,11 @@
 #include "wish_connection_mgr.h"
 #include "wish_platform.h"
 #include "wish_event.h"
-#include "wish_core_rpc_func.h"
+#include "wish_core_rpc.h"
 #include "wish_identity.h"
 #include "bson_visit.h"
 #include "wish_service_registry.h"
-#include "wish_core_app_rpc_func.h"
+#include "wish_core_app_rpc.h"
 #include "core_service_ipc.h"
 #include "wish_fs.h"
 

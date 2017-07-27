@@ -10,7 +10,7 @@
 #include "wish_event.h"
 #include "wish_core_signals.h"
 #include "wish_io.h"
-#include "wish_core_app_rpc_func.h"
+#include "wish_core_app_rpc.h"
 #include "wish_core.h"
 
 #include "wish_acl.h"

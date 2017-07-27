@@ -8,7 +8,7 @@
 #include "wish_rpc.h"
 #include "bson.h"
 #include "wish_io.h"
-#include "wish_core_rpc_func.h"
+#include "wish_core_rpc.h"
 #include "wish_service_registry.h"
 #include "core_service_ipc.h"
 #include "bson_visit.h"
