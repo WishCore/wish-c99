@@ -632,7 +632,8 @@ void wish_identity_add_meta_from_bson(wish_identity_t *id, const bson* meta) {
     bson_iterator it;
     
     bson_iterator_init(&it, meta);
-    /* FIXME copy transports */
+    
+    /* FIXME copy all transports, now copying only the first one listed */
 
     if ( bson_find_fieldpath_value("transports.0", &it) == BSON_STRING ) {
         WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
