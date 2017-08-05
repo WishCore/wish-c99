@@ -402,8 +402,8 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     bson_iterator meta_it;
     bson_iterator_from_buffer(&meta_it, meta);
     
-    if (bson_find_fieldpath_value("transports.0", &meta_it) == BSON_STRING) {
-        WISHDEBUG(LOG_CRITICAL, "Found transports array in meta field! %s", bson_iterator_string(&meta_it));
+    if (bson_find_fieldpath_value("transports.0", &meta_it) != BSON_STRING) {
+        WISHDEBUG(LOG_CRITICAL, "Friend request: no transports in meta field!");
     }
     
     /* Reset iterator */
@@ -433,6 +433,12 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     bson_init_with_data(&b, cert);
     
     wish_identity_from_bson(new_id, &b);
+    
+    bson meta_bson;
+    bson_init_with_data(&meta_bson, meta);
+    
+    wish_identity_add_meta_from_bson(new_id, &meta_bson);
+    //WISHDEBUG(LOG_CRITICAL, "Transports: %s", new_id->transports[0]);
 
     wish_relationship_req_add(core, &rel);
 
@@ -487,6 +493,22 @@ static void friend_req_callback(rpc_client_req* req, void* context, const uint8_
     bson_init_with_data(&b, cert_data);
     
     wish_identity_from_bson(&new_friend_id, &b);
+    
+    /* Get the meta part from data; reset iterator */
+    bson_iterator_from_buffer(&data_it, payload);
+    type = bson_find_fieldpath_value("data.meta", &data_it);
+    if ( type != BSON_BINDATA ) {
+        WISHDEBUG(LOG_CRITICAL, "Could not import friend metadata, data.meta not BSON_BINDATA, is type %i", type );
+        return;
+    }
+    
+    uint8_t *meta_data = (uint8_t *) bson_iterator_bin_data(&data_it);
+    bson_visit("Friend req callback, meta data: ", cert_data);
+    
+    /* Add the friend request metadata to the internal identity structure */
+    bson meta_bson;
+    bson_init_with_data(&meta_bson, meta_data);
+    wish_identity_add_meta_from_bson(&new_friend_id, &meta_bson);
     
     // Check if identity is already in db
 

@@ -40,6 +40,7 @@ int wish_save_identity_entry(wish_identity_t *identity) {
         bson_append_binary(&bs, "privkey", identity->privkey, WISH_PRIVKEY_LEN);
     }
 
+    //WISHDEBUG(LOG_CRITICAL, "transports[0] to save: %s", identity->transports[0]);
     /** \fixme For now, just encode a single transport */
     if (strnlen(&(identity->transports[0][0]), WISH_MAX_TRANSPORT_LEN) > 0) {
         bson_append_start_array(&bs, "transports");
@@ -48,7 +49,8 @@ int wish_save_identity_entry(wish_identity_t *identity) {
     }
     
     bson_finish(&bs);
-
+    //bson_visit("Identity BSON to be saved:", bson_data(&bs));'
+    
     /* FIXME add the rest of the fields */
 
     int ret = wish_save_identity_entry_bson(bson_data(&bs));
@@ -595,7 +597,7 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer) {
  * @return 0 for success
  */
 int wish_identity_from_bson(wish_identity_t *id, const bson* bs) {
-
+    //bson_visit("Populating identity from BSON:", bson_data(bs));
     if (id == NULL) {
         WISHDEBUG(LOG_CRITICAL, "new_id is null");
         return 1;
@@ -617,19 +619,29 @@ int wish_identity_from_bson(wish_identity_t *id, const bson* bs) {
     id->has_privkey = false;
     memset(id->privkey, 0, WISH_PRIVKEY_LEN);
 
-    /* FIXME copy transports */
-
-    if ( bson_find_fieldpath_value("hosts.0.transports.0", &it) != BSON_STRING ) {
-        if ( bson_find_fieldpath_value("transports.0", &it) != BSON_STRING ) {
-            return 1;
-        }
-    }
-    
-    strncpy(&(id->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+    /* Note: Transports are not part of the certificate, but are in the metadata instead. */
 
     /* FIXME update contacts */
 
     return 0;
+}
+
+void wish_identity_add_meta_from_bson(wish_identity_t *id, const bson* meta) {
+    //bson_visit("Adding metadata to identity from BSON:", bson_data(meta));
+    
+    bson_iterator it;
+    
+    bson_iterator_init(&it, meta);
+    /* FIXME copy transports */
+
+    if ( bson_find_fieldpath_value("transports.0", &it) == BSON_STRING ) {
+        WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
+        strncpy(&(id->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+        
+    }
+    else {
+        WISHDEBUG(LOG_CRITICAL, "transprots.0 not found");
+    }
 }
 
 /**

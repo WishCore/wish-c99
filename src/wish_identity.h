@@ -135,6 +135,15 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer);
 int wish_identity_from_bson(wish_identity_t *id, const bson* bs);
 
 /**
+ * Add metadata, such as transports, to a wish_identity_t structure.
+ * The metadata is expected have same structure as in a friend request "meta" element.
+ * 
+ * @param id the identity to add metadata to
+ * @param meta The BSON bin buffer containing the metadata
+ */
+void wish_identity_add_meta_from_bson(wish_identity_t *id, const bson* meta);
+
+/**
  * Remove an identity from the database 
  *
  * @param uid the uid of the identity to be removed
