@@ -424,7 +424,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     /* Copy the RPC request context to the relationship request */
     memcpy(&(rel.friend_rpc_req), req, sizeof (rpc_server_req));
     
-    strncpy(rel.luid, recepient_uid, WISH_UID_LEN);
+    memcpy(rel.luid, recepient_uid, WISH_UID_LEN);
 
     wish_identity_t* new_id = &rel.id;
     memset(new_id, 0, sizeof (wish_identity_t));
