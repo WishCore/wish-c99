@@ -458,7 +458,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     WISHDEBUG(LOG_CRITICAL, "Friend request from ruid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
 
     int buf_len = 1024;
-    char buf[1024];
+    char buf[buf_len];
 
     bson bs;
     bson_init_buffer(&bs, buf, buf_len);
