@@ -51,7 +51,7 @@ void bson_visit_inner(const uint8_t* data, uint8_t depth) {
                 WISHDEBUG(LOG_CRITICAL, "%s" AC_WHITE_STRING ": " ANSI_COLOR_GREEN "%d" ANSI_COLOR_RESET, indent, key, bson_iterator_int(&i));
                 break;
             case BSON_BOOL:
-                WISHDEBUG(LOG_CRITICAL, "%s" AC_WHITE_STRING ": " ANSI_COLOR_BLUE "%s" ANSI_COLOR_RESET, indent, key, bson_iterator_bool(&i) ? "false" : "true" );
+                WISHDEBUG(LOG_CRITICAL, "%s" AC_WHITE_STRING ": " ANSI_COLOR_BLUE "%s" ANSI_COLOR_RESET, indent, key, bson_iterator_bool(&i) ? "true" : "false" );
                 break;
             case BSON_OBJECT:
                 WISHDEBUG(LOG_CRITICAL, "%s" AC_WHITE_STRING ": {", indent, key);
