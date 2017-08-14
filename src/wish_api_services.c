@@ -174,9 +174,7 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     size_t client_req_len = args_buffer_len + MAX_RPC_OP_LEN + 128;
     uint8_t client_req[client_req_len];
     
-    wish_rpc_client_bson(core->core_rpc_client, "send", (char*)bson_data(&bs), bson_size(&bs), NULL, client_req, client_req_len);
-
-    //bson_visit("About to send this to the remote core (should be req: { op, args, id }):", client_req);
+    wish_rpc_client_bson(core->core_rpc_client, "send", bson_data(&bs), bson_size(&bs), NULL, client_req, client_req_len);
 
     
     //WISHDEBUG(LOG_CRITICAL, "Sending services.send");

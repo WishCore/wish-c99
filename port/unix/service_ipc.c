@@ -74,6 +74,11 @@ void receive_core_to_app(wish_app_t *app, uint8_t *data, size_t len) {
 
 void send_core_to_app(wish_core_t* core, const uint8_t wsid[WISH_ID_LEN], const uint8_t *data, size_t len) {
 #ifdef WITH_APP_TCP_SERVER
+    if (len == 0) {
+        WISHDEBUG(LOG_CRITICAL, "send_core_to_app with data length 0!");
+        return;
+    }
+    
     /* First test if we have an application which has contacted via the
      * TCP app port - if it is, send te data via the App TCP connection
      * and return */

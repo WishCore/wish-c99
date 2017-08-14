@@ -164,7 +164,7 @@ void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, 
      */
     /* FIXME should we be infact be supplying only "data" element to this the cb function?? */
 
-    bson_visit("peers_callback (refactored):", payload);
+    //bson_visit("peers_callback (refactored):", payload);
     
     bson_iterator it;
     
