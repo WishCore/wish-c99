@@ -342,6 +342,7 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     bson_append_finish_object(&bs);
     
     bson_append_binary(&bs, "data", payload, payload_len); 
+    bson_finish(&bs);
     
     send_core_to_app(core, lsid, bson_data(&bs), bson_size(&bs));
 }
