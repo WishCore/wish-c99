@@ -85,7 +85,7 @@ all: clean checkdirs $(TARGET)
 noclean:  checkdirs $(TARGET) 
 
 $(TARGET): $(OBJ)
-	gcc $(OBJ) $(LDFLAGS) $(LDLIBS) -o $(TARGET)
+	$(CC) $(OBJ) $(LDFLAGS) $(LDLIBS) -o $(TARGET)
 
 checkdirs: $(BUILD_DIR) 
 
