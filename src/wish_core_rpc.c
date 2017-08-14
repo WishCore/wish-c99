@@ -28,9 +28,9 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
             bson bs;
             bson_init_buffer(&bs, buffer, buffer_len);
             bson_append_start_object(&bs, "data");
-            bson_append_bool(&bs, "N", true);
-            bson_append_string(&bs, "type", "N");
-            bson_append_start_object(&bs, "data");
+            //bson_append_bool(&bs, "N", true);
+            //bson_append_string(&bs, "type", "N");
+            //bson_append_start_object(&bs, "data");
             bson_append_binary(&bs, "rsid", service_entry->wsid, WISH_WSID_LEN);
 
             /* FIXME protocols[0][0]??? It will only include first of
@@ -38,7 +38,7 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
             bson_append_string(&bs, "protocol", (char*) service_entry->protocols[0].name);
             bson_append_bool(&bs, "online", online);
             bson_append_finish_object(&bs);
-            bson_append_finish_object(&bs);
+            //bson_append_finish_object(&bs);
 
             bson_finish(&bs);
 
