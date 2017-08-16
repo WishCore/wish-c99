@@ -1,31 +1,15 @@
 Quick build instructions
 
-Build Linux mist_c99:
+Build using cmake:
 
-$ make -f Makefile.linux
+mkdir build
+cd build 
+cmake ..
+make
 
-After successfull build you have the "mist_c99" executable: 
+Build using make (deprecated):
 
-Usage:
-
-* Start Mist in "client mode" so that it tries to connect a remote wish 
-on localhost:37008:
-
-$ ./mist_c99 
-
-* Start Mist in "client mode" so that it listens to UDP port 9090 for
-Wish local discovery broadcasts:
-
-$ ./mist_c99 discover
-
-* Start mist in "server mode":
-
-$ ./mist_c99 server
-
-* Start Mist in "server mode", and send out UDP local discover
-advertizement
-
-$ ./mist_c99 server_advert
+$ make -f make-linux.mk
 
 
 
