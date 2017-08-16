@@ -94,8 +94,10 @@ void check_connection_liveliness(wish_core_t* core, void* ctx) {
                 WISHDEBUG(LOG_DEBUG, "Pinging connection %d", i);
  
                 /* Enqueue a ping message */
+                const size_t ping_buffer_sz = 128;
+                uint8_t ping_buffer[ping_buffer_sz];
                 bson ping;
-                bson_init(&ping);
+                bson_init_buffer(&ping, ping_buffer, ping_buffer_sz);
                 
                 bson_append_bool(&ping, "ping", true);
                 
