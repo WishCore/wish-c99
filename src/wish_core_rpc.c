@@ -269,11 +269,13 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("0", &it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get rsid");
+        wish_rpc_server_error(req, 41, "rsid not Buffer.");
         return;
     }
     
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: rsid not Buffer(32)");
+        wish_rpc_server_error(req, 41, "rsid not Buffer(32).");
         return;
     }
    
@@ -284,11 +286,13 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("1", &it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get lsid");
+        wish_rpc_server_error(req, 41, "lsid not Buffer.");
         return;
     }
     
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: lsid not Buffer(32)");
+        wish_rpc_server_error(req, 41, "lsid not Buffer(32).");
         return;
     }
    
@@ -300,6 +304,7 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("2", &it) != BSON_STRING) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get protocol");
+        wish_rpc_server_error(req, 41, "Protocol not string.");
         return;
     }
     
@@ -309,6 +314,7 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("3", &it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get payload");
+        wish_rpc_server_error(req, 41, "payload not Buffer.");
         return;
     }
     
@@ -328,15 +334,15 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     bson bs;
     bson_init_buffer(&bs, buf, buf_len);
 
-    wish_connection_t* ctx = req->ctx;
+    wish_connection_t* connection = req->ctx;
     
     bson_append_string(&bs, "type", "frame");
 
-    /* luid, ruid, rhid are obtained from the wish_context */
+    /* luid, ruid, rhid are obtained from the wish_connection */
     bson_append_start_object(&bs, "peer");
-    bson_append_binary(&bs, "luid", ctx->luid, WISH_ID_LEN);
-    bson_append_binary(&bs, "ruid", ctx->ruid, WISH_ID_LEN);
-    bson_append_binary(&bs, "rhid", ctx->rhid, WISH_WHID_LEN);
+    bson_append_binary(&bs, "luid", connection->luid, WISH_ID_LEN);
+    bson_append_binary(&bs, "ruid", connection->ruid, WISH_ID_LEN);
+    bson_append_binary(&bs, "rhid", connection->rhid, WISH_WHID_LEN);
     bson_append_binary(&bs, "rsid", rsid, WISH_WSID_LEN);
     bson_append_string(&bs, "protocol", protocol);
     bson_append_finish_object(&bs);
@@ -349,6 +355,8 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
 
 
 static void core_directory(rpc_server_req* req, const uint8_t* args) {
+    WISHDEBUG(LOG_CRITICAL, "CoreRPC: directory request (not implemented)");
+    bson_visit("CoreRPC: args:", args);
     wish_rpc_server_error(req, 500, "Not implemented.");
 }
 
@@ -640,8 +648,17 @@ static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
     wish_core_send_message(core, connection, bson_data(&res), bson_size(&res));
 }
 
+static void acl_check(rpc_server_req* req, const uint8_t* resource, const uint8_t* permission, void* ctx, rpc_acl_check_decision_cb decision) {
+    if ( strcmp(resource, "identity.list") == 0 && strcmp(permission, "call") == 0 ) {
+        decision(true);
+    } else {
+        decision(false);
+    }
+}
+
 void wish_core_init_rpc(wish_core_t* core) {
     core->core_api = wish_rpc_server_init(core, wish_core_connection_send);
+    wish_rpc_server_set_acl(core->core_api, acl_check);
     wish_rpc_server_set_name(core->core_api, "core-to-core");
     wish_rpc_server_register(core->core_api, &core_peers_h);
     wish_rpc_server_register(core->core_api, &core_send_h);

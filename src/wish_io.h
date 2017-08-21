@@ -199,9 +199,11 @@ int wish_core_decrypt(wish_core_t* core, wish_connection_t* ctx, uint8_t* cipher
 ciphertxt_len, uint8_t* auth_tag, size_t auth_tag_len, uint8_t* plaintxt,
 size_t plaintxt_len );
 
-/* Send a payload using the Wish connection. It will encrypt the
- * payload, and construct a frame with payload length, the encrypted
- * pyaload and auth_tag.
+/**
+ * Send a payload using the Wish connection.
+ * 
+ * Send data over wish connection. It will encrypt the payload, and construct a f
+ * rame with payload length, the encrypted payload and auth_tag.
  *
  * @return 0, if sending succeeded, non-zero if fail. This is directly
  * the return value of the platform-specific sending function
@@ -226,7 +228,10 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
  * to the id number given as argument */
 wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_connection_id_t connection_id);
 
-/** This function returns a pointer to the wish context which matches the
+/**
+ * Returns wish connection matching given luid, ruid, rhid or NULL
+ * 
+ * This function returns a pointer to the wish context which matches the
  * specified luid, ruid, rhid identities 
  *
  * Please note: The context returned here could a countext which is not
@@ -237,7 +242,7 @@ wish_connection_t* wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, con
 /* returns true if there is any connection form luid to ruid */
 bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t *ruid);
 
-/* 
+/**
  * This function will perform misc initting of various parts of the
  * system, mainly initting of RPC servers in the core 
  */
