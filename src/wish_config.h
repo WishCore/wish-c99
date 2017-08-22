@@ -12,6 +12,10 @@ int wish_core_config_load(wish_core_t* core);
 
 int wish_core_config_save(wish_core_t* core);
 
+int wish_core_config_store(wish_core_t* core, const char* key, int len, bson* document);
+
+bson* wish_core_config_find(wish_core_t* core, bson* query);
+
 #ifdef __cplusplus
 }
 #endif

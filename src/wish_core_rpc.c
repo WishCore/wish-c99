@@ -649,10 +649,22 @@ static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
 }
 
 static void acl_check(rpc_server_req* req, const uint8_t* resource, const uint8_t* permission, void* ctx, rpc_acl_check_decision_cb decision) {
-    if ( strcmp(resource, "identity.list") == 0 && strcmp(permission, "call") == 0 ) {
-        decision(true);
+    wish_connection_t* connection = req->ctx;
+    
+    WISHDEBUG(LOG_CRITICAL, "ACL Check: Remote command from %02x %02x %02x %02x.", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
+    
+    /*
+    if (remoteManagementAllowed(connection)) {
+        
+    }
+    */
+    
+    if ( strcmp(resource, "directory") == 0 && strcmp(permission, "call") == 0 ) {
+        decision(req, false);
+    } else if ( strcmp(resource, "peers") == 0 && strcmp(permission, "call") == 0 ) {
+        decision(req, true);
     } else {
-        decision(false);
+        decision(req, false);
     }
 }
 

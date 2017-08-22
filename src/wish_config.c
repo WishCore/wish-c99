@@ -10,6 +10,96 @@
 
 #include "bson_visit.h"
 
+#include "bson.h"
+#include "wish_debug.h"
+#include <stdint.h>
+#include <string.h>
+
+
+
+
+
+typedef struct {
+    bson *bsout;
+    //const void *bsdata2; //bsdata to merge with
+    int nstack; //nested object stack pos
+    //int matched; //number of matched merge fields
+} _BSONMERGE3CTX;
+
+static bson_visitor_cmd_t _bson_append_into_visitor(
+        const char *ipath, int ipathlen, 
+        const char *key, int keylen,
+        const bson_iterator *it, 
+        bool after, void *op) {
+            
+    _BSONMERGE3CTX *ctx = op;
+
+    bson_type bt = BSON_ITERATOR_TYPE(it);
+    
+    char tpath[128];
+    memcpy(tpath, ipath, ipathlen);
+    tpath[ipathlen] = 0;
+    
+    WISHDEBUG(LOG_CRITICAL, "path: %s %s %s", tpath, bson_type_string(bt), after ? "after" : "before");
+    
+    /*
+    if (bt == BSON_OBJECT || bt == BSON_ARRAY) {
+        if (!after) {
+            ctx->nstack++;
+            if (bt == BSON_OBJECT) {
+                bson_append_start_object2(ctx->bsout, key, keylen);
+            } else if (bt == BSON_ARRAY) {
+                bson_append_start_array2(ctx->bsout, key, keylen);
+            }
+            return BSON_VCMD_OK;
+        } else {
+            if (ctx->nstack > 0) {
+                //do we have something to add into end of nested object?
+                
+                //bson_append_fpath_from_iterator(mpath + i + 1, &it2, ctx->bsout);
+                
+                ctx->nstack--;
+                if (bt == BSON_OBJECT) {
+                    bson_append_finish_object(ctx->bsout);
+                } else if (bt == BSON_ARRAY) {
+                    bson_append_finish_array(ctx->bsout);
+                }
+            }
+            return BSON_VCMD_OK;
+        }
+    } else {
+        bson_append_field_from_iterator(it, ctx->bsout);
+        return BSON_VCMD_SKIP_AFTER;
+    }
+    */
+    return BSON_VCMD_OK;
+}
+
+/*
+ * This function traverses the bson_doc given as argument, and calls the
+ * visitor_func for every element encountered. Document and
+ * array elements be recursively handled in the same way. */
+static void bson_append_into_inner(const bson* bs, const char* path) {
+    bson_iterator i;
+    bson_iterator_init(&i, bs);
+
+    _BSONMERGE3CTX ctx = {
+        .bsout = NULL,
+        .nstack = 0
+    };
+    
+    bson_visit_fields(&i, 0, _bson_append_into_visitor, &ctx);
+}
+
+/*
+ * This function traverses the bson_doc given as argument, and calls the
+ * visitor_func for every element encountered. Document and
+ * array elements be recursively handled in the same way. */
+static void bson_append_into(const bson* from, bson* to, const char* path) {
+    bson_visit("bson_append_into:", bson_data(from));
+    bson_append_into_inner(from, path);
+}
+
 int wish_core_config_load(wish_core_t* core) {
     wish_file_t fd = wish_fs_open(WISH_CORE_CONFIG_DB_NAME);
     if (fd <= 0) {
@@ -82,68 +172,47 @@ int wish_core_config_load(wish_core_t* core) {
         }
     }
 
-    /* Load content from sandbox file */
-#if 0    
-    bson_iterator it;
-    bson_iterator sit;
-    bson_iterator soit;
-    bson_iterator pit;
-    bson_iterator poit;
+    bson bi;
+    bson_init_size(&bi, 512);
+    bson_append_start_object(&bi, "acl");
+    bson_append_start_object(&bi, "roles");
+    bson_append_start_array(&bi, "root");
+    bson_append_string(&bi, "0", "uid1");
+    bson_append_finish_array(&bi);
+    bson_append_start_array(&bi, "user");
+    bson_append_string(&bi, "0", "uid1");
+    bson_append_string(&bi, "1", "uid2");
+    bson_append_finish_array(&bi);
+    bson_append_finish_object(&bi);
+
+    bson_append_start_object(&bi, "permissions");
+    bson_append_start_object(&bi, "root");
+    bson_append_start_array(&bi, "remote_identity_list");
+    bson_append_string(&bi, "0", "call");
+    bson_append_finish_array(&bi);
+    bson_append_start_array(&bi, "remote_identity_remove");
+    bson_append_string(&bi, "0", "call");
+    bson_append_finish_array(&bi);
+    bson_append_finish_object(&bi);
+    bson_append_start_object(&bi, "user");
+    bson_append_start_array(&bi, "remote_identity_list");
+    bson_append_string(&bi, "0", "call");
+    bson_append_finish_array(&bi);
+    bson_append_finish_object(&bi);
+    bson_append_finish_object(&bi);
     
-    if ( bson_find(&it, &bs, "data") != BSON_ARRAY ) {
-        // that didn't work
-        WISHDEBUG(LOG_CRITICAL, "That didn't work d. %i", bson_find(&sit, &bs, "data"));
-        return -4;
-    }
+    bson_append_finish_object(&bi);
+    bson_finish(&bi);
     
-    // sandbox index
-    int si = 0;
-    char sindex[21];
+    bson bo;
+    bson_init_size(&bo, 512);
     
-    while (true) {
-        BSON_NUMSTR(sindex, si++);
-        
-        bson_iterator_subiterator(&it, &sit);
-        if ( bson_find_fieldpath_value(sindex, &sit) != BSON_OBJECT ) {
-            // that didn't work
-            //WISHDEBUG(LOG_CRITICAL, "Not an object at index %s looking for sandboxes.", sindex);
-            return -5;
-        }
-        
-        bson_iterator_subiterator(&sit, &soit);
-
-        if ( bson_find_fieldpath_value("name", &soit) != BSON_STRING ) {
-            // that didn't work
-            WISHDEBUG(LOG_CRITICAL, "That didn't work b.");
-            return -6;
-        }
-
-        const char* name = bson_iterator_string(&soit);
-
-        //WISHDEBUG(LOG_CRITICAL, "A sandbox name: %s", name);
-
-        bson_iterator_subiterator(&sit, &soit);
-
-        if ( bson_find_fieldpath_value("id", &soit) != BSON_BINDATA || bson_iterator_bin_len(&soit) != WISH_UID_LEN ) {
-            // that didn't work
-            WISHDEBUG(LOG_CRITICAL, "That didn't work c.");
-            return -7;
-        }
-
-        const char* id = bson_iterator_bin_data(&soit);
-
-        //WISHDEBUG(LOG_CRITICAL, "A sandbox id: %02x %02x %02x %02x", id[0], id[1], id[2], id[3]);
-
-        bson_iterator_subiterator(&sit, &soit);
-
-        if ( bson_find_fieldpath_value("peers", &soit) != BSON_ARRAY ) {
-            // that didn't work
-            WISHDEBUG(LOG_CRITICAL, "That didn't work d.");
-            return -8;
-        }
-    }
-#endif
+    bson_append_into(&bi, &bo, "acl");
+    
+    bson_finish(&bo);
+    
     bson_destroy(&bs);
+    
     return 0;
 }
 
