@@ -10,7 +10,12 @@
  * array elements be recursively handled in the same way. */
 void bson_visit(const char* title, const uint8_t* data) {
     uint8_t depth = 0;
-    WISHDEBUG(LOG_CRITICAL, "%s", title);
+    
+    bson b;
+    bson_init_with_data(&b, data);
+    int size = bson_size(&b);
+    
+    WISHDEBUG(LOG_CRITICAL, "%s (%i bytes)", title, size);
     bson_visit_inner(data, depth);
 }
 

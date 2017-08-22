@@ -14,6 +14,7 @@
 #include "wish_debug.h"
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 
 
@@ -21,6 +22,8 @@
 
 typedef struct {
     bson *bsout;
+    const char* lastkey;
+    int lastindex;
     //const void *bsdata2; //bsdata to merge with
     int nstack; //nested object stack pos
     //int matched; //number of matched merge fields
@@ -40,9 +43,23 @@ static bson_visitor_cmd_t _bson_append_into_visitor(
     memcpy(tpath, ipath, ipathlen);
     tpath[ipathlen] = 0;
     
-    WISHDEBUG(LOG_CRITICAL, "path: %s %s %s", tpath, bson_type_string(bt), after ? "after" : "before");
+    char tkey[128];
+    memcpy(tkey, key, keylen);
+    tkey[keylen] = 0;
     
-    /*
+    WISHDEBUG(LOG_CRITICAL, "path: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+    
+    if (after && strcmp(tpath, "acl.roles.user") == 0) {
+        WISHDEBUG(LOG_CRITICAL, "appending here: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+        if (bt == BSON_ARRAY) {
+            char index[22];
+            BSON_NUMSTR(index, ctx->lastindex+1);
+            bson_append_string(ctx->bsout, index, "yes");
+        } else {
+            bson_append_string(ctx->bsout, "test", "yes");
+        }
+    }
+    
     if (bt == BSON_OBJECT || bt == BSON_ARRAY) {
         if (!after) {
             ctx->nstack++;
@@ -69,9 +86,12 @@ static bson_visitor_cmd_t _bson_append_into_visitor(
         }
     } else {
         bson_append_field_from_iterator(it, ctx->bsout);
+        ctx->lastkey = BSON_ITERATOR_KEY(it);
+        char* endptr;
+        ctx->lastindex = strtoimax(ctx->lastkey, &endptr,10);
         return BSON_VCMD_SKIP_AFTER;
     }
-    */
+
     return BSON_VCMD_OK;
 }
 
@@ -79,12 +99,14 @@ static bson_visitor_cmd_t _bson_append_into_visitor(
  * This function traverses the bson_doc given as argument, and calls the
  * visitor_func for every element encountered. Document and
  * array elements be recursively handled in the same way. */
-static void bson_append_into_inner(const bson* bs, const char* path) {
+static void bson_append_into_inner(const bson* from, bson* to, const char* path) {
     bson_iterator i;
-    bson_iterator_init(&i, bs);
-
+    bson_iterator_init(&i, from);
+    
     _BSONMERGE3CTX ctx = {
-        .bsout = NULL,
+        .bsout = to,
+        .lastkey = NULL,
+        .lastindex = 0,
         .nstack = 0
     };
     
@@ -97,7 +119,7 @@ static void bson_append_into_inner(const bson* bs, const char* path) {
  * array elements be recursively handled in the same way. */
 static void bson_append_into(const bson* from, bson* to, const char* path) {
     bson_visit("bson_append_into:", bson_data(from));
-    bson_append_into_inner(from, path);
+    bson_append_into_inner(from, to, path);
 }
 
 int wish_core_config_load(wish_core_t* core) {
@@ -203,15 +225,16 @@ int wish_core_config_load(wish_core_t* core) {
     
     bson_append_finish_object(&bi);
     bson_finish(&bi);
-    
+
     bson bo;
     bson_init_size(&bo, 512);
-    
     bson_append_into(&bi, &bo, "acl");
-    
     bson_finish(&bo);
     
+    bson_visit("After append:", bson_data(&bo));
+    
     bson_destroy(&bs);
+    bson_destroy(&bo);
     
     return 0;
 }
