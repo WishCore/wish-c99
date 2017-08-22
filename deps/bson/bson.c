@@ -3063,3 +3063,26 @@ int bson_validate(bson *bs, bool checkdots, bool checkdollar) {
     bson_visit_fields(&it, BSON_TRAVERSE_ARRAYS_EXCLUDED, _bson_validate_visitor, &ctx);
     return bs->err ? BSON_ERROR : BSON_OK;
 }
+
+const char* bson_type_string(bson_type type) {
+    switch(type) {
+        case BSON_EOO:
+            return "BSON_EOO";
+        case BSON_STRING:
+            return "BSON_STRING";
+        case BSON_BINDATA:
+            return "BSON_BINDATA";
+        case BSON_BOOL:
+            return "BSON_BOOL";
+        case BSON_INT:
+            return "BSON_INT";
+        case BSON_DOUBLE:
+            return "BSON_DOUBLE";
+        case BSON_OBJECT:
+            return "BSON_OBJECT";
+        case BSON_ARRAY:
+            return "BSON_ARRAY";
+        default:
+            return "BSON_Unknown";
+    }
+}

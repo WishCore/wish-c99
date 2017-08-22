@@ -1378,6 +1378,13 @@ bson* json2bson(const char *jsonstr);
  */
 int bson_validate(bson *bs, bool checkdots, bool checkdollar);
 
+/**
+ * @brief Return string representation of bson type
+ * 
+ * @param type
+ * @return 
+ */
+const char* bson_type_string(bson_type type);
 
 //EJDB_EXTERN_C_END
 #endif
