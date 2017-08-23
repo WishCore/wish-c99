@@ -1386,5 +1386,13 @@ int bson_validate(bson *bs, bool checkdots, bool checkdollar);
  */
 const char* bson_type_string(bson_type type);
 
+/* The following functions were not part of the original code extracted from EJDB */
+
+void bson_insert_string(bson* bs, const char* path, const char* string);
+
+void bson_remove_string(bson* bs, const char* path, const char* string);
+
+void bson_remove_path(bson* bs, const char* path);
+
 //EJDB_EXTERN_C_END
 #endif

@@ -1,5 +1,4 @@
-#ifndef WISH_PLATFORM_H
-#define WISH_PLATFORM_H
+#pragma once
 
 /* Porting layer functions */
 
@@ -52,4 +51,3 @@ void wish_platform_set_vprintf(int (*fn)(const char* format, va_list args));
 
 int wish_platform_printf(const char* format, ...);
 
-#endif

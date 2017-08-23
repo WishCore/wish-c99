@@ -3,6 +3,7 @@
 #include "wish_platform.h"
 #include <stdarg.h>
 #include "stdbool.h"
+#include "stdint.h"
 
 #include "wish_port_config.h"
 

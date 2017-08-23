@@ -96,8 +96,13 @@ const char* bson_first_errormsg(bson *b) {
         return "A key or a string is not valid UTF-8";
     } else if (b->err & BSON_NOT_FINISHED) {
         return "BSON not finished";
+    } else if (b->err & BSON_SIZE_OVERFLOW) {
+        return "BSON size overflow";
+    } else if (b->err) {
+        return "Unspecified BSON error";
+    } else {
+        return "BSON no error";
     }
-    return "Unspecified BSON error";
 }
 
 void bson_reset(bson *b) {
@@ -3064,6 +3069,8 @@ int bson_validate(bson *bs, bool checkdots, bool checkdollar) {
     return bs->err ? BSON_ERROR : BSON_OK;
 }
 
+/* The following functions were not part of the original code extracted from EJDB */
+
 const char* bson_type_string(bson_type type) {
     switch(type) {
         case BSON_EOO:
@@ -3085,4 +3092,262 @@ const char* bson_type_string(bson_type type) {
         default:
             return "BSON_Unknown";
     }
+}
+
+typedef struct {
+    bson *bsout;
+    const char* path;
+    const char* data;
+    bson_type type;
+    bson_type parentType;
+    const char* lastkey;
+    int lastindex;
+    //const void *bsdata2; //bsdata to merge with
+    int nstack; //nested object stack pos
+    //int matched; //number of matched merge fields
+} _BSONMERGE3CTX;
+
+static bson_visitor_cmd_t _bson_append_into_visitor(
+        const char *ipath, int ipathlen, 
+        const char *key, int keylen,
+        const bson_iterator *it, 
+        bool after, void *op) 
+{
+    _BSONMERGE3CTX *ctx = op;
+
+    bson_type bt = BSON_ITERATOR_TYPE(it);
+    
+    char tpath[128];
+    memcpy(tpath, ipath, ipathlen);
+    tpath[ipathlen] = 0;
+    
+    char tkey[128];
+    memcpy(tkey, key, keylen);
+    tkey[keylen] = 0;
+    
+    //WISHDEBUG(LOG_CRITICAL, "path: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+    
+    if (after && strcmp(tpath, ctx->path) == 0) {
+        //WISHDEBUG(LOG_CRITICAL, "appending here: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+        if (bt == BSON_ARRAY) {
+            char index[22];
+            BSON_NUMSTR(index, ctx->lastindex+1);
+            bson_append_string(ctx->bsout, index, ctx->data);
+        } else {
+            bson_append_string(ctx->bsout, "test", ctx->data);
+        }
+    }
+    
+    if (bt == BSON_OBJECT || bt == BSON_ARRAY) {
+        if (!after) {
+            ctx->nstack++;
+            if (bt == BSON_OBJECT) {
+                bson_append_start_object2(ctx->bsout, key, keylen);
+            } else if (bt == BSON_ARRAY) {
+                bson_append_start_array2(ctx->bsout, key, keylen);
+            }
+            return BSON_VCMD_OK;
+        } else {
+            if (ctx->nstack > 0) {
+                //do we have something to add into end of nested object?
+                ctx->nstack--;
+                if (bt == BSON_OBJECT) {
+                    bson_append_finish_object(ctx->bsout);
+                } else if (bt == BSON_ARRAY) {
+                    bson_append_finish_array(ctx->bsout);
+                }
+            }
+            return BSON_VCMD_OK;
+        }
+    } else {
+        bson_append_field_from_iterator(it, ctx->bsout);
+        ctx->lastkey = BSON_ITERATOR_KEY(it);
+        char* endptr;
+        ctx->lastindex = strtoimax(ctx->lastkey, &endptr,10);
+        return BSON_VCMD_SKIP_AFTER;
+    }
+
+    return BSON_VCMD_OK;
+}
+
+static bson_visitor_cmd_t _bson_remove_visitor(
+        const char *ipath, int ipathlen, 
+        const char *key, int keylen,
+        const bson_iterator *it, 
+        bool after, void *op) 
+{
+    _BSONMERGE3CTX *ctx = op;
+
+    bson_type bt = BSON_ITERATOR_TYPE(it);
+    
+    char tpath[128];
+    memcpy(tpath, ipath, ipathlen);
+    tpath[ipathlen] = 0;
+    
+    char tkey[128];
+    memcpy(tkey, key, keylen);
+    tkey[keylen] = 0;
+
+    if (!ctx->data) {
+        //WISHDEBUG(LOG_CRITICAL, "remove iterator: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+    }
+    
+    if (!ctx->data && !after && strcmp(tpath, ctx->path) == 0) {
+        //WISHDEBUG(LOG_CRITICAL, "removing this path: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+        return BSON_VCMD_SKIP_NESTED | BSON_VCMD_SKIP_AFTER;
+    }
+
+    
+    if (bt == BSON_OBJECT || bt == BSON_ARRAY) {
+        if (!after) {
+            ctx->nstack++;
+            if (bt == BSON_OBJECT) {
+                bson_append_start_object2(ctx->bsout, key, keylen);
+            } else if (bt == BSON_ARRAY) {
+                bson_append_start_array2(ctx->bsout, key, keylen);
+            }
+            return BSON_VCMD_OK;
+        } else {
+            if (ctx->nstack > 0) {
+                ctx->nstack--;
+                if (bt == BSON_OBJECT) {
+                    bson_append_finish_object(ctx->bsout);
+                } else if (bt == BSON_ARRAY) {
+                    bson_append_finish_array(ctx->bsout);
+                }
+            }
+            return BSON_VCMD_OK;
+        }
+    } else {
+        if (ctx->data && bt == BSON_STRING && strcmp(bson_iterator_string(it), ctx->data) == 0) {
+            // Found match: Do not copy this one
+        } else {
+            bson_append_field_from_iterator(it, ctx->bsout);
+        }
+        return BSON_VCMD_SKIP_AFTER;
+    }
+
+    return BSON_VCMD_OK;
+}
+
+static void bson_append_into_inner(const bson* from, bson* to, const char* path, const char* string) {
+    bson_iterator i;
+    bson_iterator_init(&i, from);
+    
+    _BSONMERGE3CTX ctx = {
+        .bsout = to,
+        .path = path,
+        .data = string,
+        .type = string ? BSON_STRING : BSON_EOO,
+        .lastkey = NULL,
+        .lastindex = 0,
+        .nstack = 0
+    };
+    
+    bson_visit_fields(&i, 0, _bson_append_into_visitor, &ctx);
+}
+
+static void bson_remove_inner(const bson* from, bson* to, const char* path, const char* string) {
+    bson_iterator i;
+    bson_iterator_init(&i, from);
+    
+    _BSONMERGE3CTX ctx = {
+        .bsout = to,
+        .path = path,
+        .data = string,
+        .type = BSON_STRING,
+        .lastkey = NULL,
+        .lastindex = 0,
+        .nstack = 0
+    };
+    
+    bson_visit_fields(&i, 0, _bson_remove_visitor, &ctx);
+}
+
+/**
+ * Copy bson object with complate state
+ * 
+ * Copies complete data, state and errors to output object
+ * 
+ * @param out
+ * @param in
+ * @return 
+ */
+static int bson_copy_with_state(bson* out, const bson* in) {
+    if (!out || !in) {
+        return BSON_ERROR;
+    }
+
+    if (bson_size(in) > out->dataSize) {
+        //WISHDEBUG(LOG_CRITICAL, "bson_insert_string could not copy data to original bson. Buffer too small.");
+        out->err = BSON_SIZE_OVERFLOW;
+        return;
+    }
+
+    // copy bson data
+    memcpy(out->data, in->data, bson_size(in));
+    bson_init_finished_data(out, out->data);
+    
+    // save the original buffer
+    char* data = out->data;
+    int dataSize = out->dataSize;
+    
+    // copy state
+    memcpy(out, in, sizeof(bson));
+    
+    // restore buffer and buffer size
+    out->data = data;
+    out->dataSize = dataSize;
+}
+
+void bson_insert_string(bson* bs, const char* path, const char* string) {
+    //bson_visit("bson_append_into:", bson_data(bs));
+
+    bson tmp;
+    bson_init_size(&tmp, 512);
+    
+    // Do the inserting
+    bson_append_into_inner(bs, &tmp, path, string);
+    
+    bson_finish(&tmp);
+
+    bson_copy_with_state(bs, &tmp);
+
+    //bson_visit("bson_append_into tmp copy when done:", bson_data(&tmp));
+    
+    bson_destroy(&tmp);
+}
+
+void bson_remove_string(bson* bs, const char* path, const char* string) {
+    //bson_visit("bson_append_into:", bson_data(bs));
+
+    bson tmp;
+    bson_init_size(&tmp, 512);
+    
+    // Do the inserting
+    bson_remove_inner(bs, &tmp, path, string);
+    
+    bson_finish(&tmp);
+
+    bson_copy_with_state(bs, &tmp);
+
+    //bson_visit("bson_append_into tmp copy when done:", bson_data(&tmp));
+    
+    bson_destroy(&tmp);
+}
+
+void bson_remove_path(bson* bs, const char* path) {
+    //bson_visit("bson_append_into:", bson_data(bs));
+
+    bson tmp;
+    bson_init_size(&tmp, 512);
+    
+    // Do the inserting
+    bson_remove_inner(bs, &tmp, path, NULL);
+    
+    bson_finish(&tmp);
+
+    bson_copy_with_state(bs, &tmp);
+
+    bson_destroy(&tmp);
 }
