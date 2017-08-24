@@ -907,7 +907,7 @@ var certificate = {
 };
 */
 
-return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffer) {
+return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char* signed_meta, bin *buffer) {
     int id_export_len = 1024;
     uint8_t id_export[id_export_len];
     bson bs;
@@ -915,11 +915,23 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffe
     bson_append_string(&bs, "alias", id->alias);
     bson_append_binary(&bs, "uid", id->uid, WISH_UID_LEN);
     bson_append_binary(&bs, "pubkey", id->pubkey, WISH_PUBKEY_LEN);
+    
+    // If we have some signed meta requested (used in friend requests with extra data)
+    if (signed_meta) {
+        bson bm;
+        bson_init_with_data(&bm, signed_meta);
+        bson_append_bson(&bs, "meta", &bm);
+    }
+    
     bson_finish(&bs);
 
     if (bs.err) {
         WISHDEBUG(LOG_CRITICAL, "Failed while writing id_export document");
         return RET_FAIL;
+    }
+    
+    if (signed_meta) {
+        bson_visit("wish_identity_export with additional signed meta data", bson_data(&bs));
     }
     
     const char *id_export_bson = bson_data(&bs);
@@ -980,7 +992,7 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffe
  * @param signed_cert_actual_len the actual length of the BSON result array is stored here
  * @return RET_SUCCESS for success, RET_FAIL for errors
  */
-return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, bin *buffer) {
+return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* meta, bin *buffer) {
     /* identity.export on the "luid" identity */
     wish_identity_t id;
     
@@ -992,11 +1004,11 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, bin *buffer) {
     size_t cert_buffer_len = 1024;
     char cert_buffer[cert_buffer_len];
     bin cert = { .base = cert_buffer, .len = cert_buffer_len };
-    if (wish_identity_export(core, &id, &cert) != RET_SUCCESS) {
+    if (wish_identity_export(core, &id, meta, &cert) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not export the identity");
         return RET_FAIL;
     }
-   
+    
     size_t signature_len = WISH_SIGNATURE_LEN;
     char signature_buffer[signature_len];
     bin signature = { .base = signature_buffer, .len = signature_len };

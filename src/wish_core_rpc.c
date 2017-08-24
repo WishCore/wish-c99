@@ -565,7 +565,7 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
     uint8_t signed_cert_buffer[signed_cert_buffer_len];
     bin signed_cert = { .base = signed_cert_buffer, .len = signed_cert_buffer_len };
     
-    if (wish_build_signed_cert(core, ctx->luid, &signed_cert) != RET_SUCCESS) {
+    if (wish_build_signed_cert(core, ctx->luid, ctx->friend_req_meta, &signed_cert) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not construct the signed cert");
         return;
     }

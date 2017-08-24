@@ -160,6 +160,14 @@ return_t wish_identity_sign(wish_core_t* core, wish_identity_t* uid, const bin* 
 
 return_t wish_identity_verify(wish_core_t* core, wish_identity_t* uid, const bin* data, const bin* claim, const bin* signature);
 
-return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, bin *buffer);
+/**
+ * Export identity by uid to bin buffer
+ * 
+ * @param core
+ * @param id
+ * @param buffer
+ * @return 
+ */
+return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char* signed_meta, bin *buffer);
 
-return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, bin *buffer);
+return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* meta, bin *buffer);

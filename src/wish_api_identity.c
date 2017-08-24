@@ -59,7 +59,7 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     buf.base = buf_base;
     buf.len = WISH_PORT_RPC_BUFFER_SZ;
     
-    if ( RET_SUCCESS != wish_identity_export(core, &id, &buf) ) {
+    if ( RET_SUCCESS != wish_identity_export(core, &id, NULL, &buf) ) {
         wish_rpc_server_error(req, 92, "Internal export failed.");
         return;
     }
@@ -798,10 +798,39 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     WISHDEBUG(LOG_CRITICAL, "alias for remote friend req: %s", alias);
     WISHDEBUG(LOG_CRITICAL, "tranport for remote friend req: %s", transport);
 
+    // check optional argument 3; 
+    bson_find_from_buffer(&it, args, "2");
+    
+    char* freq_meta = NULL;
+    
+    if (bson_iterator_type(&it) == BSON_OBJECT) {
+        const char* freq_meta_bson = bson_iterator_value(&it);
+        bson_visit("We should add this meta data to the friend request", freq_meta_bson);
+        
+        bson tmp;
+        bson_init_with_data(&tmp, freq_meta_bson);
+        
+        int freq_meta_size = bson_size(&tmp);
+        if (freq_meta_size > 256) {
+            // we should return error
+            wish_rpc_server_error(req, 340, "Argument 3 too big");
+            return;
+        }
+        
+        freq_meta = wish_platform_malloc(freq_meta_size);
+        
+        if (freq_meta == NULL) {
+            wish_rpc_server_error(req, 340, "Failed allocating memory for friend request meta data.");
+            return;
+        }
 
+        WISHDEBUG(LOG_CRITICAL, "Made copy of friend_req_meta data.");
+        memcpy(freq_meta, freq_meta_bson, freq_meta_size);
+    }
     
     wish_connection_t* friend_req_ctx = wish_connection_init(core, luid, ruid);
     friend_req_ctx->friend_req_connection = true;
+    friend_req_ctx->friend_req_meta = freq_meta; // NULL or pointer to data
     //memcpy(friend_req_ctx->rhid, rhid, WISH_ID_LEN);
         
     //uint8_t *ip = db[i].transport_ip.addr;
@@ -993,7 +1022,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     uint8_t signed_cert_buffer[signed_cert_buffer_len];
     bin signed_cert = { .base = signed_cert_buffer, .len = signed_cert_buffer_len };
     
-    if (wish_build_signed_cert(core, elt->luid, &signed_cert) == RET_FAIL) {
+    if (wish_build_signed_cert(core, elt->luid, NULL, &signed_cert) == RET_FAIL) {
         WISHDEBUG(LOG_CRITICAL, "Could not construct the signed cert");
         return;
     }

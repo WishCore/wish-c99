@@ -153,6 +153,7 @@ typedef struct wish_context {
     /** This flag must be set to true when you open a connection to a
      * peer in order to send a friend request */
     bool friend_req_connection;
+    const char* friend_req_meta;
     struct wish_remote_service *rsid_list_head;
 } wish_connection_t;
 
