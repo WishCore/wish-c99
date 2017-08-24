@@ -36,8 +36,8 @@ list(REMOVE_ITEM wish_port_test_SRC "${CMAKE_SOURCE_DIR}/port/unix/app.c")
 #MESSAGE( STATUS "wish_port_SRC: " ${wish_port_SRC} )
 
 add_executable(${EXECUTABLE} ${wish_SRC} ${wish_port_SRC} ${wish_deps_SRC})
-add_executable(${TEST_EXECUTABLE} ${wish_port_test_SRC} ${wish_deps_SRC})
+#add_executable(${TEST_EXECUTABLE} ${wish_port_test_SRC} ${wish_deps_SRC})
 
-enable_testing()
+#enable_testing()
 
-add_test(NAME bson_test COMMAND ${TEST_EXECUTABLE})
+#add_test(NAME bson_test COMMAND ${TEST_EXECUTABLE})
