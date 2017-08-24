@@ -18,6 +18,7 @@
 
 // includes for remote rpc commands
 #include "wish_api_identity.h"
+#include "wish_core_signals.h"
 
 #include "utlist.h"
 
@@ -612,6 +613,7 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
 typedef struct wish_rpc_server_handler handler;
 
 handler core_peers_h =                                 { .op_str = "peers",                               .handler = peers_op_handler };
+handler core_signals_h =                               { .op_str = "signals",                             .handler = wish_core_signals };
 handler core_send_h =                                  { .op_str = "send",                                .handler = send_op_handler };
 handler core_directory_h =                             { .op_str = "directory",                           .handler = core_directory };
 handler core_identity_list_h =                         { .op_str = "identity.list",                       .handler = wish_api_identity_list };
@@ -679,6 +681,7 @@ void wish_core_init_rpc(wish_core_t* core) {
     wish_rpc_server_set_acl(core->core_api, acl_check);
     wish_rpc_server_set_name(core->core_api, "core-to-core");
     wish_rpc_server_register(core->core_api, &core_peers_h);
+    wish_rpc_server_register(core->core_api, &core_signals_h);
     wish_rpc_server_register(core->core_api, &core_send_h);
     wish_rpc_server_register(core->core_api, &core_directory_h);
     wish_rpc_server_register(core->core_api, &core_identity_list_h);
