@@ -3,6 +3,7 @@
 #include "wish_connection_mgr.h"
 
 #include "wish_debug.h"
+#include "bson_visit.h"
 
 /**
  * connections.list
