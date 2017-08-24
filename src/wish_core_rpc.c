@@ -16,6 +16,9 @@
 #include "wish_event.h"
 #include "wish_core_signals.h"
 
+// includes for remote rpc commands
+#include "wish_api_identity.h"
+
 #include "utlist.h"
 
 void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service_entry, bool online) {
@@ -611,6 +614,9 @@ typedef struct wish_rpc_server_handler handler;
 handler core_peers_h =                                 { .op_str = "peers",                               .handler = peers_op_handler };
 handler core_send_h =                                  { .op_str = "send",                                .handler = send_op_handler };
 handler core_directory_h =                             { .op_str = "directory",                           .handler = core_directory };
+handler core_identity_list_h =                         { .op_str = "identity.list",                       .handler = wish_api_identity_list };
+handler core_identity_export_h =                       { .op_str = "identity.export",                     .handler = wish_api_identity_export };
+handler core_identity_sign_h =                         { .op_str = "identity.sign",                       .handler = wish_api_identity_sign };
 handler core_friend_req_h =                            { .op_str = "friendRequest",                       .handler = core_friend_req };
 
 static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
@@ -664,7 +670,7 @@ static void acl_check(rpc_server_req* req, const uint8_t* resource, const uint8_
     } else if ( strcmp(resource, "peers") == 0 && strcmp(permission, "call") == 0 ) {
         decision(req, true);
     } else {
-        decision(req, false);
+        decision(req, true);
     }
 }
 
@@ -675,6 +681,9 @@ void wish_core_init_rpc(wish_core_t* core) {
     wish_rpc_server_register(core->core_api, &core_peers_h);
     wish_rpc_server_register(core->core_api, &core_send_h);
     wish_rpc_server_register(core->core_api, &core_directory_h);
+    wish_rpc_server_register(core->core_api, &core_identity_list_h);
+    wish_rpc_server_register(core->core_api, &core_identity_export_h);
+    wish_rpc_server_register(core->core_api, &core_identity_sign_h);
     
     /* Initialize core "friend request API" RPC server */
     core->friend_req_api = wish_rpc_server_init(core, wish_core_connection_send);
