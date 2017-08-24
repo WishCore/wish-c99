@@ -3298,6 +3298,8 @@ static int bson_copy_with_state(bson* out, const bson* in) {
     // restore buffer and buffer size
     out->data = data;
     out->dataSize = dataSize;
+    
+    return BSON_OK;
 }
 
 void bson_insert_string(bson* bs, const char* path, const char* string) {
