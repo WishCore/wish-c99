@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
+/*
 int main(int argc, char** argv) {
     wish_platform_set_malloc(malloc);
     wish_platform_set_realloc(realloc);
@@ -94,3 +94,4 @@ int main(int argc, char** argv) {
     
     return 0;
 }
+*/
