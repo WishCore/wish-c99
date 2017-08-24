@@ -3281,7 +3281,7 @@ static int bson_copy_with_state(bson* out, const bson* in) {
     if (bson_size(in) > out->dataSize) {
         //WISHDEBUG(LOG_CRITICAL, "bson_insert_string could not copy data to original bson. Buffer too small.");
         out->err = BSON_SIZE_OVERFLOW;
-        return;
+        return BSON_ERROR;
     }
 
     // copy bson data
