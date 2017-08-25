@@ -811,7 +811,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         bson_init_with_data(&tmp, freq_meta_bson);
         
         int freq_meta_size = bson_size(&tmp);
-        if (freq_meta_size > 256) {
+        if (freq_meta_size > 512) {
             // we should return error
             wish_rpc_server_error(req, 340, "Argument 3 too big");
             return;

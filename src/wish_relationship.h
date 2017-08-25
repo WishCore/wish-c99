@@ -19,6 +19,7 @@ typedef struct wish_relationship_t {
 typedef struct wish_relationship_req_t {
     uint8_t luid[WISH_UID_LEN];
     wish_identity_t id;
+    const char* signed_meta;
     struct wish_relationship_req_t* prev;
     struct wish_relationship_req_t* next;
     /* A a copy of the RPC request structure representing the friend request sent by the remote core */
