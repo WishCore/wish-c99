@@ -523,7 +523,10 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         }
         
         // add signature by uid
-        wish_identity_sign(core, &uid, &data, &claim, &signature);
+        if ( RET_SUCCESS != wish_identity_sign(core, &uid, &data, &claim, &signature) ) {
+            wish_rpc_server_error(req, 345, "Failed producing signature");
+            return;
+        }
         
         BSON_NUMSTR(index, i++);
 
@@ -531,6 +534,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         bson_append_string(&b, "algo", "sha256-ed25519");
         bson_append_binary(&b, "uid", luid, WISH_UID_LEN);
         bson_append_binary(&b, "sign", signature.base, ED25519_SIGNATURE_LEN);
+        
         if (claim.base != NULL && claim.len > 0) {
             bson_append_binary(&b, "claim", claim.base, claim.len);
         }
@@ -609,8 +613,7 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
 
     bson_append_binary(&b, "data", data.base, data.len);
 
-    bson_append_field_from_iterator(&it, &b);
-
+    // copy meta field if it exists
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("0.meta", &it) != BSON_EOO ) {
@@ -618,6 +621,7 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
         bson_append_field_from_iterator(&it, &b);
     }
 
+    // start dealing with signatures
     bson_iterator_from_buffer(&it, args);
 
     bson_append_start_array(&b, "signatures");
@@ -646,7 +650,7 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
             memset(&signature, 0, sizeof(bin));
             
             while ( bson_iterator_next(&sit) != BSON_EOO ) {
-                WISHDEBUG(LOG_CRITICAL, "  sub object %i: %s", bson_iterator_type(&sit), bson_iterator_key(&sit));
+                //WISHDEBUG(LOG_CRITICAL, "  sub object %i: %s", bson_iterator_type(&sit), bson_iterator_key(&sit));
                 if (strncmp("sign", bson_iterator_key(&sit), 5) == 0 && bson_iterator_type(&sit) == BSON_BINDATA && bson_iterator_bin_len(&sit) == WISH_SIGNATURE_LEN ) {
                     signature.base = (char*) bson_iterator_bin_data(&sit);
                     signature.len = bson_iterator_bin_len(&sit);
@@ -657,7 +661,7 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
                     claim.base = (char*) bson_iterator_bin_data(&sit);
                     claim.len = bson_iterator_bin_len(&sit);
                     bson_append_element(&b, bson_iterator_key(&sit), &sit);
-                } else {
+                } else if (strncmp("algo", bson_iterator_key(&sit), 5) == 0 && bson_iterator_type(&sit) == BSON_STRING) {
                     bson_append_element(&b, bson_iterator_key(&sit), &sit);
                 }
             }
@@ -674,6 +678,9 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
                 } else {
                     bson_append_null(&b, "sign");
                 }
+            } else {
+                //WISHDEBUG(LOG_CRITICAL, "signature base is %p len: %i", signature.base, signature.len);
+                bson_append_null(&b, "sign");
             }
             
             bson_append_finish_object(&b);
@@ -684,12 +691,12 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
 
     bson_append_finish_object(&b);
     bson_finish(&b);
-
+    
     if(b.err != 0) {
         wish_rpc_server_error(req, 344, "Failed writing reponse.");
         return;
     }
-
+    
     wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
@@ -892,6 +899,16 @@ void wish_api_identity_friend_request_list(rpc_server_req* req, const uint8_t* a
         bson_append_binary(&bs, "ruid", elt->id.uid, WISH_UID_LEN);
         bson_append_string(&bs, "alias", elt->id.alias);
         bson_append_binary(&bs, "pubkey", elt->id.pubkey, WISH_PUBKEY_LEN);
+        
+        if (elt->signed_meta) {
+            bson b;
+            bson_init_with_data(&b, elt->signed_meta);
+
+            WISHDEBUG(LOG_CRITICAL, "appending signed meta %d bytes", bson_size(&b));
+            
+            bson_append_bson(&bs, "meta", &b);
+        }
+        
         bson_append_finish_object(&bs);
     }
     

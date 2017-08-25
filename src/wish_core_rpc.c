@@ -400,31 +400,32 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     
     const char *cert = bson_iterator_bin_data(&it);
     
-    const char* signed_meta_bin_data = NULL;
+    const char* signed_meta_bson = NULL;
     char* signed_meta_copy = NULL;
     
     if (bson_find_from_buffer(&it, cert, "meta") == BSON_OBJECT) {
-        signed_meta_bin_data = bson_iterator_bin_data(&it);
+        signed_meta_bson = bson_iterator_value(&it);
         
         bson tmp;
-        bson_init_with_data(&tmp, signed_meta_bin_data);
+        bson_init_with_data(&tmp, signed_meta_bson);
         
-        int signed_meta_bin_len = bson_size(&tmp);
-        if (signed_meta_bin_len > 512) {
+        int signed_meta_bson_size = bson_size(&tmp);
+        WISHDEBUG(LOG_CRITICAL, "Argument 3 signed meta size: %d", signed_meta_bson_size);
+        if (signed_meta_bson_size > 512) {
             // we should return error
             wish_rpc_server_error(req, 340, "Argument 3 too big");
             return;
         }
         
-        signed_meta_copy = wish_platform_malloc(signed_meta_bin_len);
+        signed_meta_copy = wish_platform_malloc(signed_meta_bson_size);
         
         if (signed_meta_copy == NULL) {
             wish_rpc_server_error(req, 340, "Failed allocating memory for friend request meta data.");
             return;
         }
  
-        bson_visit("Made copy of friend_req_meta data", signed_meta_copy);
-        memcpy(signed_meta_copy, signed_meta_bin_data, signed_meta_bin_len);        
+        memcpy(signed_meta_copy, signed_meta_bson, signed_meta_bson_size);        
+        //bson_visit("Made copy of friend_req_meta data", signed_meta_copy);
     }
     
     /* Reset iterator */
