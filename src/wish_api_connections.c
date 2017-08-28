@@ -184,7 +184,7 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     
-    int abuf_len = 256;
+    int abuf_len = 512;
     char abuf[abuf_len];
     
     bson ba;
@@ -199,7 +199,12 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     
-    size_t buffer_max_len = 256;
+    if (ba.err) {
+        wish_rpc_server_error(req, 39, "Args copy failed.");
+        return;
+    }
+    
+    size_t buffer_max_len = 512+128;
     uint8_t buffer[buffer_max_len];
     wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, op, bson_data(&ba), bson_size(&ba), rpc_callback, buffer, buffer_max_len);
 
@@ -210,13 +215,18 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson rreq;
     bson_init_with_data(&rreq, buffer);
     
-    size_t request_max_len = 512;
+    size_t request_max_len = 512+256;
     uint8_t request[request_max_len];
     
     bson b;
     bson_init_buffer(&b, request, request_max_len);
     bson_append_bson(&b, "req", &rreq);
     bson_finish(&b);
+    
+    if (b.err) {
+        wish_rpc_server_error(req, 39, "Building req failed.");
+        return;
+    }
     
     wish_core_send_message(core, connection, bson_data(&b), bson_size(&b));
     
