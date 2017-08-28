@@ -54,9 +54,10 @@ void wish_api_wld_list(rpc_server_req* req, const uint8_t* args) {
                 bson_append_start_object(&bs, index);
                 bson_append_string(&bs, "type", "friendReq");
                 bson_append_string(&bs, "alias", db[i].alias);
-                bson_append_binary(&bs, "luid", db[i].luid, WISH_ID_LEN);
+                //bson_append_binary(&bs, "luid", db[i].luid, WISH_ID_LEN);
                 bson_append_binary(&bs, "ruid", db[i].ruid, WISH_ID_LEN);
                 bson_append_binary(&bs, "rhid", db[i].rhid, WISH_ID_LEN);
+                bson_append_binary(&bs, "rsid", db[i].rsid, WISH_ID_LEN);
                 bson_append_binary(&bs, "pubkey", db[i].pubkey, WISH_PUBKEY_LEN);
                 bson_append_finish_object(&bs);
             }
