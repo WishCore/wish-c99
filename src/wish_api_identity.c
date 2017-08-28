@@ -496,8 +496,6 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         
         bson_append_binary(&b, "data", data.base, data.len);
         
-        bson_append_field_from_iterator(&it, &b);
-
         bson_iterator_from_buffer(&it, args);
         
         if ( bson_find_fieldpath_value("1.meta", &it) != BSON_EOO ) {
