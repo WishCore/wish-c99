@@ -39,15 +39,27 @@ void wish_api_wld_list(rpc_server_req* req, const uint8_t* args) {
             char index[21];
             BSON_NUMSTR(index, p);
             
-            bson_append_start_object(&bs, index);
-            bson_append_string(&bs, "alias", db[i].alias);
-            bson_append_binary(&bs, "ruid", db[i].ruid, WISH_ID_LEN);
-            bson_append_binary(&bs, "rhid", db[i].rhid, WISH_ID_LEN);
-            bson_append_binary(&bs, "pubkey", db[i].pubkey, WISH_PUBKEY_LEN);
-            if (db[i].claim) {
-                bson_append_bool(&bs, "claim", true);
+            if (db[i].type == DISCOVER_TYPE_LOCAL) {
+                bson_append_start_object(&bs, index);
+                bson_append_string(&bs, "type", "local");
+                bson_append_string(&bs, "alias", db[i].alias);
+                bson_append_binary(&bs, "ruid", db[i].ruid, WISH_ID_LEN);
+                bson_append_binary(&bs, "rhid", db[i].rhid, WISH_ID_LEN);
+                bson_append_binary(&bs, "pubkey", db[i].pubkey, WISH_PUBKEY_LEN);
+                if (db[i].claim) {
+                    bson_append_bool(&bs, "claim", true);
+                }
+                bson_append_finish_object(&bs);
+            } else if (db[i].type == DISCOVER_TYPE_FRIEND_REQ) {
+                bson_append_start_object(&bs, index);
+                bson_append_string(&bs, "type", "friendReq");
+                bson_append_string(&bs, "alias", db[i].alias);
+                bson_append_binary(&bs, "luid", db[i].luid, WISH_ID_LEN);
+                bson_append_binary(&bs, "ruid", db[i].ruid, WISH_ID_LEN);
+                bson_append_binary(&bs, "rhid", db[i].rhid, WISH_ID_LEN);
+                bson_append_binary(&bs, "pubkey", db[i].pubkey, WISH_PUBKEY_LEN);
+                bson_append_finish_object(&bs);
             }
-            bson_append_finish_object(&bs);
             p++;
         }
     }

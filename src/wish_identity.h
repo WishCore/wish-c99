@@ -8,9 +8,8 @@
 
 /* The maximum number of Wish identities that the identity database has */
 #define WISH_MAX_WUID_LIST_LEN 4
-/* The maimum length of the Alias string of an identity, includeing
- * terminating null char */
-#define WISH_MAX_ALIAS_LEN 48
+/** The maximum length of the Alias string of an identity, including terminating null char */
+#define WISH_ALIAS_LEN 48
 /* The maximum number of references to other identities ("friends") that
  * an identity can have */
 #define WISH_MAX_CONTACTS 4
@@ -47,7 +46,7 @@ typedef struct {
     /* True, if the privkey buffer has a valid privkey */
     bool has_privkey;
     uint8_t privkey[WISH_PRIVKEY_LEN];
-    char alias[WISH_MAX_ALIAS_LEN];
+    char alias[WISH_ALIAS_LEN];
     char transports[WISH_MAX_TRANSPORTS][WISH_MAX_TRANSPORT_LEN];
     char contacts[WISH_MAX_CONTACTS][WISH_MAX_CONTACT_LEN];
 } wish_identity_t;

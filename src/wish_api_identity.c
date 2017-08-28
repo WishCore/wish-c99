@@ -921,6 +921,85 @@ void wish_api_identity_friend_request_list(rpc_server_req* req, const uint8_t* a
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
+/*
+ *      { data: <Buffer b0 00 00 00 05 75 69 ... 34 05 68 69 64 ... >,
+ *        meta: <Buffer 38 00 00 00 04 74 72 ... 33 31 3a 34 30 ... >,
+ *        signatures: 
+ *         [ { algo: 'sha256-ed25519',
+ *             uid: <Buffer c6 e2 16 1c ... 33 30 7f 34>,
+ *             sign: <Buffer 5b a6 9a 32 ... fe 2a 1f a8 ... > } ] } } ]
+ */
+
+static return_t wish_ldiscover_entry_from_bson(const char* signed_meta, wish_ldiscover_t* out) {
+    if (!signed_meta || !out) { return RET_E_INVALID_INPUT; }
+    
+    bson_visit("wish_ldiscover_entry_from_bson", signed_meta);
+
+    bson_iterator it;
+    
+    bson in;
+    bson_init_with_data(&in, signed_meta);
+    
+    bson data;
+    
+    bson_find(&it, &in, "data");
+    if (bson_iterator_type(&it) != BSON_BINDATA) { return RET_E_INVALID_INPUT; }
+    bson_init_with_data(&data, bson_iterator_bin_data(&it));
+    
+    bson meta;
+
+    bson_find(&it, &in, "meta");
+    if (bson_iterator_type(&it) != BSON_BINDATA) { return RET_E_INVALID_INPUT; }
+    bson_init_with_data(&meta, bson_iterator_bin_data(&it));
+
+    bson_visit("data", bson_data(&data));
+    bson_visit("meta", bson_data(&meta));
+
+    
+    // Now we have data and meta fields from the cert
+    
+    bson_find(&it, &data, "alias");
+    if (bson_iterator_type(&it) != BSON_STRING) { return RET_E_INVALID_INPUT; }
+    strncpy(out->alias, bson_iterator_string(&it), WISH_ALIAS_LEN);
+
+    /* 
+    bson_find(&it, &data, "luid");
+    if (bson_iterator_type(&it) != BSON_BINDATA) { return RET_E_INVALID_INPUT; }
+    if (bson_iterator_bin_len(&it) != WISH_UID_LEN) { return RET_E_INVALID_INPUT; }
+    memcpy(out->luid, bson_iterator_bin_data(&it), WISH_UID_LEN);
+    */
+    
+    bson_find(&it, &data, "uid");
+    if (bson_iterator_type(&it) != BSON_BINDATA) { return RET_E_INVALID_INPUT; }
+    if (bson_iterator_bin_len(&it) != WISH_UID_LEN) { return RET_E_INVALID_INPUT; }
+    memcpy(out->ruid, bson_iterator_bin_data(&it), WISH_UID_LEN);
+
+    
+    bson_find(&it, &data, "hid");
+    if (bson_iterator_type(&it) != BSON_BINDATA) { return RET_E_INVALID_INPUT; }
+    if (bson_iterator_bin_len(&it) != WISH_WHID_LEN) { return RET_E_INVALID_INPUT; }
+    memcpy(out->rhid, bson_iterator_bin_data(&it), WISH_WHID_LEN);
+    
+    bson_find(&it, &data, "sid");
+    if (bson_iterator_type(&it) != BSON_BINDATA) { return RET_E_INVALID_INPUT; }
+    if (bson_iterator_bin_len(&it) != WISH_WSID_LEN) { return RET_E_INVALID_INPUT; }
+    memcpy(out->rsid, bson_iterator_bin_data(&it), WISH_WSID_LEN);
+    
+    bson_find(&it, &data, "pubkey");
+    if (bson_iterator_type(&it) != BSON_BINDATA) { return RET_E_INVALID_INPUT; }
+    if (bson_iterator_bin_len(&it) != WISH_PUBKEY_LEN) { return RET_E_INVALID_INPUT; }
+    memcpy(out->pubkey, bson_iterator_bin_data(&it), WISH_PUBKEY_LEN);
+    
+    bson_iterator_init(&it, &meta);
+    bson_find_fieldpath_value("transports.0", &it);
+    if (bson_iterator_type(&it) != BSON_STRING) { return RET_E_INVALID_INPUT; }
+    wish_parse_transport_ip_port(bson_iterator_string(&it), bson_iterator_string_len(&it), &out->transport_ip, &out->transport_port);
+    
+    out->timestamp = UINT32_MAX;
+    
+    return RET_SUCCESS;
+}
+
 /**
  * identity.friendRequestAccept
  *
@@ -1057,6 +1136,19 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     bson_finish(&b);
     
     bson_visit("Signed cert buffer: ", bson_data(&b));
+    
+    if (elt->signed_meta) {
+        wish_ldiscover_t entry;
+        memset(&entry, 0, sizeof(entry));
+        
+        if (RET_SUCCESS == wish_ldiscover_entry_from_bson(elt->signed_meta, &entry)) {
+            entry.type = DISCOVER_TYPE_FRIEND_REQ;
+
+            wish_ldiscover_add(core, &entry);
+        } else {
+            WISHDEBUG(LOG_CRITICAL, "wish_ldiscover_entry_from_bson returned error");
+        }
+    }
 
     wish_rpc_server_send(&(elt->friend_rpc_req), bson_data(&b), bson_size(&b));
     

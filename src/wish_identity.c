@@ -343,7 +343,7 @@ return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
             
             const char* alias = bson_iterator_string(&it);
             
-            strncpy(&(identity->alias[0]), alias, WISH_MAX_ALIAS_LEN);
+            strncpy(&(identity->alias[0]), alias, WISH_ALIAS_LEN);
 
             /* When we got this far, we are satisfied with import, the
              * rest is optional */
@@ -535,7 +535,7 @@ void wish_create_local_identity(wish_identity_t *id, const char *alias) {
     wish_create_keypair(&(id->pubkey[0]), &(id->privkey[0]));
     id->has_privkey = true;
     wish_pubkey2uid(&(id->pubkey[0]), &(id->uid[0]));
-    strncpy(&(id->alias[0]), alias, WISH_MAX_ALIAS_LEN);
+    strncpy(&(id->alias[0]), alias, WISH_ALIAS_LEN);
 
     /* Encode our preferred relay server as first transport */
     wish_relay_get_preferred_server_url(&(id->transports[0][0]), WISH_MAX_TRANSPORT_LEN);
@@ -615,7 +615,7 @@ int wish_identity_from_bson(wish_identity_t *id, const bson* bs) {
 
     wish_pubkey2uid(pubkey, id->uid);
     memcpy(id->pubkey, pubkey, WISH_PUBKEY_LEN);
-    memcpy(id->alias, alias, strnlen(alias, WISH_MAX_ALIAS_LEN));
+    memcpy(id->alias, alias, strnlen(alias, WISH_ALIAS_LEN));
     id->has_privkey = false;
     memset(id->privkey, 0, WISH_PRIVKEY_LEN);
 

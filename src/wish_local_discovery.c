@@ -167,7 +167,7 @@ size_t buffer_len) {
 
     int i;
     for(i=0; i<WISH_LOCAL_DISCOVERY_MAX; i++) {
-        if (core->ldiscovery_db[i].occupied && current_time - core->ldiscovery_db[i].timestamp > 30) {
+        if (core->ldiscovery_db[i].occupied && core->ldiscovery_db[i].type == DISCOVER_TYPE_LOCAL && current_time - core->ldiscovery_db[i].timestamp > 30) {
             core->ldiscovery_db[i].occupied = false;
             WISHDEBUG(LOG_CRITICAL, "LocalDiscovery dropped timed out entry.");
             
@@ -201,12 +201,13 @@ size_t buffer_len) {
         }
     }
     if(!found && free != -1) {
+        core->ldiscovery_db[free].type = DISCOVER_TYPE_LOCAL;
         core->ldiscovery_db[free].occupied = true;
         core->ldiscovery_db[free].timestamp = current_time;
         memcpy(&core->ldiscovery_db[free].ruid, ruid, WISH_ID_LEN);
         memcpy(&core->ldiscovery_db[free].rhid, rhid, WISH_ID_LEN);
         memcpy(&core->ldiscovery_db[free].pubkey, pubkey_ptr, WISH_PUBKEY_LEN);
-        strncpy((char*) &core->ldiscovery_db[free].alias, alias, WISH_MAX_ALIAS_LEN);
+        strncpy((char*) &core->ldiscovery_db[free].alias, alias, WISH_ALIAS_LEN);
         core->ldiscovery_db[free].claim = claim;
         /* FIXME ip address length here is hardcoded and assumed to be
          * IPv4 */
@@ -355,7 +356,7 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     // Local discovery will not advertise if we don't have a private key
     if (!my_identity.has_privkey) { return; }
 
-    const size_t msg_len = 2 + 2*(20 + WISH_ID_LEN) + 20 + WISH_PUBKEY_LEN + 10 + WISH_MAX_TRANSPORT_LEN + WISH_MAX_ALIAS_LEN;
+    const size_t msg_len = 2 + 2*(20 + WISH_ID_LEN) + 20 + WISH_PUBKEY_LEN + 10 + WISH_MAX_TRANSPORT_LEN + WISH_ALIAS_LEN;
     uint8_t msg[msg_len];
 
     msg[0] = 'W';
@@ -390,6 +391,29 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     //bson_visit("Advertisement message going out from core:", bson_data(&bs));
     
     wish_send_advertizement(core, msg, 2 + bson_size(&bs));
+}
+
+void wish_ldiscover_add(wish_core_t* core, wish_ldiscover_t* entry) {
+    int i;
+    int free = -1;
+    
+    for(i=0; i<WISH_LOCAL_DISCOVERY_MAX; i++) {
+        if (!core->ldiscovery_db[i].occupied) {
+            free = i;
+            break;
+        }
+    }
+    
+    if (free == -1) {
+        WISHDEBUG(LOG_CRITICAL, "Dropped a discovery entry due to memory being full.");
+        return;
+    }
+
+    wish_ldiscover_t* elt = &core->ldiscovery_db[free];
+    
+    memcpy(elt, entry, sizeof(wish_ldiscover_t));
+    elt->occupied = true;
+    WISHDEBUG(LOG_CRITICAL, "wish_ldiscover_add completed successfully.");
 }
 
 void wish_ldiscover_clear(wish_core_t* core) {

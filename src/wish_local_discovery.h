@@ -9,16 +9,27 @@
 #include "wish_identity.h"
 #include "wish_port_config.h"
 
+typedef enum {
+    DISCOVER_TYPE_NONE,
+    DISCOVER_TYPE_LOCAL,
+    DISCOVER_TYPE_REMOTE,
+    DISCOVER_TYPE_FRIEND_REQ,
+    DISCOVER_TYPE_DIRECTORY
+} ldiscover_type;
 
 typedef struct wish_ldiscover_t {
     /* This field is used for identifying occupied/vacant app contexts.
      * Has value false if context is vacant */
     bool occupied;
+    /**  */
+    ldiscover_type type;
     /* The service IF of the app */
+    uint8_t luid[WISH_ID_LEN];
     uint8_t ruid[WISH_ID_LEN];
     uint8_t rhid[WISH_ID_LEN];
+    uint8_t rsid[WISH_ID_LEN];
     uint8_t pubkey[WISH_PUBKEY_LEN];
-    uint8_t alias[WISH_MAX_ALIAS_LEN];
+    uint8_t alias[WISH_ALIAS_LEN];
     bool claim;
     uint32_t timestamp;
     /* FIXME support support multiple transports, and IPv6, and..  */
@@ -52,7 +63,13 @@ void wish_ldiscover_feed(wish_core_t* core, wish_ip_addr_t *ip, uint16_t port, u
 /* Send out one "advertizement" message for wish identity my_uid */
 void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid);
 
-/* Clear the table */
+/** */
+void wish_ldiscover_add(wish_core_t* core, wish_ldiscover_t* entry);
+
+/** */
+//void wish_ldiscover_remove(wish_core_t* core, wish_ldiscover_t* entry);
+
+/** Clear the table */
 void wish_ldiscover_clear(wish_core_t* core);
 
 wish_ldiscover_t *wish_ldiscover_get(wish_core_t* core);
