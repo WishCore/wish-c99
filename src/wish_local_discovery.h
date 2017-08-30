@@ -35,6 +35,7 @@ typedef struct wish_ldiscover_t {
     /* FIXME support support multiple transports, and IPv6, and..  */
     wish_ip_addr_t transport_ip;
     uint16_t transport_port;
+    const char* meta;
 } wish_ldiscover_t;
 
 void wish_ldiscover_init(wish_core_t* core);

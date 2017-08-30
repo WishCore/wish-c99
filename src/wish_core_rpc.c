@@ -591,12 +591,12 @@ static void friend_req_callback(rpc_client_req* req, void* context, const uint8_
  *        ]
  *       }]
  */
-void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {        
+void wish_core_send_friend_req(wish_core_t* core, wish_connection_t* connection) {        
     size_t signed_cert_buffer_len = 1024;
     uint8_t signed_cert_buffer[signed_cert_buffer_len];
     bin signed_cert = { .base = signed_cert_buffer, .len = signed_cert_buffer_len };
     
-    if (wish_build_signed_cert(core, ctx->luid, ctx->friend_req_meta, &signed_cert) != RET_SUCCESS) {
+    if (wish_build_signed_cert(core, connection->luid, connection->friend_req_meta, &signed_cert) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not construct the signed cert");
         return;
     }
@@ -624,7 +624,7 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
     wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "friendRequest", (uint8_t*)bson_data(&b), bson_size(&b), friend_req_callback, buffer, buffer_len);
 
     rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
-    mreq->cb_context = ctx;
+    mreq->cb_context = connection;
 
     bson req;
     bson_init_with_data(&req, buffer);
@@ -637,7 +637,7 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t *ctx) {
     bson_append_bson(&bs, "req", &req);
     bson_finish(&bs);
     
-    wish_core_send_message(core, ctx, bson_data(&bs), bson_size(&bs));
+    wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
 }
 
 
@@ -650,6 +650,9 @@ handler core_directory_h =                             { .op_str = "directory", 
 handler core_identity_list_h =                         { .op_str = "identity.list",                       .handler = wish_api_identity_list };
 handler core_identity_export_h =                       { .op_str = "identity.export",                     .handler = wish_api_identity_export };
 handler core_identity_sign_h =                         { .op_str = "identity.sign",                       .handler = wish_api_identity_sign };
+handler core_identity_friend_request_list_h =          { .op_str = "identity.friendRequestList",          .handler = wish_api_identity_friend_request_list };
+handler core_identity_friend_request_accept_h =        { .op_str = "identity.friendRequestAccept",        .handler = wish_api_identity_friend_request_accept };
+handler core_identity_friend_request_decline_h =       { .op_str = "identity.friendRequestDecline",       .handler = wish_api_identity_friend_request_decline };
 handler core_friend_req_h =                            { .op_str = "friendRequest",                       .handler = core_friend_req };
 
 static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
@@ -718,6 +721,9 @@ void wish_core_init_rpc(wish_core_t* core) {
     wish_rpc_server_register(core->core_api, &core_identity_list_h);
     wish_rpc_server_register(core->core_api, &core_identity_export_h);
     wish_rpc_server_register(core->core_api, &core_identity_sign_h);
+    wish_rpc_server_register(core->core_api, &core_identity_friend_request_list_h);
+    wish_rpc_server_register(core->core_api, &core_identity_friend_request_accept_h);
+    wish_rpc_server_register(core->core_api, &core_identity_friend_request_decline_h);
     
     /* Initialize core "friend request API" RPC server */
     core->friend_req_api = wish_rpc_server_init(core, wish_core_connection_send);

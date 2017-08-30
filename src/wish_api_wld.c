@@ -227,15 +227,16 @@ void wish_api_wld_friend_request(rpc_server_req* req, const uint8_t* args) {
         return;
     }
 
-    wish_connection_t *friend_req_ctx = wish_connection_init(core, luid, ruid);
-    friend_req_ctx->friend_req_connection = true;
-    memcpy(friend_req_ctx->rhid, rhid, WISH_ID_LEN);
+    wish_connection_t* connection = wish_connection_init(core, luid, ruid);
+    connection->friend_req_connection = true;
+    connection->friend_req_meta = db[i].meta;
+    memcpy(connection->rhid, rhid, WISH_ID_LEN);
         
     uint8_t *ip = db[i].transport_ip.addr;
     
     WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
 
-    wish_open_connection(core, friend_req_ctx, &(db[i].transport_ip), db[i].transport_port, false);
+    wish_open_connection(core, connection, &(db[i].transport_ip), db[i].transport_port, false);
 
     bson bs;
     bson_init_buffer(&bs, buffer, buffer_len);

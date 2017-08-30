@@ -833,9 +833,9 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         memcpy(freq_meta, freq_meta_bson, freq_meta_size);
     }
     
-    wish_connection_t* friend_req_ctx = wish_connection_init(core, luid, ruid);
-    friend_req_ctx->friend_req_connection = true;
-    friend_req_ctx->friend_req_meta = freq_meta; // NULL or pointer to data
+    wish_connection_t* connection = wish_connection_init(core, luid, ruid);
+    connection->friend_req_connection = true;
+    connection->friend_req_meta = freq_meta; // NULL or pointer to data
     //memcpy(friend_req_ctx->rhid, rhid, WISH_ID_LEN);
         
     //uint8_t *ip = db[i].transport_ip.addr;
@@ -847,7 +847,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     
     WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip.addr[0], ip.addr[1], ip.addr[2], ip.addr[3]);
 
-    wish_open_connection(core, friend_req_ctx, &ip, port, false);
+    wish_open_connection(core, connection, &ip, port, false);
     
     
     
@@ -1143,6 +1143,10 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
         
         if (RET_SUCCESS == wish_ldiscover_entry_from_bson(elt->signed_meta, &entry)) {
             entry.type = DISCOVER_TYPE_FRIEND_REQ;
+            
+            // take signed meta from friend request for reuse in 
+            entry.meta = elt->signed_meta;
+            elt->signed_meta = NULL;
 
             wish_ldiscover_add(core, &entry);
         } else {

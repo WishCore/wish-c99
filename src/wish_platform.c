@@ -54,8 +54,8 @@ void* wish_platform_realloc(void *ptr, size_t size) {
 
 
 
-void wish_platform_free(void* ptr) {
-    my_free(ptr);
+void wish_platform_free(const void* ptr) {
+    my_free( (void*)ptr );
 }
 
 void wish_platform_set_vsprintf(int (*fn)(char* str, const char* format, va_list args)) {

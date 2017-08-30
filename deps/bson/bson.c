@@ -69,7 +69,7 @@ extern bson_printf_func bson_errprintf;
 //void ( *bson_free_func)(void *) = MYFREE;
 void *(*bson_malloc_func)(size_t) = wish_platform_malloc;
 void *(*bson_realloc_func)(void *, size_t) = wish_platform_realloc;
-void ( *bson_free_func)(void *) = wish_platform_free;
+void ( *bson_free_func)(void *) = (void (*)(void*)) wish_platform_free;
 
 int (*bson_sprintf)(char *str, const char *format, ...) = wish_platform_sprintf;
 

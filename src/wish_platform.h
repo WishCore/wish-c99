@@ -18,7 +18,7 @@ void* wish_platform_malloc(size_t size);
 
 void* wish_platform_realloc(void *ptr, size_t new_size);
 
-void wish_platform_free(void* ptr);
+void wish_platform_free(const void* ptr);
 
 
 int wish_platform_fill_random(void* dummy, unsigned char* buffer, size_t len);

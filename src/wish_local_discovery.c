@@ -419,6 +419,8 @@ void wish_ldiscover_add(wish_core_t* core, wish_ldiscover_t* entry) {
 void wish_ldiscover_clear(wish_core_t* core) {
     int i;
     for(i=0; i<WISH_LOCAL_DISCOVERY_MAX; i++) {
+        if (core->ldiscovery_db[i].meta) { wish_platform_free(core->ldiscovery_db[i].meta); }
+        
         core->ldiscovery_db[i].occupied = false;
     }
 }
