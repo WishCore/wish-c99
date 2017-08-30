@@ -90,6 +90,8 @@ static void version(rpc_server_req* req, const uint8_t* args) {
 }
 
 static void host_config(rpc_server_req* req, const uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
     
@@ -98,6 +100,7 @@ static void host_config(rpc_server_req* req, const uint8_t* args) {
     bson_append_start_object(&bs, "data");
     // FIXME version is shown in the separate version rpc command, consider removing this
     bson_append_string(&bs, "version", WISH_CORE_VERSION_STRING);
+    bson_append_binary(&bs, "hid", core->id, WISH_WHID_LEN);
     bson_append_finish_object(&bs);
     bson_finish(&bs);
 
