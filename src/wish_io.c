@@ -1349,8 +1349,8 @@ void wish_core_init(wish_core_t* core) {
     wish_core_init_rpc(core);
     wish_core_app_rpc_init(core);
 
-    core->core_rpc_client = wish_platform_malloc(sizeof(wish_rpc_client_t));
-    memset(core->core_rpc_client, 0, sizeof(wish_rpc_client_t));
+    core->core_rpc_client = wish_platform_malloc(sizeof(rpc_client));
+    memset(core->core_rpc_client, 0, sizeof(rpc_client));
     core->core_rpc_client->next_id = 1;
     core->core_rpc_client->context = core;
 

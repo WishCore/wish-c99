@@ -47,14 +47,14 @@ typedef struct wish_rpc_server_handler handler;
 static void methods(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    handler *h = core->app_api->list_head;
+    handler *h = core->app_api->handlers;
     
     bson bs; 
     bson_init(&bs);
     bson_append_start_object(&bs, "data");
     
     while (h != NULL) {
-        bson_append_start_object(&bs, h->op_str);
+        bson_append_start_object(&bs, h->op);
         if (h->args) { bson_append_string(&bs, "args", h->args); }
         if (h->doc) { bson_append_string(&bs, "doc", h->doc); }
         bson_append_finish_object(&bs);
@@ -90,6 +90,8 @@ static void version(rpc_server_req* req, const uint8_t* args) {
 }
 
 static void host_config(rpc_server_req* req, const uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buffer[buffer_len];
     
@@ -98,6 +100,7 @@ static void host_config(rpc_server_req* req, const uint8_t* args) {
     bson_append_start_object(&bs, "data");
     // FIXME version is shown in the separate version rpc command, consider removing this
     bson_append_string(&bs, "version", WISH_CORE_VERSION_STRING);
+    bson_append_binary(&bs, "hid", core->id, WISH_WHID_LEN);
     bson_append_finish_object(&bs);
     bson_finish(&bs);
 
@@ -109,53 +112,53 @@ static void host_config(rpc_server_req* req, const uint8_t* args) {
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
-handler methods_h =                                   { .op_str = "methods",                           .handler = methods, .args = "(void): string" };
-handler signals_h =                                   { .op_str = "signals",                           .handler = wish_core_signals, .args = "(filter?: string): Signal" };
-handler version_h =                                   { .op_str = "version",                           .handler = version, .args = "(void): string", .doc = "Returns core version." };
+handler methods_h =                                   { .op = "methods",                           .handler = methods, .args = "(void): string" };
+handler signals_h =                                   { .op = "signals",                           .handler = wish_core_signals, .args = "(filter?: string): Signal" };
+handler version_h =                                   { .op = "version",                           .handler = version, .args = "(void): string", .doc = "Returns core version." };
 
-handler services_send_h =                             { .op_str = "services.send",                     .handler = wish_api_services_send, .args = "(peer: Peer, payload: Buffer): bool", .doc = "Send payload to peer." };
-handler services_list_h =                             { .op_str = "services.list",                     .handler = wish_api_services_list, .args = "(void): Service[]", .doc = "List local services." };
+handler services_send_h =                             { .op = "services.send",                     .handler = wish_api_services_send, .args = "(peer: Peer, payload: Buffer): bool", .doc = "Send payload to peer." };
+handler services_list_h =                             { .op = "services.list",                     .handler = wish_api_services_list, .args = "(void): Service[]", .doc = "List local services." };
 
-handler identity_list_h =                             { .op_str = "identity.list",                     .handler = wish_api_identity_list, .args="(void): Identity[]" };
-handler identity_export_h =                           { .op_str = "identity.export",                   .handler = wish_api_identity_export, .args="(void): Document" };
-handler identity_import_h =                           { .op_str = "identity.import",                   .handler = wish_api_identity_import, .args="(identity: Document): Identity" };
-handler identity_create_h =                           { .op_str = "identity.create",                   .handler = wish_api_identity_create, .args="(alias: string): Identity" };
-handler identity_get_h =                              { .op_str = "identity.get",                      .handler = wish_api_identity_get, .args="(uid: Uid): Identity" };
-handler identity_remove_h =                           { .op_str = "identity.remove",                   .handler = wish_api_identity_remove, .args="(uid: Uid): bool" };
+handler identity_list_h =                             { .op = "identity.list",                     .handler = wish_api_identity_list, .args="(void): Identity[]" };
+handler identity_export_h =                           { .op = "identity.export",                   .handler = wish_api_identity_export, .args="(void): Document" };
+handler identity_import_h =                           { .op = "identity.import",                   .handler = wish_api_identity_import, .args="(identity: Document): Identity" };
+handler identity_create_h =                           { .op = "identity.create",                   .handler = wish_api_identity_create, .args="(alias: string): Identity" };
+handler identity_get_h =                              { .op = "identity.get",                      .handler = wish_api_identity_get, .args="(uid: Uid): Identity" };
+handler identity_remove_h =                           { .op = "identity.remove",                   .handler = wish_api_identity_remove, .args="(uid: Uid): bool" };
 
-handler identity_sign_h =                             { .op_str = "identity.sign",                     .handler = wish_api_identity_sign, .args="(uid: Uid, document: Document, claim: Buffer): Document" };
-handler identity_verify_h =                           { .op_str = "identity.verify",                   .handler = wish_api_identity_verify, .args = "(document: Document): Document" };
-handler identity_friend_request_h =                   { .op_str = "identity.friendRequest",            .handler = wish_api_identity_friend_request, .args = "(luid: Uid, contact: Contact): bool" };
-handler identity_friend_request_list_h =              { .op_str = "identity.friendRequestList",        .handler = wish_api_identity_friend_request_list, .args = "(void): FriendRequest[]" };
-handler identity_friend_request_accept_h =            { .op_str = "identity.friendRequestAccept",      .handler = wish_api_identity_friend_request_accept, .args = "(luid: Uid, ruid: Uid): bool" };
-handler identity_friend_request_decline_h =           { .op_str = "identity.friendRequestDecline",     .handler = wish_api_identity_friend_request_decline, .args = "(luid: Uid, ruid: Uid): bool" };
+handler identity_sign_h =                             { .op = "identity.sign",                     .handler = wish_api_identity_sign, .args="(uid: Uid, document: Document, claim: Buffer): Document" };
+handler identity_verify_h =                           { .op = "identity.verify",                   .handler = wish_api_identity_verify, .args = "(document: Document): Document" };
+handler identity_friend_request_h =                   { .op = "identity.friendRequest",            .handler = wish_api_identity_friend_request, .args = "(luid: Uid, contact: Contact): bool" };
+handler identity_friend_request_list_h =              { .op = "identity.friendRequestList",        .handler = wish_api_identity_friend_request_list, .args = "(void): FriendRequest[]" };
+handler identity_friend_request_accept_h =            { .op = "identity.friendRequestAccept",      .handler = wish_api_identity_friend_request_accept, .args = "(luid: Uid, ruid: Uid): bool" };
+handler identity_friend_request_decline_h =           { .op = "identity.friendRequestDecline",     .handler = wish_api_identity_friend_request_decline, .args = "(luid: Uid, ruid: Uid): bool" };
 
-handler connections_list_h =                          { .op_str = "connections.list",                  .handler = wish_api_connections_list, .args = "(void): Connection[]" };
-handler connections_request_h =                       { .op_str = "connections.request",               .handler = wish_api_connections_request, .args = "(host: Host, op: string, args: array): Response" };
-handler connections_disconnect_h =                    { .op_str = "connections.disconnect",            .handler = wish_api_connections_disconnect, .args = "(id: number): bool" };
-handler connections_check_connections_h =             { .op_str = "connections.checkConnections",      .handler = wish_api_connections_check_connections, .args = "(id: number): bool" };
+handler connections_list_h =                          { .op = "connections.list",                  .handler = wish_api_connections_list, .args = "(void): Connection[]" };
+handler connections_request_h =                       { .op = "connections.request",               .handler = wish_api_connections_request, .args = "(host: Host, op: string, args: array): Response" };
+handler connections_disconnect_h =                    { .op = "connections.disconnect",            .handler = wish_api_connections_disconnect, .args = "(id: number): bool" };
+handler connections_check_connections_h =             { .op = "connections.checkConnections",      .handler = wish_api_connections_check_connections, .args = "(id: number): bool" };
 
-handler directory_find_h =                            { .op_str = "directory.find",                    .handler = wish_api_directory_find, .args = "(filter?: string): DirectoryEntry" };
+handler directory_find_h =                            { .op = "directory.find",                    .handler = wish_api_directory_find, .args = "(filter?: string): DirectoryEntry" };
 
-handler api_acl_check_h =                             { .op_str = "acl.check",                         .handler = wish_api_acl_check };
-handler api_acl_allow_h =                             { .op_str = "acl.allow",                         .handler = wish_api_acl_allow };
-handler api_acl_remove_allow_h =                      { .op_str = "acl.removeAllow",                   .handler = wish_api_acl_remove_allow };
-handler api_acl_add_user_roles_h =                    { .op_str = "acl.addUserRoles",                  .handler = wish_api_acl_add_user_roles };
-handler api_acl_remove_user_roles_h =                 { .op_str = "acl.removeUserRoles",               .handler = wish_api_acl_remove_user_roles };
-handler api_acl_user_roles_h =                        { .op_str = "acl.userRoles",                     .handler = wish_api_acl_user_roles };
-handler api_acl_what_resources_h =                    { .op_str = "acl.whatResources",                 .handler = wish_api_acl_what_resources };
-handler api_acl_allowed_permissions_h =               { .op_str = "acl.allowedPermissions",            .handler = wish_api_acl_allowed_permissions };
+handler api_acl_check_h =                             { .op = "acl.check",                         .handler = wish_api_acl_check };
+handler api_acl_allow_h =                             { .op = "acl.allow",                         .handler = wish_api_acl_allow };
+handler api_acl_remove_allow_h =                      { .op = "acl.removeAllow",                   .handler = wish_api_acl_remove_allow };
+handler api_acl_add_user_roles_h =                    { .op = "acl.addUserRoles",                  .handler = wish_api_acl_add_user_roles };
+handler api_acl_remove_user_roles_h =                 { .op = "acl.removeUserRoles",               .handler = wish_api_acl_remove_user_roles };
+handler api_acl_user_roles_h =                        { .op = "acl.userRoles",                     .handler = wish_api_acl_user_roles };
+handler api_acl_what_resources_h =                    { .op = "acl.whatResources",                 .handler = wish_api_acl_what_resources };
+handler api_acl_allowed_permissions_h =               { .op = "acl.allowedPermissions",            .handler = wish_api_acl_allowed_permissions };
         
-handler relay_list_h =                                { .op_str = "relay.list",                        .handler = wish_api_relay_list, .args = "(void): Relay[]" };
-handler relay_add_h =                                 { .op_str = "relay.add",                         .handler = wish_api_relay_add, .args = "(relay: string): bool" };
-handler relay_remove_h =                              { .op_str = "relay.remove",                      .handler = wish_api_relay_remove, .args = "(relay: string): bool" };
+handler relay_list_h =                                { .op = "relay.list",                        .handler = wish_api_relay_list, .args = "(void): Relay[]" };
+handler relay_add_h =                                 { .op = "relay.add",                         .handler = wish_api_relay_add, .args = "(relay: string): bool" };
+handler relay_remove_h =                              { .op = "relay.remove",                      .handler = wish_api_relay_remove, .args = "(relay: string): bool" };
 
-handler wld_list_h =                                  { .op_str = "wld.list",                          .handler = wish_api_wld_list, .args = "(void): Identity[]" };
-handler wld_clear_h =                                 { .op_str = "wld.clear",                         .handler = wish_api_wld_clear, .args = "(void): bool" };
-handler wld_announce_h =                              { .op_str = "wld.announce",                      .handler = wish_api_wld_announce, .args = "(void): bool" };
-handler wld_friend_request_h =                        { .op_str = "wld.friendRequest",                 .handler = wish_api_wld_friend_request, .args = "(luid: Uid, ruid: Uid, rhid: Hid): bool" };
+handler wld_list_h =                                  { .op = "wld.list",                          .handler = wish_api_wld_list, .args = "(void): Identity[]" };
+handler wld_clear_h =                                 { .op = "wld.clear",                         .handler = wish_api_wld_clear, .args = "(void): bool" };
+handler wld_announce_h =                              { .op = "wld.announce",                      .handler = wish_api_wld_announce, .args = "(void): bool" };
+handler wld_friend_request_h =                        { .op = "wld.friendRequest",                 .handler = wish_api_wld_friend_request, .args = "(luid: Uid, ruid: Uid, rhid: Hid): bool" };
 
-handler host_config_h =                               { .op_str = "host.config",                       .handler = host_config };
+handler host_config_h =                               { .op = "host.config",                       .handler = host_config };
 
 static void wish_core_app_rpc_send(rpc_server_req* req, const bson* bs) {
     wish_core_t* core = (wish_core_t*) req->server->context;
@@ -244,7 +247,7 @@ void wish_core_app_rpc_cleanup_requests(wish_core_t* core, struct wish_service_e
     //WISHDEBUG(LOG_CRITICAL, "App rpc server clean up starting");
     struct wish_rpc_context_list_elem *list_elem = NULL;
     struct wish_rpc_context_list_elem *tmp = NULL;
-    LL_FOREACH_SAFE(core->app_api->request_list_head, list_elem, tmp) {
+    LL_FOREACH_SAFE(core->app_api->requests, list_elem, tmp) {
         if (list_elem->request_ctx.context == service_entry_offline) {
             //WISHDEBUG(LOG_CRITICAL, "App rpc server clean up: request op %s", list_elem->request_ctx.op_str);
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
@@ -253,7 +256,7 @@ void wish_core_app_rpc_cleanup_requests(wish_core_t* core, struct wish_service_e
 #error not implemented
             //wish_platform_free....
 #endif
-            LL_DELETE(core->app_api->request_list_head, list_elem);
+            LL_DELETE(core->app_api->requests, list_elem);
         }
     }
 }

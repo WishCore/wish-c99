@@ -99,14 +99,14 @@ typedef struct wish_core {
     struct wish_rpc_context_list_elem request_pool[REQUEST_POOL_SIZE];
     #endif
 
-    wish_rpc_server_t* core_api;
-    wish_rpc_server_t* app_api;
-    wish_rpc_server_t* friend_req_api;
+    rpc_server* core_api;
+    rpc_server* app_api;
+    rpc_server* friend_req_api;
     
     /* Services */
     struct wish_service_entry* service_registry;
     
-    wish_rpc_client_t* core_rpc_client;
+    rpc_client* core_rpc_client;
     
     /* The number of seconds since core startup is stored here */
     wish_time_t core_time;
