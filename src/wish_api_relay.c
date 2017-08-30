@@ -42,7 +42,7 @@ void wish_api_relay_list(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
 
     if (bs.err) {
-        wish_rpc_server_error(req, 305, "Failed writing bson.");
+        wish_rpc_server_error_msg(req, 305, "Failed writing bson.");
         return;
     }
     
@@ -63,7 +63,7 @@ void wish_api_relay_add(rpc_server_req* req, const uint8_t* args) {
     bson_find_from_buffer(&it, args, "0");
     
     if ( BSON_STRING != bson_iterator_type(&it) ) {
-        wish_rpc_server_error(req, 306, "Could not add relay. Expecting string parameter host: 92.12.33.221:40000.");
+        wish_rpc_server_error_msg(req, 306, "Could not add relay. Expecting string parameter host: 92.12.33.221:40000.");
         return;
     }
     
@@ -81,7 +81,7 @@ void wish_api_relay_add(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
 
     if (bs.err) {
-        wish_rpc_server_error(req, 305, "Failed writing bson.");
+        wish_rpc_server_error_msg(req, 305, "Failed writing bson.");
         return;
     }
     
@@ -98,7 +98,7 @@ void wish_api_relay_remove(rpc_server_req* req, const uint8_t* args) {
     bson_find_from_buffer(&it, args, "0");
     
     if ( BSON_STRING != bson_iterator_type(&it) ) {
-        wish_rpc_server_error(req, 306, "Could not remove relay. Expecting string parameter host: 92.12.33.221:40000.");
+        wish_rpc_server_error_msg(req, 306, "Could not remove relay. Expecting string parameter host: 92.12.33.221:40000.");
         return;
     }
     
@@ -134,7 +134,7 @@ void wish_api_relay_remove(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
 
     if (bs.err) {
-        wish_rpc_server_error(req, 305, "Failed writing bson.");
+        wish_rpc_server_error_msg(req, 305, "Failed writing bson.");
         return;
     }
 

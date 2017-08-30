@@ -58,7 +58,7 @@ void wish_api_connections_list(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        wish_rpc_server_error(req, 303, "Failed writing bson.");
+        wish_rpc_server_error_msg(req, 303, "Failed writing bson.");
         return;
     }
     
@@ -99,8 +99,8 @@ static void rpc_callback(rpc_client_req* req, void* context, const uint8_t* payl
     bson_finish(&bs);
     
     if (bson_find_from_buffer(&it, payload, "err") == BSON_INT) {
-        WISHDEBUG(LOG_CRITICAL, "CoreRPC response is an error, but we don't yet support passing it up as one!");
-        //wish_rpc_server_emit(sreq, bson_data(&bs), bson_size(&bs));
+        WISHDEBUG(LOG_CRITICAL, "CoreRPC response is an error, trying to pass it up as one!");
+        wish_rpc_server_error(sreq, bson_data(&bs), bson_size(&bs));
         return;
     }
 
@@ -125,12 +125,12 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
     
     if (bson_find_fieldpath_value("0.luid", &it) != BSON_BINDATA) {
-        wish_rpc_server_error(req, 307, "Argument 1 not Buffer.");
+        wish_rpc_server_error_msg(req, 307, "Argument 1 not Buffer.");
         return;
     }
     
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
-        wish_rpc_server_error(req, 307, "Argument 1 not Buffer(32).");
+        wish_rpc_server_error_msg(req, 307, "Argument 1 not Buffer(32).");
         return;
     }
     
@@ -140,12 +140,12 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if (bson_find_fieldpath_value("0.ruid", &it) != BSON_BINDATA) {
-        wish_rpc_server_error(req, 307, "Argument 2 not Buffer.");
+        wish_rpc_server_error_msg(req, 307, "Argument 2 not Buffer.");
         return;
     }
 
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
-        wish_rpc_server_error(req, 307, "Argument 2 not Buffer(32).");
+        wish_rpc_server_error_msg(req, 307, "Argument 2 not Buffer(32).");
         return;
     }
 
@@ -155,12 +155,12 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if (bson_find_fieldpath_value("0.rhid", &it) != BSON_BINDATA) {
-        wish_rpc_server_error(req, 307, "Argument 3 not Buffer.");
+        wish_rpc_server_error_msg(req, 307, "Argument 3 not Buffer.");
         return;
     }
 
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
-        wish_rpc_server_error(req, 307, "Argument 3 not Buffer(32).");
+        wish_rpc_server_error_msg(req, 307, "Argument 3 not Buffer(32).");
         return;
     }
 
@@ -170,7 +170,7 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if (bson_find_fieldpath_value("1", &it) != BSON_STRING) {
-        wish_rpc_server_error(req, 307, "Argument 2 not String.");
+        wish_rpc_server_error_msg(req, 307, "Argument 2 not String.");
         return;
     }
     
@@ -180,7 +180,7 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if (bson_find_fieldpath_value("2", &it) != BSON_ARRAY) {
-        wish_rpc_server_error(req, 307, "Argument 3, args not Array.");
+        wish_rpc_server_error_msg(req, 307, "Argument 3, args not Array.");
         return;
     }
     
@@ -195,12 +195,12 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     wish_connection_t* connection = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
     
     if (connection == NULL) {
-        wish_rpc_server_error(req, 39, "Connection not found.");
+        wish_rpc_server_error_msg(req, 39, "Connection not found.");
         return;
     }
     
     if (ba.err) {
-        wish_rpc_server_error(req, 39, "Args copy failed.");
+        wish_rpc_server_error_msg(req, 39, "Args copy failed.");
         return;
     }
     
@@ -224,7 +224,7 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&b);
     
     if (b.err) {
-        wish_rpc_server_error(req, 39, "Building req failed.");
+        wish_rpc_server_error_msg(req, 39, "Building req failed.");
         return;
     }
     
@@ -270,13 +270,13 @@ void wish_api_connections_disconnect(rpc_server_req* req, const uint8_t* args) {
         bson_finish(&bs);
 
         if(bs.err != 0) {
-            wish_rpc_server_error(req, 344, "Failed writing reponse.");
+            wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
             return;
         }
         
         wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     } else {
-        wish_rpc_server_error(req, 343, "Invalid argument. Int index.");
+        wish_rpc_server_error_msg(req, 343, "Invalid argument. Int index.");
     }
 }
 
@@ -298,7 +298,7 @@ void wish_api_connections_check_connections(rpc_server_req* req, const uint8_t* 
     bson_finish(&bs);
 
     if(bs.err != 0) {
-        wish_rpc_server_error(req, 344, "Failed writing reponse.");
+        wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
         return;
     }
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));

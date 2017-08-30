@@ -273,13 +273,13 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("0", &it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get rsid");
-        wish_rpc_server_error(req, 41, "rsid not Buffer.");
+        wish_rpc_server_error_msg(req, 41, "rsid not Buffer.");
         return;
     }
     
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: rsid not Buffer(32)");
-        wish_rpc_server_error(req, 41, "rsid not Buffer(32).");
+        wish_rpc_server_error_msg(req, 41, "rsid not Buffer(32).");
         return;
     }
    
@@ -290,13 +290,13 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("1", &it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get lsid");
-        wish_rpc_server_error(req, 41, "lsid not Buffer.");
+        wish_rpc_server_error_msg(req, 41, "lsid not Buffer.");
         return;
     }
     
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: lsid not Buffer(32)");
-        wish_rpc_server_error(req, 41, "lsid not Buffer(32).");
+        wish_rpc_server_error_msg(req, 41, "lsid not Buffer(32).");
         return;
     }
    
@@ -308,7 +308,7 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("2", &it) != BSON_STRING) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get protocol");
-        wish_rpc_server_error(req, 41, "Protocol not string.");
+        wish_rpc_server_error_msg(req, 41, "Protocol not string.");
         return;
     }
     
@@ -318,7 +318,7 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("3", &it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "send_op_handler: Could not get payload");
-        wish_rpc_server_error(req, 41, "payload not Buffer.");
+        wish_rpc_server_error_msg(req, 41, "payload not Buffer.");
         return;
     }
     
@@ -361,7 +361,7 @@ static void send_op_handler(rpc_server_req* req, const uint8_t* args) {
 static void core_directory(rpc_server_req* req, const uint8_t* args) {
     WISHDEBUG(LOG_CRITICAL, "CoreRPC: directory request (not implemented)");
     bson_visit("CoreRPC: args:", args);
-    wish_rpc_server_error(req, 500, "Not implemented.");
+    wish_rpc_server_error_msg(req, 500, "Not implemented.");
 }
 
 /**
@@ -384,7 +384,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     bson_find_from_buffer(&it, args, "0");
     if (bson_iterator_type(&it) != BSON_OBJECT) {
         WISHDEBUG(LOG_CRITICAL, "Cannot get the object '0'");
-        wish_rpc_server_error(req, 501, "Bad friend request args");
+        wish_rpc_server_error_msg(req, 501, "Bad friend request args");
         return;
     }
     
@@ -394,7 +394,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     if ( bson_find_fieldpath_value("0.data", &it) != BSON_BINDATA ) {
         WISHDEBUG(LOG_CRITICAL, "0.data not bin data");
 
-        wish_rpc_server_error(req, 502, "friend req args does not have { data: <Buffer> }.");
+        wish_rpc_server_error_msg(req, 502, "friend req args does not have { data: <Buffer> }.");
         return;
     }
     
@@ -413,14 +413,14 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
         WISHDEBUG(LOG_CRITICAL, "Argument 3 signed meta size: %d", signed_meta_bson_size);
         if (signed_meta_bson_size > 512) {
             // we should return error
-            wish_rpc_server_error(req, 340, "Argument 3 too big");
+            wish_rpc_server_error_msg(req, 340, "Argument 3 too big");
             return;
         }
         
         signed_meta_copy = wish_platform_malloc(signed_meta_bson_size);
         
         if (signed_meta_copy == NULL) {
-            wish_rpc_server_error(req, 340, "Failed allocating memory for friend request meta data.");
+            wish_rpc_server_error_msg(req, 340, "Failed allocating memory for friend request meta data.");
             return;
         }
  
@@ -434,7 +434,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     if ( bson_find_fieldpath_value("0.meta", &it) != BSON_BINDATA ) {
         WISHDEBUG(LOG_CRITICAL, "0.meta not bin data");
 
-        wish_rpc_server_error(req, 502, "friend req args does not have { meta: <Buffer> }.");
+        wish_rpc_server_error_msg(req, 502, "friend req args does not have { meta: <Buffer> }.");
         return;
     }
     
@@ -453,7 +453,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     if ( bson_find_fieldpath_value("0.signatures", &it) != BSON_ARRAY ) {
         WISHDEBUG(LOG_CRITICAL, "0.signatures not array");
 
-        wish_rpc_server_error(req, 503, "friend req args does not have { signatures: [...] }.");
+        wish_rpc_server_error_msg(req, 503, "friend req args does not have { signatures: [...] }.");
         return;
     }
     

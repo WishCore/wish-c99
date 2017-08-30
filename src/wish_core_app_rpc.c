@@ -102,7 +102,7 @@ static void host_config(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
 
     if (bs.err) {
-        wish_rpc_server_error(req, 305, "Failed writing bson.");
+        wish_rpc_server_error_msg(req, 305, "Failed writing bson.");
         return;
     }
     

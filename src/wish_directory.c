@@ -20,7 +20,7 @@ void wish_api_directory_find(rpc_server_req* req, const uint8_t* args) {
     
     bson_find(&it, &bs, "0");
     if (bson_iterator_type(&it) != BSON_STRING || bson_iterator_string_len(&it) >= ROLE_NAME_LEN) {
-        wish_rpc_server_error(req, 501, "Expected alias to be String(<64).");
+        wish_rpc_server_error_msg(req, 501, "Expected alias to be String(<64).");
         return;
     }
     
@@ -28,7 +28,7 @@ void wish_api_directory_find(rpc_server_req* req, const uint8_t* args) {
     
     bson_find(&it, &bs, "1");
     if (bson_iterator_type(&it) != BSON_INT) {
-        wish_rpc_server_error(req, 501, "Expected count to be Int.");
+        wish_rpc_server_error_msg(req, 501, "Expected count to be Int.");
         return;
     }
     
@@ -46,7 +46,7 @@ void wish_api_directory_find(rpc_server_req* req, const uint8_t* args) {
     }
     
     
-    wish_rpc_server_error(req, 600, "Not implemented.");
+    wish_rpc_server_error_msg(req, 600, "Not implemented.");
     
     bson_destroy(&b);
 }

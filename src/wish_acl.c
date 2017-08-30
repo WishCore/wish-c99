@@ -20,7 +20,7 @@ void wish_api_acl_check(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
-    wish_rpc_server_error(req, 600, "Not implemented.");
+    wish_rpc_server_error_msg(req, 600, "Not implemented.");
 }
 
 /* args: 'String(Hex) luid, String role, String resource, Object permission' */
@@ -28,7 +28,7 @@ void wish_api_acl_allow(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
-    wish_rpc_server_error(req, 600, "Not implemented.");
+    wish_rpc_server_error_msg(req, 600, "Not implemented.");
 }
 
 /* args: 'String(Hex) luid, String role, String resource, Object permission' */
@@ -36,7 +36,7 @@ void wish_api_acl_remove_allow(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
-    wish_rpc_server_error(req, 600, "Not implemented.");
+    wish_rpc_server_error_msg(req, 600, "Not implemented.");
 }
 
 /* args: 'Buffer(32) luid, String role' */
@@ -52,7 +52,7 @@ void wish_api_acl_add_user_roles(rpc_server_req* req, const uint8_t* args) {
     
     bson_find(&it, &bs, "0");
     if (bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_UID_LEN) {
-        wish_rpc_server_error(req, 501, "Expected luid to be Buffer(32).");
+        wish_rpc_server_error_msg(req, 501, "Expected luid to be Buffer(32).");
         return;
     }
     
@@ -60,7 +60,7 @@ void wish_api_acl_add_user_roles(rpc_server_req* req, const uint8_t* args) {
     
     bson_find(&it, &bs, "1");
     if (bson_iterator_type(&it) != BSON_STRING || bson_iterator_string_len(&it) >= ROLE_NAME_LEN) {
-        wish_rpc_server_error(req, 501, "Expected role to be String(<64).");
+        wish_rpc_server_error_msg(req, 501, "Expected role to be String(<64).");
         return;
     }
     
@@ -71,7 +71,7 @@ void wish_api_acl_add_user_roles(rpc_server_req* req, const uint8_t* args) {
     
     wish_acl_user_roles_add(core->acl, &role);
     
-    wish_rpc_server_error(req, 600, "Not implemented.");
+    wish_rpc_server_error_msg(req, 600, "Not implemented.");
 }
 
 /* args: 'String(Hex) luid, String role, String resource, Object permission' */
@@ -79,7 +79,7 @@ void wish_api_acl_remove_user_roles(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
-    wish_rpc_server_error(req, 600, "Not implemented.");
+    wish_rpc_server_error_msg(req, 600, "Not implemented.");
 }
 
 /* args: 'String(Hex) luid, String role, String resource, Object permission' */
@@ -116,7 +116,7 @@ void wish_api_acl_what_resources(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
-    wish_rpc_server_error(req, 600, "Not implemented.");
+    wish_rpc_server_error_msg(req, 600, "Not implemented.");
 }
 
 /* args: 'resource, peer' */
@@ -124,7 +124,7 @@ void wish_api_acl_allowed_permissions(rpc_server_req* req, const uint8_t* args) 
     wish_core_t* core = req->server->context;
     wish_app_entry_t* app = req->context;
     
-    wish_rpc_server_error(req, 600, "Not implemented.");
+    wish_rpc_server_error_msg(req, 600, "Not implemented.");
 }
     
 
