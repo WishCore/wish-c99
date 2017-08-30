@@ -643,17 +643,17 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t* connection)
 
 typedef struct wish_rpc_server_handler handler;
 
-handler core_peers_h =                                 { .op_str = "peers",                               .handler = peers_op_handler };
-handler core_signals_h =                               { .op_str = "signals",                             .handler = wish_core_signals };
-handler core_send_h =                                  { .op_str = "send",                                .handler = send_op_handler };
-handler core_directory_h =                             { .op_str = "directory",                           .handler = core_directory };
-handler core_identity_list_h =                         { .op_str = "identity.list",                       .handler = wish_api_identity_list };
-handler core_identity_export_h =                       { .op_str = "identity.export",                     .handler = wish_api_identity_export };
-handler core_identity_sign_h =                         { .op_str = "identity.sign",                       .handler = wish_api_identity_sign };
-handler core_identity_friend_request_list_h =          { .op_str = "identity.friendRequestList",          .handler = wish_api_identity_friend_request_list };
-handler core_identity_friend_request_accept_h =        { .op_str = "identity.friendRequestAccept",        .handler = wish_api_identity_friend_request_accept };
-handler core_identity_friend_request_decline_h =       { .op_str = "identity.friendRequestDecline",       .handler = wish_api_identity_friend_request_decline };
-handler core_friend_req_h =                            { .op_str = "friendRequest",                       .handler = core_friend_req };
+handler core_peers_h =                                 { .op = "peers",                               .handler = peers_op_handler };
+handler core_signals_h =                               { .op = "signals",                             .handler = wish_core_signals };
+handler core_send_h =                                  { .op = "send",                                .handler = send_op_handler };
+handler core_directory_h =                             { .op = "directory",                           .handler = core_directory };
+handler core_identity_list_h =                         { .op = "identity.list",                       .handler = wish_api_identity_list };
+handler core_identity_export_h =                       { .op = "identity.export",                     .handler = wish_api_identity_export };
+handler core_identity_sign_h =                         { .op = "identity.sign",                       .handler = wish_api_identity_sign };
+handler core_identity_friend_request_list_h =          { .op = "identity.friendRequestList",          .handler = wish_api_identity_friend_request_list };
+handler core_identity_friend_request_accept_h =        { .op = "identity.friendRequestAccept",        .handler = wish_api_identity_friend_request_accept };
+handler core_identity_friend_request_decline_h =       { .op = "identity.friendRequestDecline",       .handler = wish_api_identity_friend_request_decline };
+handler core_friend_req_h =                            { .op = "friendRequest",                       .handler = core_friend_req };
 
 static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
     wish_connection_t* connection = (wish_connection_t*) req->ctx;
@@ -884,10 +884,10 @@ void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
     wish_rpc_client_end_by_ctx(core->core_rpc_client, ctx);
 
     
-    LL_FOREACH_SAFE(core->core_api->request_list_head, list_elem, tmp) {
+    LL_FOREACH_SAFE(core->core_api->requests, list_elem, tmp) {
         if (list_elem->request_ctx.ctx == (void*) ctx) {
-            WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", list_elem->request_ctx.op_str);
-            LL_DELETE(core->core_api->request_list_head, list_elem);
+            WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", list_elem->request_ctx.op);
+            LL_DELETE(core->core_api->requests, list_elem);
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
             memset(&(list_elem->request_ctx), 0, sizeof(rpc_server_req));
 #else

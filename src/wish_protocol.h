@@ -27,7 +27,7 @@ typedef struct {
 typedef struct {
     /* A facility for sending RPC messages, and define callbacks which
      * will be executed when the call is acked */
-    wish_rpc_client_t rpc_client;
+    rpc_client rpc_client;
     
     /* wish_rpc_server_t *rpc_server,
      * This will include a facility for dynamically define callbacks for

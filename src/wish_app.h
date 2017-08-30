@@ -51,7 +51,7 @@ typedef struct wish_app_context {
     //wish_permission_t *permissions[WISH_APP_MAX_PERMISSIONS];
     size_t num_permissions;
     // client for accessing core api
-    wish_rpc_client_t rpc_client;
+    rpc_client rpc_client;
     uint16_t port;
 } wish_app_t;
 
