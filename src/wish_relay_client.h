@@ -37,7 +37,7 @@ enum wish_relay_client_state {
 typedef struct wish_relay_client_ctx {
     int sockfd;
     /* The UID for which connections are to be relayed */
-    uint8_t relayed_uid[32];
+    uint8_t uid[32];
     /* The Relay session id given by the relay server is stored here */
     uint8_t session_id[RELAY_SESSION_ID_LEN];
     enum wish_relay_client_state curr_state;

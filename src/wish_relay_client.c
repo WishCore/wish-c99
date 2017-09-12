@@ -120,7 +120,7 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
             handshake_data[1] = '.';
             handshake_data[2] = (WISH_WIRE_VERSION << 4) | 
                 WISH_WIRE_TYPE_RELAY_CONTROL;   /* Type: 6 */
-            memcpy(handshake_data + 3, relay->relayed_uid, WISH_ID_LEN);
+            memcpy(handshake_data + 3, relay->uid, WISH_ID_LEN);
             relay->send(relay->sockfd, handshake_data, handshake_len);
             /* Advance state */
             relay->curr_state = WISH_RELAY_CLIENT_READ_SESSION_ID;

@@ -30,15 +30,13 @@ int relay_send(int sockfd, unsigned char* buffer, int len) {
     return 0;
 }
 
-void wish_relay_client_open(wish_core_t* core, wish_relay_client_t *relay, 
-        uint8_t relay_uid[WISH_ID_LEN]) {
+void wish_relay_client_open(wish_core_t* core, wish_relay_client_t* relay, uint8_t uid[WISH_ID_LEN]) {
     /* FIXME this has to be split into port-specific and generic
      * components. For example, setting up the RB, next state, expect
      * byte, copying of id is generic to all ports */
     relay->curr_state = WISH_RELAY_CLIENT_OPEN;
-    ring_buffer_init(&(relay->rx_ringbuf), relay->rx_ringbuf_storage, 
-        RELAY_CLIENT_RX_RB_LEN);
-    memcpy(relay->relayed_uid, relay_uid, WISH_ID_LEN);
+    ring_buffer_init(&(relay->rx_ringbuf), relay->rx_ringbuf_storage, RELAY_CLIENT_RX_RB_LEN);
+    memcpy(relay->uid, uid, WISH_ID_LEN);
 
     /* Linux/Unix-specific from now on */ 
 

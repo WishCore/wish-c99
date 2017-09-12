@@ -4,6 +4,7 @@
 #include "wish_core_signals.h"
 #include "wish_local_discovery.h"
 #include "wish_connection_mgr.h"
+#include "wish_relay_client.h"
 #include "wish_service_registry.h"
 #include "core_service_ipc.h"
 #include "wish_relationship.h"
@@ -337,12 +338,19 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
     // pass to identity get handler with uid as parameter
     wish_api_identity_get(req, (char*) bson_data(&bs));
     
-    WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
     wish_core_update_identities(core);
 
+    WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
     wish_ldiscover_advertize(core, id.uid);
     wish_report_identity_to_local_services(core, &id, true);
+    
+    
+    wish_relay_client_t* relay;
 
+    LL_FOREACH(core->relay_db, relay) {
+        wish_relay_client_open(core, relay, id.uid);
+    }
+    
     wish_core_signals_emit_string(core, "identity");
 }
 
@@ -370,15 +378,15 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
 
         /* Get the uid of identity to export, the uid is argument "0" in
          * args */
-        uint8_t *luid = 0;
-        luid = (uint8_t *)bson_iterator_bin_data(&it);
+        uint8_t* uid = 0;
+        uid = (uint8_t *)bson_iterator_bin_data(&it);
 
         wish_identity_t id_to_remove;
-        if (wish_identity_load(luid, &id_to_remove) == RET_SUCCESS) {
+        if (wish_identity_load(uid, &id_to_remove) == RET_SUCCESS) {
             wish_report_identity_to_local_services(core, &id_to_remove, false);
         }
         
-        int res = wish_identity_remove(core, luid);
+        int res = wish_identity_remove(core, uid);
 
         bson bs;
 
@@ -392,6 +400,15 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
         }
 
         wish_core_update_identities(core);
+        
+        wish_relay_client_t* relay;
+
+        LL_FOREACH(core->relay_db, relay) {
+            if (memcmp(relay->uid, uid, WISH_UID_LEN) == 0) {
+                wish_relay_client_close(core, relay);
+            }
+        }
+        
         wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
         
         wish_core_signals_emit_string(core, "identity");
