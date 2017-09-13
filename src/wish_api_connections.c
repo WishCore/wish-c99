@@ -184,7 +184,7 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     
-    int abuf_len = 512;
+    int abuf_len = 1024;
     char abuf[abuf_len];
     
     bson ba;
@@ -215,7 +215,7 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson rreq;
     bson_init_with_data(&rreq, buffer);
     
-    size_t request_max_len = 512+256;
+    size_t request_max_len = 1024+256;
     uint8_t request[request_max_len];
     
     bson b;
