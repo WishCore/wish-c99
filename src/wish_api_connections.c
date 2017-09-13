@@ -204,10 +204,15 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     
-    size_t buffer_max_len = 512+128;
+    size_t buffer_max_len = abuf_len+128;
     uint8_t buffer[buffer_max_len];
     wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, op, bson_data(&ba), bson_size(&ba), rpc_callback, buffer, buffer_max_len);
 
+    if (id == 0) {
+        wish_rpc_server_error_msg(req, 39, "wish rpc client error");
+        return;
+    }
+    
     rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
     mreq->cb_context = connection;
     mreq->passthru_ctx = req;
@@ -215,7 +220,7 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson rreq;
     bson_init_with_data(&rreq, buffer);
     
-    size_t request_max_len = 1024+256;
+    size_t request_max_len = abuf_len+256;
     uint8_t request[request_max_len];
     
     bson b;
