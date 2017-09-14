@@ -5,6 +5,7 @@
 #include "wish_dispatcher.h"
 #include "wish_debug.h"
 #include "string.h"
+#include "bson_visit.h"
 
 /**
  * Request to send message to peer
@@ -104,6 +105,7 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     
     int payload_len = bson_iterator_bin_len(&it);
     const uint8_t* payload = bson_iterator_bin_data(&it);
+    //bson_visit("Handling services.send, payload:", payload);
 
     /* First, check if message is to be delivered to some of our local services.
      * In this case we very if the message's rhid corresponds to our local core's rhid 
