@@ -515,6 +515,8 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
 }
 
 static void friend_req_callback(rpc_client_req* req, void* context, const uint8_t* payload, size_t payload_len) {
+    wish_core_t *core = req->client->context;
+    
     bson_visit("Friend req callback, payload: ", payload);
     
     bson_iterator data_it;
@@ -573,20 +575,11 @@ static void friend_req_callback(rpc_client_req* req, void* context, const uint8_
 
     if(!found) {
         wish_save_identity_entry(&new_friend_id);
+        wish_core_signals_emit_string(core, "identity");
     }
     
-    /* Finally, emit signal friendRequesteeAccepted. Note that this signal is emitted even if we already were friends (new friend was already in DB) */
-    const size_t buf_len = 128;
-    uint8_t buf[buf_len];
-    bson bs;
-    bson_init_buffer(&bs, buf, buf_len);
-    bson_append_start_array(&bs, "data");
-    bson_append_string(&bs, "0", "friendRequesteeAccepted");
-    bson_append_finish_array(&bs);
-    bson_finish(&bs);
-
-    wish_core_t *core = req->client->context;
-    wish_core_signals_emit(core, &bs);
+    /* emit friendRequesteeAccepted even if it was an identity which already existed */
+    wish_core_signals_emit_string(core, "friendRequesteeAccepted");
 }
 
 
