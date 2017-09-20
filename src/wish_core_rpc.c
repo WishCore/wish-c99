@@ -884,23 +884,21 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
  * @param ctx The connection context of the severed link
  */
 void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
-    struct wish_rpc_context_list_elem *list_elem = NULL;
-    struct wish_rpc_context_list_elem *tmp = NULL;
-    
+    rpc_server_req_list* elm = NULL;
+    rpc_server_req_list* tmp = NULL;
             
     //WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up client.");
     wish_rpc_client_end_by_ctx(core->core_rpc_client, ctx);
-
     
-    LL_FOREACH_SAFE(core->core_api->requests, list_elem, tmp) {
-        if (list_elem->request_ctx.ctx == (void*) ctx) {
-            WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", list_elem->request_ctx.op);
-            LL_DELETE(core->core_api->requests, list_elem);
+    LL_FOREACH_SAFE(core->core_api->requests, elm, tmp) {
+        if (elm->request_ctx.ctx == (void*) ctx) {
+            WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", elm->request_ctx.op);
+            LL_DELETE(core->core_api->requests, elm);
+            
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
-            memset(&(list_elem->request_ctx), 0, sizeof(rpc_server_req));
+            memset(&(elm->request_ctx), 0, sizeof(rpc_server_req));
 #else
-#error not implemented
-            //wish_platform_free....
+            wish_platform_free(elm);
 #endif
         }
     }
