@@ -245,12 +245,12 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH
 // Move implementation to wish-rpc-c99, just call it from here
 void wish_core_app_rpc_cleanup_requests(wish_core_t* core, struct wish_service_entry *service_entry_offline) {
     //WISHDEBUG(LOG_CRITICAL, "App rpc server clean up starting");
-    rpc_server_req_list* elm = NULL;
-    rpc_server_req_list* tmp = NULL;
+    rpc_server_req* elm = NULL;
+    rpc_server_req* tmp = NULL;
     
     LL_FOREACH_SAFE(core->app_api->requests, elm, tmp) {
-        if (elm->request_ctx.context == service_entry_offline) {
-            //WISHDEBUG(LOG_CRITICAL, "App rpc server clean up: request op %s", list_elem->request_ctx.op_str);
+        if (elm->context == service_entry_offline) {
+            //WISHDEBUG(LOG_CRITICAL, "App rpc server clean up: request op %s", elm->op_str);
             LL_DELETE(core->app_api->requests, elm);
             
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL
