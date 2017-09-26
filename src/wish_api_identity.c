@@ -1,6 +1,6 @@
 #include "wish_api_identity.h"
 #include "utlist.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_core_signals.h"
 #include "wish_local_discovery.h"
 #include "wish_connection_mgr.h"
@@ -105,7 +105,7 @@ void wish_api_identity_import(rpc_server_req* req, const uint8_t* args) {
         return;
     }
 
-    bson_visit("import args:", bson_iterator_bin_data(&it));
+    //bson_visit("import args:", bson_iterator_bin_data(&it));
     
     bson i;
     bson_init_with_data(&i, bson_iterator_bin_data(&it));
@@ -340,7 +340,7 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
     
     wish_core_update_identities(core);
 
-    WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
+    //WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
     wish_ldiscover_advertize(core, id.uid);
     wish_report_identity_to_local_services(core, &id, true);
     
@@ -1169,6 +1169,9 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
             wish_ldiscover_add(core, &entry);
         } else {
             WISHDEBUG(LOG_CRITICAL, "wish_ldiscover_entry_from_bson returned error");
+            wish_rpc_server_error_msg(req, 344, "Failed creating wld entry from signed_meta");
+            wish_platform_free(elt);
+            return;
         }
     }
 

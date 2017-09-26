@@ -1,7 +1,7 @@
 #pragma once
 
 #include "wish_core.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 
 /* Embedded Wish */
 

@@ -9,6 +9,7 @@
 #include "wish_core_rpc.h"
 #include "wish_identity.h"
 #include "wish_utils.h"
+#include "wish_core_signals.h"
 
 
 
@@ -46,7 +47,7 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
             }
 
             if (local_alias != NULL && remote_alias != NULL) {
-                WISHDEBUG(LOG_CRITICAL ,"Connection established: %s > %s (%s)", local_alias, remote_alias, e->context->via_relay ? "relayed" : "direct");
+                //WISHDEBUG(LOG_CRITICAL ,"Connection established: %s > %s (%s)", local_alias, remote_alias, e->context->via_relay ? "relayed" : "direct");
 
                 wish_platform_free(tmp_id);
                 wish_platform_free(local_alias);
@@ -54,6 +55,7 @@ void wish_message_processor_task(wish_core_t* core, struct wish_event *e) {
             }
 
             e->context->context_state = WISH_CONTEXT_CONNECTED;
+            wish_core_signals_emit_string(core, "connections");
         }
         break;
     default:

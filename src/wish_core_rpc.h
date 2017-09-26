@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "wish_core.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_service_registry.h"
 
 void wish_core_init_rpc(wish_core_t* core);

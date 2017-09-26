@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_debug.h"
 #include "wish_connection_mgr.h"
 
@@ -25,7 +25,7 @@ void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay) {
 }
 
 void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_t *relay) {
-    WISHDEBUG(LOG_CRITICAL, "Relay control connection disconnected");
+    //WISHDEBUG(LOG_CRITICAL, "Relay control connection disconnected");
     relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
 
     // Used for reconnect timeout

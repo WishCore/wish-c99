@@ -7,7 +7,7 @@
 #include "wish_debug.h"
 #include "wish_rpc.h"
 #include "bson.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_core_rpc.h"
 #include "wish_service_registry.h"
 #include "core_service_ipc.h"
@@ -243,8 +243,7 @@ void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, 
         if (wish_service_entry_is_valid(core, &(registry[i]))) {
             //WISHDEBUG(LOG_CRITICAL, "Service entry is valid");
             if (strncmp(((const char*) &(registry[i].protocols[0].name)), protocol, WISH_PROTOCOL_NAME_MAX_LEN) == 0) {
-                WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_callback: %s", core->id[0], core->id[1], online ? "online" : "offline");
-                
+                //WISHDEBUG(LOG_CRITICAL, "core 0x%02x%02x: wish_core_rpc_func: peers_callback: %s", core->id[0], core->id[1], online ? "online" : "offline");
                 send_core_to_app(core, registry[i].wsid, (char*)bson_data(&b), bson_size(&b));
             }
         }
@@ -699,9 +698,9 @@ static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
 }
 
 static void acl_check(rpc_server_req* req, const uint8_t* resource, const uint8_t* permission, void* ctx, rpc_acl_check_decision_cb decision) {
+    // This acl implementation is a dummy
+
     wish_connection_t* connection = req->ctx;
-    
-    WISHDEBUG(LOG_CRITICAL, "ACL Check: Remote command from %02x %02x %02x %02x.", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
     
     /*
     if (remoteManagementAllowed(connection)) {
@@ -710,6 +709,7 @@ static void acl_check(rpc_server_req* req, const uint8_t* resource, const uint8_
     */
     
     if ( strcmp(resource, "directory") == 0 && strcmp(permission, "call") == 0 ) {
+        WISHDEBUG(LOG_CRITICAL, "ACL Check: Remote command from %02x %02x %02x %02x.", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
         decision(req, false);
     } else if ( strcmp(resource, "peers") == 0 && strcmp(permission, "call") == 0 ) {
         decision(req, true);
@@ -862,7 +862,7 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
         for (i = 0; i < WISH_MAX_SERVICES; i++) {
             if (wish_service_entry_is_valid(core, &(registry[i]))) {
                 //bson_visit("This is peer info", peer_info);
-                WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_online_offline_signal_to_apps: (len %d)", bson_size(&bs));
+                //WISHDEBUG(LOG_CRITICAL, "wish_core_rpc_func: wish_send_online_offline_signal_to_apps: (len %d)", bson_size(&bs));
                 send_core_to_app(core, registry[i].wsid, bson_data(&bs), bson_size(&bs));
             }
         }
@@ -893,7 +893,7 @@ void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
     
     LL_FOREACH_SAFE(core->core_api->requests, elm, tmp) {
         if (elm->ctx == (void*) ctx) {
-            WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", elm->op);
+            //WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", elm->op);
             LL_DELETE(core->core_api->requests, elm);
             
 #ifdef WISH_RPC_SERVER_STATIC_REQUEST_POOL

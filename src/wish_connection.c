@@ -8,7 +8,7 @@
 #include "mbedtls/dhm.h"
 #include "mbedtls/gcm.h"
 #include "wish_core.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_core_signals.h"
 #include "wish_identity.h"
 #include "wish_config.h"
@@ -429,7 +429,7 @@ again:
             }
             break;
         case TRANSPORT_STATE_RELAY_CLIENT_SEND_SESSION_ID:
-            WISHDEBUG(LOG_CRITICAL, "Sending relay session id");
+            //WISHDEBUG(LOG_CRITICAL, "Sending relay session id");
             /* Just prior to entering this state the relay server has
              * told us that there is a connection waiting for us. We
              * open a connection to the relay server, send a wish
@@ -516,8 +516,8 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             if ( RET_SUCCESS == wish_identity_load(conn->luid, &lu) 
                     && RET_SUCCESS == wish_identity_load(conn->ruid, &ru) )
             {
-                WISHDEBUG(LOG_CRITICAL, "Connection attempt failed: %s > %s (%u.%u.%u.%u:%hu)",
-                        lu.alias, ru.alias, conn->remote_ip_addr[0], conn->remote_ip_addr[1], conn->remote_ip_addr[2], conn->remote_ip_addr[3], conn->remote_port);
+                //WISHDEBUG(LOG_CRITICAL, "Connection TCP_DISCONNECTED: %s > %s (%u.%u.%u.%u:%hu)",
+                //        lu.alias, ru.alias, conn->remote_ip_addr[0], conn->remote_ip_addr[1], conn->remote_ip_addr[2], conn->remote_ip_addr[3], conn->remote_port);
             }
             
             
@@ -551,10 +551,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             }
 #endif
 
-            if (other_connection_found) {
-                WISHDEBUG(LOG_CRITICAL, "Not sending offline signal because other connection luid and ruid found!");
-            }
-            else {
+            if (!other_connection_found) {
                 wish_send_online_offline_signal_to_apps(core, connection, false);
             }
         }
@@ -590,6 +587,9 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
 
         connection->close_timestamp = 0;
         connection->send_arg = NULL;
+        
+        wish_core_signals_emit_string(core, "connections");
+        
         break;
     case TCP_CLIENT_CONNECTED:
         WISHDEBUG(LOG_DEBUG, "Event TCP_CLIENT_CONNECTED");
@@ -1140,7 +1140,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             bson_iterator_from_buffer(&it, plaintxt);
             
             if (bson_find_fieldpath_value("transports.0", &it) == BSON_STRING) {
-                WISHDEBUG(LOG_CRITICAL, "FIXME: Not stored, but transport reported on connection %s", bson_iterator_string(&it));
+                // FIXME: Not stored, but transport reported on connection
             }
             
             /* Finished processing the handshake */

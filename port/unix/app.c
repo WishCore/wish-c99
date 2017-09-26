@@ -16,7 +16,7 @@
 #include "utlist.h"
 
 #include "wish_version.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_event.h"
 #include "wish_platform.h"
 
@@ -691,7 +691,7 @@ int main(int argc, char** argv) {
                             wish_relay_client_periodic(core, relay);
                         }
                         else if (read_len == 0) {
-                            printf("Relay control connection disconnected\n");
+                            //printf("Relay control connection disconnected\n");
                             relay_ctrl_disconnect_cb(core, relay);
                         }
                         else {

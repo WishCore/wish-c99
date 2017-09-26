@@ -5,7 +5,7 @@
 #include "wish_utils.h"
 #include "wish_identity.h"
 #include "wish_debug.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "bson.h"
 #include "bson_visit.h"
 #include "wish_connection_mgr.h"
@@ -144,7 +144,7 @@ return_t wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t 
     
     wish_connection_t *new_ctx = wish_connection_init(core, luid, ruid);
     if (new_ctx != NULL) {
-        WISHDEBUG(LOG_CRITICAL, "Connection attempt: %s > %s (%u.%u.%u.%u:%hu)", lu.alias, ru.alias, ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], port);
+        //WISHDEBUG(LOG_CRITICAL, "Connection attempt: %s > %s (%u.%u.%u.%u:%hu)", lu.alias, ru.alias, ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], port);
         wish_open_connection(core, new_ctx, ip, port, false);
     }
     

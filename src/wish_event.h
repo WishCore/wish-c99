@@ -2,7 +2,7 @@
 #define WISH_EVENT_H
 
 #include "wish_core.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 
 enum wish_event_type {
     WISH_EVENT_CONTINUE, /* Signal to the task indicating a continued message processing */

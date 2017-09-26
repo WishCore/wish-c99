@@ -3,7 +3,7 @@
 #include "utlist.h"
 #include "mbedtls/gcm.h"
 #include "wish_config.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_debug.h"
 #include "bson.h"
 #include <string.h>

@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #include "wish_time.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_debug.h"
 #include "wish_connection_mgr.h"
 #include "wish_relay_client.h"

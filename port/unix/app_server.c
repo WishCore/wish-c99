@@ -19,7 +19,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_event.h"
 #include "wish_platform.h"
 #include "wish_debug.h"

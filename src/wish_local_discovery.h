@@ -5,7 +5,7 @@
  */
 
 #include <stddef.h>
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_identity.h"
 #include "wish_port_config.h"
 

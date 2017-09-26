@@ -21,7 +21,7 @@
 #include "wish_dispatcher.h"
 #include "wish_core_signals.h"
 #include "wish_time.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 
 static void wish_ldiscover_periodic(wish_core_t* core, void* ctx) {
     //WISHDEBUG(LOG_CRITICAL, "Do some discovering...", ctx);
@@ -169,7 +169,7 @@ size_t buffer_len) {
     for(i=0; i<WISH_LOCAL_DISCOVERY_MAX; i++) {
         if (core->ldiscovery_db[i].occupied && core->ldiscovery_db[i].type == DISCOVER_TYPE_LOCAL && current_time - core->ldiscovery_db[i].timestamp > 30) {
             core->ldiscovery_db[i].occupied = false;
-            WISHDEBUG(LOG_CRITICAL, "LocalDiscovery dropped timed out entry.");
+            //WISHDEBUG(LOG_CRITICAL, "LocalDiscovery dropped timed out entry.");
             
             wish_core_signals_emit_string(core, "localDiscovery");
             continue;
@@ -278,15 +278,16 @@ size_t buffer_len) {
 
     /* FIXME currently always using first uid of list */
     uint8_t *my_uid = uid_list[0].uid;
-    wish_connection_t *new_ctx = wish_connection_init(core, my_uid, ruid);
-    if (new_ctx != NULL) {
+    wish_connection_t *connection = wish_connection_init(core, my_uid, ruid);
+    if (connection != NULL) {
         /* FIXME the ipshould be read from * 'transports' */
-        WISHDEBUG(LOG_CRITICAL, "LocalDiscovery: Will start connection to: %u.%u.%u.%u:%hu\n", ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], tcp_port);
+        
+        //WISHDEBUG(LOG_CRITICAL, "LocalDiscovery: Will start connection to: %u.%u.%u.%u:%hu\n", ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], tcp_port);
 
         /* Request opening of a new wish connection, and associate the
          * new wish context with it */
 
-        wish_open_connection(core, new_ctx, ip, tcp_port, false);
+        wish_open_connection(core, connection, ip, tcp_port, false);
     }
 
 }

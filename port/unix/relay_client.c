@@ -15,7 +15,7 @@
 
 
 #include "wish_relay_client.h"
-#include "wish_io.h"
+#include "wish_connection.h"
 
 void socket_set_nonblocking(int sockfd);
 

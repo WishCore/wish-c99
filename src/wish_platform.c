@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_platform.h"
 
 /* Variables for saving the function pointers set via wish_platform_set_* */

@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "wish_io.h"
+#include "wish_connection.h"
 #include "wish_identity.h"
 #include "ed25519.h"
 #include "mbedtls/sha256.h"
@@ -253,7 +253,7 @@ return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
     int retval = RET_FAIL;
 
     if (uid == NULL) {
-        return retval;
+        return RET_FAIL;
     }
 
     wish_file_t fd = wish_fs_open(WISH_ID_DB_NAME);
@@ -999,6 +999,16 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* me
     if (wish_identity_load(luid, &id) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not load the identity");
         return RET_FAIL;
+    }
+
+    if (meta != NULL) {
+        bson validate;
+        bson_init_with_data(&validate, meta);
+
+        if ( bson_size(&validate) > 1024 ) {
+            WISHDEBUG(LOG_CRITICAL, "Could load meta data, it was bigger than 1024 bytes: %i", bson_size(&validate));
+            return RET_FAIL;
+        }
     }
     
     size_t cert_buffer_len = 1024;
