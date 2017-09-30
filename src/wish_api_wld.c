@@ -215,8 +215,9 @@ void wish_api_wld_friend_request(rpc_server_req* req, const uint8_t* args) {
     for(i=0; i< WISH_LOCAL_DISCOVERY_MAX; i++) {
         if( db[i].occupied && 
                 memcmp(&db[i].ruid, ruid, WISH_ID_LEN) == 0 &&
-                memcmp(&db[i].rhid, rhid, WISH_ID_LEN) == 0) {
-            WISHDEBUG(LOG_CRITICAL, "Found in slot %d", i);
+                memcmp(&db[i].rhid, rhid, WISH_ID_LEN) == 0) 
+        {
+            //WISHDEBUG(LOG_CRITICAL, "Found in slot %d", i);
             found = true;
             break;
         }
@@ -234,7 +235,7 @@ void wish_api_wld_friend_request(rpc_server_req* req, const uint8_t* args) {
         
     uint8_t *ip = db[i].transport_ip.addr;
     
-    WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
+    //WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
 
     wish_open_connection(core, connection, &(db[i].transport_ip), db[i].transport_port, false);
 

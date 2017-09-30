@@ -414,7 +414,7 @@ void wish_ldiscover_add(wish_core_t* core, wish_ldiscover_t* entry) {
     
     memcpy(elt, entry, sizeof(wish_ldiscover_t));
     elt->occupied = true;
-    WISHDEBUG(LOG_CRITICAL, "wish_ldiscover_add completed successfully.");
+    //WISHDEBUG(LOG_CRITICAL, "wish_ldiscover_add completed successfully.");
 }
 
 void wish_ldiscover_clear(wish_core_t* core) {

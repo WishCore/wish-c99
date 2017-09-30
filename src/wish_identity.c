@@ -636,11 +636,10 @@ void wish_identity_add_meta_from_bson(wish_identity_t *id, const bson* meta) {
     /* FIXME copy all transports, now copying only the first one listed */
 
     if ( bson_find_fieldpath_value("transports.0", &it) == BSON_STRING ) {
-        WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
+        //WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
         strncpy(&(id->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
         
-    }
-    else {
+    } else {
         WISHDEBUG(LOG_CRITICAL, "transprots.0 not found");
     }
 }
@@ -744,11 +743,11 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
             continue;
         }
         if (memcmp(wish_context_pool[i].luid, uid, WISH_ID_LEN) == 0) {
-            WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is luid of a connection");
+            //WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is luid of a connection");
             wish_close_connection(core, &wish_context_pool[i]);
         }
         else if (memcmp(wish_context_pool[i].ruid, uid, WISH_ID_LEN) == 0) {
-            WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is ruid of a connection");
+            //WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is ruid of a connection");
             wish_close_connection(core, &wish_context_pool[i]); 
         }
     }
@@ -930,9 +929,9 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char
         return RET_FAIL;
     }
     
-    if (signed_meta) {
-        bson_visit("wish_identity_export with additional signed meta data", bson_data(&bs));
-    }
+    //if (signed_meta) {
+    //    bson_visit("wish_identity_export with additional signed meta data", bson_data(&bs));
+    //}
     
     const char *id_export_bson = bson_data(&bs);
     const int id_export_bson_len = bson_size(&bs);

@@ -81,9 +81,9 @@ static void rpc_callback(rpc_client_req* req, void* context, const uint8_t* payl
     wish_core_t* core = req->client->context;
     rpc_server_req* sreq = req->passthru_ctx;
     
-    WISHDEBUG(LOG_CRITICAL, "CoreRPC: got respose to %d", req->id);
+    //WISHDEBUG(LOG_CRITICAL, "CoreRPC: got respose to %d", req->id);
     
-    bson_visit("CoreRPC: payload:", payload);
+    //bson_visit("CoreRPC: payload:", payload);
     
     int buf_len = WISH_PORT_RPC_BUFFER_SZ;
     uint8_t buf[buf_len];

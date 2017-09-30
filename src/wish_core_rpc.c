@@ -410,7 +410,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
         bson_init_with_data(&tmp, signed_meta_bson);
         
         int signed_meta_bson_size = bson_size(&tmp);
-        WISHDEBUG(LOG_CRITICAL, "Argument 3 signed meta size: %d", signed_meta_bson_size);
+
         if (signed_meta_bson_size > 512) {
             // we should return error
             wish_rpc_server_error_msg(req, 340, "Argument 3 too big");
@@ -498,8 +498,8 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     memcpy(connection->luid, recepient_uid, WISH_ID_LEN);
     memcpy(connection->ruid, new_id->uid, WISH_ID_LEN);
 
-    WISHDEBUG(LOG_CRITICAL, "Friend request to luid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
-    WISHDEBUG(LOG_CRITICAL, "Friend request from ruid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
+    //WISHDEBUG(LOG_CRITICAL, "Friend request to luid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
+    //WISHDEBUG(LOG_CRITICAL, "Friend request from ruid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
 
     int buf_len = 1024;
     char buf[buf_len];
@@ -517,7 +517,17 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
 static void friend_req_callback(rpc_client_req* req, void* context, const uint8_t* payload, size_t payload_len) {
     wish_core_t *core = req->client->context;
     
-    bson_visit("Friend req callback, payload: ", payload);
+    //bson_visit("Friend req callback, payload: ", payload);
+    /*
+    data: {
+        data: Buffer(0x6b 00 00 00 ...)
+        meta: Buffer(0x38 00 00 00 ...)
+        signatures: [
+            0: {
+                uid: Buffer(0x33 1d 0c a6 ...)
+                sign: Buffer(0xc9 78 a7 0b ...)
+    ack: 4
+    */
     
     bson_iterator data_it;
     bson_iterator_from_buffer(&data_it, payload);
@@ -528,7 +538,13 @@ static void friend_req_callback(rpc_client_req* req, void* context, const uint8_
     }
     
     uint8_t *cert_data = (uint8_t *) bson_iterator_bin_data(&data_it);
-    bson_visit("Friend req callback, cert data: ", cert_data);
+    
+    //bson_visit("Friend req callback, cert data: ", cert_data);
+    /*    
+    alias: 'Bob'
+    uid: Buffer(0x33 1d 0c a6 ...)
+    pubkey: Buffer(0x03 7c 37 a7 ...)
+    */
          
     /* FIXME TODO: verify cert signatures */
       
@@ -549,7 +565,6 @@ static void friend_req_callback(rpc_client_req* req, void* context, const uint8_
     }
     
     uint8_t *meta_data = (uint8_t *) bson_iterator_bin_data(&data_it);
-    bson_visit("Friend req callback, meta data: ", cert_data);
     
     /* Add the friend request metadata to the internal identity structure */
     bson meta_bson;
@@ -623,7 +638,7 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t* connection)
     bson_append_finish_array(&b);
     bson_finish(&b);
     
-    bson_visit("Signed cert buffer: ", bson_data(&b));
+    //bson_visit("Signed cert buffer: ", bson_data(&b));
 
     size_t buffer_len = 1024;
     uint8_t buffer[buffer_len];

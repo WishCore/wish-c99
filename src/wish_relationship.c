@@ -14,8 +14,6 @@ void wish_relationship_destroy(wish_core_t* core) {
 }
 
 void wish_relationship_req_add(wish_core_t* core, wish_relationship_req_t* req) {
-    WISHDEBUG(LOG_CRITICAL, "We should add a friend req from %s", req->id.alias);
-    
     wish_relationship_req_t* rel = wish_platform_malloc(sizeof(wish_relationship_req_t));
     memcpy(rel, req, sizeof(wish_relationship_req_t));
     

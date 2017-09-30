@@ -326,7 +326,7 @@ again:
                                 /* Normal situation, proceed */
                             }
                             else if (conn_type ==  WISH_WIRE_TYPE_FRIEND_REQ) {
-                                WISHDEBUG(LOG_CRITICAL, "Friend req");           
+                                //WISHDEBUG(LOG_CRITICAL, "Friend req");           
                                 connection->friend_req_connection = true;
                             } else {
                                 WISHDEBUG(LOG_CRITICAL, "Unknown connection type");
@@ -361,7 +361,7 @@ again:
                     }
                     else {
                         /* Friend request connection */
-                        WISHDEBUG(LOG_CRITICAL, "Skipping UID check in handshake, because friend request connection");
+                        //WISHDEBUG(LOG_CRITICAL, "Skipping UID check in handshake, because friend request connection");
                     }
 
                     memcpy(connection->luid, dst_id, WISH_ID_LEN);
@@ -861,7 +861,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 connection->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
             } else {
                 /* Friend request connection */
-                WISHDEBUG(LOG_CRITICAL, "Outgoing friend req: Skipping server signature check");
+                //WISHDEBUG(LOG_CRITICAL, "Outgoing friend req: Skipping server signature check");
                 connection->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
             }
         }
@@ -892,7 +892,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             connection->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
 
             if (connection->friend_req_connection) {
-                WISHDEBUG(LOG_CRITICAL, "Sending friend request RPC");
+                //WISHDEBUG(LOG_CRITICAL, "Sending friend request RPC");
                 /* FIXME: this should just call a "connection established" handler instead, which would in turn call the RPC client for sending the friend req */
                 wish_core_send_friend_req(core, connection);
                 connection->context_state = WISH_CONTEXT_CONNECTED;
@@ -1053,7 +1053,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                     = PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE;
             } else {
                 /* Incoming friend request connection */
-                WISHDEBUG(LOG_CRITICAL, "Incoming friend req connection, skipping client hash check");
+                //WISHDEBUG(LOG_CRITICAL, "Incoming friend req connection, skipping client hash check");
                 connection->curr_protocol_state = PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE;
             }
         }

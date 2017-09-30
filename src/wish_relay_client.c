@@ -155,10 +155,10 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
                 /* Keepalive received - just ignore it */
                 WISHDEBUG(LOG_DEBUG, "Relay: received keep-alive");
                 break;
-            case ':':
+            case ':': {
                 /* We have a connection attempt to the relayed uid -
                  * Start accepting it! */
-                WISHDEBUG(LOG_CRITICAL, "Relay: connection attempt!");
+                //WISHDEBUG(LOG_CRITICAL, "Relay: connection attempt!");
 
                 /* Action plan: Open new Wish connection
                  * then send the session ID 
@@ -170,21 +170,22 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
                  * The actual IDs will be established during handshake
                  * */
                 uint8_t null_id[WISH_ID_LEN] = { 0 };
-                wish_connection_t *new_ctx = wish_connection_init(core, null_id, null_id);
+                wish_connection_t* connection = wish_connection_init(core, null_id, null_id);
                 /* Register the relay context to the newly created wish
                  * context, this is because we need to send over the
                  * relay session id */
-                if (new_ctx == NULL) {
+                if (connection == NULL) {
                     WISHDEBUG(LOG_CRITICAL, "Cannot accept new connections at this time. Please try again later!");
                     break;
                 }
-                new_ctx->relay = relay;
-                new_ctx->via_relay = true;
+                connection->relay = relay;
+                connection->via_relay = true;
 
                 /* FIXME Implement some kind of abstraction for IP
                  * addresses */
-                wish_open_connection(core, new_ctx, &(relay->ip), relay->port, true);
+                wish_open_connection(core, connection, &(relay->ip), relay->port, true);
                 break;
+            }
             default:
                 WISHDEBUG(LOG_CRITICAL, "Relay error: Unexepected data");
                 break;
