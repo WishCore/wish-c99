@@ -953,7 +953,7 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char
             char index[21];
             BSON_NUMSTR(index, i++);
             char host[29];
-            snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+            wish_platform_snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
 
             bson_append_string(&meta, index, host);
         }

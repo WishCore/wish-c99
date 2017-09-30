@@ -30,7 +30,7 @@ void wish_api_relay_list(rpc_server_req* req, const uint8_t* args) {
         
         char host[22];
         
-        snprintf(host, 22, "%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+        wish_platform_snprintf(host, 22, "%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
         
         bson_append_start_object(&bs, index);
         bson_append_string(&bs, "host", host);

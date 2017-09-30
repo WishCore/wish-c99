@@ -127,7 +127,7 @@ void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t b
         
         char host[29];
         
-        snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+        wish_platform_snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
         host[28] = '\0';
         
         bson_append_string(&bs, index, host);

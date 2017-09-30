@@ -41,6 +41,7 @@ int wish_platform_sprintf(char* str, const char* format, ...);
 #else
 int ets_sprintf(char *str, const char *format, ...)  __attribute__ ((format (printf, 2, 3)));
 #define wish_platform_sprintf ets_sprintf
+#define wish_platform_snprintf(str, size, format, ...) ets_sprintf(str, format, __VA_ARGS__)
 #endif
 
 /* Set the platform-dependent printf function.

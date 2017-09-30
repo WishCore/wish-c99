@@ -1,7 +1,6 @@
 #include "wish_core.h"
 #include "wish_identity.h"
 
-#include "stdio.h"
 #include "string.h"
 
 int wish_core_update_identities(wish_core_t* core) {

@@ -79,13 +79,16 @@ typedef unsigned char uint8_t;
 #endif
 
 #ifndef uthash_fatal
-#define uthash_fatal(msg) exit(-1)        /* fatal error (out of memory,etc) */
+#define uthash_fatal(msg) { \
+    wish_platform_printf("uthash out of memory\n"); \
+    while (1); \
+} /* fatal error (out of memory,etc) */
 #endif
 #ifndef uthash_malloc
-#define uthash_malloc(sz) malloc(sz)      /* malloc fcn                      */
+#define uthash_malloc(sz) wish_platform_malloc(sz)      /* malloc fcn                      */
 #endif
 #ifndef uthash_free
-#define uthash_free(ptr,sz) free(ptr)     /* free fcn                        */
+#define uthash_free(ptr,sz) wish_platform_free(ptr)     /* free fcn                        */
 #endif
 #ifndef uthash_strlen
 #define uthash_strlen(s) strlen(s)
