@@ -81,23 +81,23 @@ void socket_set_nonblocking(int sockfd) {
 
 /* When the wish connection "i" is connecting and connect succeeds
  * (socket becomes writable) this function is called */
-void connected_cb(wish_connection_t *ctx) {
+void connected_cb(wish_connection_t* connection) {
     //printf("Signaling wish session connected \n");
-    wish_core_signal_tcp_event(ctx->core, ctx, TCP_CONNECTED);
+    wish_core_signal_tcp_event(connection->core, connection, TCP_CONNECTED);
 }
 
-void connected_cb_relay(wish_connection_t *ctx) {
+void connected_cb_relay(wish_connection_t* connection) {
     //printf("Signaling relayed wish session connected \n");
-    wish_core_signal_tcp_event(ctx->core, ctx, TCP_RELAY_SESSION_CONNECTED);
+    wish_core_signal_tcp_event(connection->core, connection, TCP_RELAY_SESSION_CONNECTED);
 }
 
-void connect_fail_cb(wish_connection_t *ctx) {
+void connect_fail_cb(wish_connection_t* connection) {
     printf("Connect fail... \n");
-    wish_core_signal_tcp_event(ctx->core, ctx, TCP_DISCONNECTED);
+    wish_core_signal_tcp_event(connection->core, connection, TCP_DISCONNECTED);
 }
 
-int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr_t *ip, uint16_t port, bool relaying) {
-    ctx->core = core;
+int wish_open_connection(wish_core_t* core, wish_connection_t* connection, wish_ip_addr_t *ip, uint16_t port, bool relaying) {
+    connection->core = core;
     
     //printf("should start connect\n");
     int *sockfd_ptr = malloc(sizeof(int));
@@ -111,7 +111,7 @@ int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr
     int sockfd = *(sockfd_ptr);
     socket_set_nonblocking(sockfd);
 
-    wish_core_register_send(core, ctx, write_to_socket, sockfd_ptr);
+    wish_core_register_send(core, connection, write_to_socket, sockfd_ptr);
 
     //printf("Opening connection sockfd %i\n", sockfd);
     if (sockfd < 0) {
@@ -119,8 +119,8 @@ int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr
     }
 
     // set ip and port to wish connection
-    memcpy(ctx->remote_ip_addr, ip->addr, WISH_IPV4_ADDRLEN);
-    ctx->remote_port = port;
+    memcpy(connection->remote_ip_addr, ip->addr, WISH_IPV4_ADDRLEN);
+    connection->remote_port = port;
     
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
@@ -137,7 +137,7 @@ int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr
     if (ret == -1) {
         if (errno == EINPROGRESS) {
             WISHDEBUG(LOG_DEBUG, "Connect now in progress");
-            ctx->curr_transport_state = TRANSPORT_STATE_CONNECTING;
+            connection->curr_transport_state = TRANSPORT_STATE_CONNECTING;
         }
         else {
             perror("Unhandled connect() errno");
@@ -145,25 +145,25 @@ int wish_open_connection(wish_core_t* core, wish_connection_t *ctx, wish_ip_addr
     }
     else if (ret == 0) {
         printf("Cool, connect succeeds immediately!\n");
-        if (ctx->via_relay) {
-            connected_cb_relay(ctx);
+        if (connection->via_relay) {
+            connected_cb_relay(connection);
         }
         else {
-            connected_cb(ctx);
+            connected_cb(connection);
         }
     }
     return 0;
 }
 
-void wish_close_connection(wish_core_t* core, wish_connection_t *ctx) {
+void wish_close_connection(wish_core_t* core, wish_connection_t* connection) {
     /* Note that because we don't get a callback invocation when closing
      * succeeds, we need to excplicitly call TCP_DISCONNECTED so that
      * clean-up will happen */
-    ctx->context_state = WISH_CONTEXT_CLOSING;
-    int sockfd = *((int *)ctx->send_arg);
+    connection->context_state = WISH_CONTEXT_CLOSING;
+    int sockfd = *((int *)connection->send_arg);
     close(sockfd);
-    free(ctx->send_arg);
-    wish_core_signal_tcp_event(core, ctx, TCP_DISCONNECTED);
+    free(connection->send_arg);
+    wish_core_signal_tcp_event(core, connection, TCP_DISCONNECTED);
 }
 
 char usage_str[] = "Wish Core " WISH_CORE_VERSION_STRING
@@ -854,8 +854,8 @@ int main(int argc, char** argv) {
                      * The actual IDs will be established during handshake
                      * */
                     uint8_t null_id[WISH_ID_LEN] = { 0 };
-                    wish_connection_t *ctx = wish_connection_init(core, null_id, null_id);
-                    if (ctx == NULL) {
+                    wish_connection_t* connection = wish_connection_init(core, null_id, null_id);
+                    if (connection == NULL) {
                         /* Fail... no more contexts in our pool */
                         printf("No new Wish connections can be accepted!\n");
                         close(newsockfd);
@@ -864,8 +864,8 @@ int main(int argc, char** argv) {
                         int *fd_ptr = malloc(sizeof(int));
                         *fd_ptr = newsockfd;
                         /* New wish connection can be accepted */
-                        wish_core_register_send(core, ctx, write_to_socket, fd_ptr);
-                        wish_core_signal_tcp_event(core, ctx, TCP_CLIENT_CONNECTED);
+                        wish_core_register_send(core, connection, write_to_socket, fd_ptr);
+                        wish_core_signal_tcp_event(core, connection, TCP_CLIENT_CONNECTED);
                     }
                 }
             }
@@ -917,14 +917,12 @@ int main(int argc, char** argv) {
  
 
 /* This function is called when a new service is first detected */
-void wish_report_new_service(wish_connection_t *ctx, uint8_t *wsid,
-    char *protocol_name_str) {
-    printf("Detected new service, protocol %s",
-        protocol_name_str);
+void wish_report_new_service(wish_connection_t* connection, uint8_t* wsid, char* protocol_name_str) {
+    printf("Detected new service, protocol %s", protocol_name_str);
 }
 
 /* This function is called when a Wish service goes up or down */
-void wish_report_service_status_change(wish_connection_t *ctx, uint8_t *wsid, bool online) {
+void wish_report_service_status_change(wish_connection_t* connection, uint8_t* wsid, bool online) {
     printf("Detected service status change");
 }
 

@@ -71,7 +71,7 @@ wish_connection_t* wish_connection_init(wish_core_t* core, const uint8_t* luid, 
 
     connection->curr_transport_state = TRANSPORT_STATE_INITIAL;
     connection->curr_protocol_state = PROTO_STATE_INITIAL;
-    connection->rsid_list_head = NULL;
+    connection->apps = NULL;
 
     return connection;
 }
@@ -567,8 +567,8 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
          * the element */
         struct wish_remote_service *service;
         struct wish_remote_service *tmp;
-        LL_FOREACH_SAFE(connection->rsid_list_head, service, tmp) {
-            LL_DELETE(connection->rsid_list_head, service);
+        LL_FOREACH_SAFE(connection->apps, service, tmp) {
+            LL_DELETE(connection->apps, service);
             wish_platform_free(service);
         }
 
@@ -1370,8 +1370,8 @@ void wish_core_init(wish_core_t* core) {
 }
 
 
-int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t *ctx) {
-    return ring_buffer_space(&(ctx->rx_ringbuf));
+int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t* connection) {
+    return ring_buffer_space(&(connection->rx_ringbuf));
 }
 
 

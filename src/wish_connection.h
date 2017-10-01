@@ -73,11 +73,12 @@ enum tcp_event {
 #define AES_GCM_IV_LEN          12
 #define AES_GCM_AUTH_TAG_LEN    16
 
-struct wish_remote_service {
+typedef struct wish_remote_service {
+    uint8_t name[WISH_APP_NAME_MAX_LEN];
     uint8_t rsid[WISH_WSID_LEN];
     char protocol[10];
     struct wish_remote_service *next;
-};
+} wish_remote_app;
 
 enum wish_context_state {
     WISH_CONTEXT_FREE,      /* Uncommitted, unused "free" wish connection */
@@ -154,7 +155,7 @@ typedef struct wish_context {
      * peer in order to send a friend request */
     bool friend_req_connection;
     const char* friend_req_meta;
-    struct wish_remote_service *rsid_list_head;
+    wish_remote_app* apps;
 } wish_connection_t;
 
 struct wish_peer {
@@ -252,4 +253,4 @@ void wish_core_init(wish_core_t* core);
 /*
  * This function returns the number of bytes free in the ring buffer 
  */
-int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t *ctx);
+int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t* connection);

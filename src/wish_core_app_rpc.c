@@ -134,6 +134,7 @@ handler identity_friend_request_accept_h =            { .op = "identity.friendRe
 handler identity_friend_request_decline_h =           { .op = "identity.friendRequestDecline",     .handler = wish_api_identity_friend_request_decline, .args = "(luid: Uid, ruid: Uid): bool" };
 
 handler connections_list_h =                          { .op = "connections.list",                  .handler = wish_api_connections_list, .args = "(void): Connection[]" };
+handler connections_apps_h =                          { .op = "connections.apps",                  .handler = wish_api_connections_apps, .args = "(host: Host): Apps[]" };
 handler connections_request_h =                       { .op = "connections.request",               .handler = wish_api_connections_request, .args = "(host: Host, op: string, args: array): Response" };
 handler connections_disconnect_h =                    { .op = "connections.disconnect",            .handler = wish_api_connections_disconnect, .args = "(id: number): bool" };
 handler connections_check_connections_h =             { .op = "connections.checkConnections",      .handler = wish_api_connections_check_connections, .args = "(id: number): bool" };
@@ -202,6 +203,7 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     wish_rpc_server_register(core->app_api, &directory_find_h);
     
     wish_rpc_server_register(core->app_api, &connections_list_h);
+    wish_rpc_server_register(core->app_api, &connections_apps_h);
     wish_rpc_server_register(core->app_api, &connections_request_h);
     wish_rpc_server_register(core->app_api, &connections_disconnect_h);
     wish_rpc_server_register(core->app_api, &connections_check_connections_h);
