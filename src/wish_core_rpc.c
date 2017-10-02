@@ -141,7 +141,7 @@ static void wish_core_add_remote_service(wish_connection_t* connection, const ch
         WISHDEBUG(LOG_CRITICAL, "Out of memory when adding context peer!");
         return;
     }
-    strncpy(app->name, name, WISH_APP_NAME_MAX_LEN);
+    if (name) { strncpy(app->name, name, WISH_APP_NAME_MAX_LEN); }
     memcpy(app->rsid, rsid, WISH_WSID_LEN);
     strncpy(app->protocol, protocol, WISH_PROTOCOL_NAME_MAX_LEN);
     LL_APPEND(connection->apps, app);
