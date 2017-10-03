@@ -14,7 +14,10 @@ extern "C" {
 #include "wish_protocol.h"
 
 /* Number of Wish applications supported */
+#ifndef NUM_WISH_APPS
 #define NUM_WISH_APPS   5
+#endif //NUM_WISH_APPS
+
 #define WISH_APP_INDEX_VACANT  0
     
 #define WISH_APP_NAME_MAX_LEN 32
