@@ -1,3 +1,0 @@
-//#define OLIMEX_HARDWARE
-#define SONOFF_HARDWARE
-
