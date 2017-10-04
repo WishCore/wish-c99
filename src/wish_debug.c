@@ -9,6 +9,8 @@
  * terminal */
 const int octets_per_line = 16;
 
+#ifndef COMPILING_FOR_ESP8266
+
 #define WISH_DEBUG_STREAM_INDEX_MAX 10
 
 char debug_stream_names[WISH_DEBUG_STREAM_INDEX_MAX][15] = {
@@ -44,6 +46,8 @@ void wish_debug_printf(int stream, const char* format, ...) {
         va_end(arg);        
     }
 }
+
+#endif //COMPILING_FOR_ESP8266
 
 /* Print out an array on the terminal */
 void wish_debug_print_array(int log_lvl, char* title, uint8_t* array, uint8_t len) {
