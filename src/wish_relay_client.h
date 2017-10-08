@@ -15,10 +15,13 @@
 
 #define RELAY_CLIENT_RECONNECT_TIMEOUT 10 /* Seconds */
 
+#define RELAY_CLIENT_CONNECT_TIMEOUT 30 /* Seconds */
+
 #define RELAY_SESSION_ID_LEN 10
 
 enum wish_relay_client_state {
     WISH_RELAY_CLIENT_INITIAL,  /* The initial state */
+    WISH_RELAY_CLIENT_CONNECTING,  /* The relay client connection has been started, but has not yet connected */
     WISH_RELAY_CLIENT_OPEN,     /* The state where the client sends the
     preamble + uid */
     WISH_RELAY_CLIENT_READ_SESSION_ID,  /* The state where the client

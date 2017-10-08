@@ -14,6 +14,7 @@
 
 void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay) {
     //printf("Relay control connection established\n");
+    relay->curr_state = WISH_RELAY_CLIENT_OPEN;
 }
 
 void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay) {
@@ -37,6 +38,12 @@ static void wish_relay_client_check_connections(wish_core_t* core) {
 
     LL_FOREACH(core->relay_db, relay) {
         switch(relay->curr_state) {
+            case WISH_RELAY_CLIENT_CONNECTING: {
+                if (wish_time_get_relative(core) > (relay->last_input_timestamp + RELAY_CLIENT_CONNECT_TIMEOUT)) {
+                    wish_relay_client_close(core, relay);
+                }
+                break;
+            }
             case WISH_RELAY_CLIENT_INITIAL:
                 if (core->loaded_num_ids > 0) {
                     // Assume first identity in db is the one we want
