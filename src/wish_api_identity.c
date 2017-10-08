@@ -1131,7 +1131,16 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     
     /* The friend request has been accepted, send our certificate as a RPC response to the remote core that originally sent us the core-to-core friend request. */
     size_t signed_cert_buffer_len = 1024;
+#ifdef COMPILING_FOR_ESP8266
+    uint8_t *signed_cert_buffer = wish_platform_malloc(signed_cert_buffer_len);
+    if (signed_cert_buffer == NULL) {
+        WISHDEBUG(LOG_CRITICAL, "Out of memory in wish_api_identity_friend_request_accept (1)");
+        wish_rpc_server_error_msg(req, 344, "Out of memory (1)");
+        return;
+    }
+#else
     uint8_t signed_cert_buffer[signed_cert_buffer_len];
+#endif 
     bin signed_cert = { .base = signed_cert_buffer, .len = signed_cert_buffer_len };
     
     if (wish_build_signed_cert(core, elt->luid, NULL, &signed_cert) == RET_FAIL) {
@@ -1142,7 +1151,17 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     bson cert;
     bson_init_with_data(&cert, signed_cert.base);
     
+#ifdef COMPILING_FOR_ESP8266
+    char *buf_base = wish_platform_malloc(WISH_PORT_RPC_BUFFER_SZ);
+    if (buf_base == NULL) {
+        WISHDEBUG(LOG_CRITICAL, "Out of memory in wish_api_identity_friend_request_accept (2)");
+        wish_platform_free(signed_cert_buffer);
+        wish_rpc_server_error_msg(req, 344, "Out of memory (2)");
+        return;
+    }
+#else
     char buf_base[WISH_PORT_RPC_BUFFER_SZ];
+#endif
     
     bin buf;
     buf.base = buf_base;
@@ -1171,6 +1190,10 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
             WISHDEBUG(LOG_CRITICAL, "wish_ldiscover_entry_from_bson returned error");
             wish_rpc_server_error_msg(req, 344, "Failed creating wld entry from signed_meta");
             wish_platform_free(elt);
+#ifdef COMPILING_FOR_ESP8266
+            wish_platform_free(signed_cert_buffer);
+            wish_platform_free(buf_base);
+#endif
             return;
         }
     }
@@ -1193,11 +1216,20 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
 
     if(bs.err != 0) {
         wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+#ifdef COMPILING_FOR_ESP8266
+        wish_platform_free(signed_cert_buffer);
+        wish_platform_free(buf_base);
+#endif
         return;
     }
 
     wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     wish_platform_free(elt);
+#ifdef COMPILING_FOR_ESP8266
+    wish_platform_free(signed_cert_buffer);
+    wish_platform_free(buf_base);
+#endif    
+    
 }
 
 /**
