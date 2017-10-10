@@ -585,7 +585,7 @@ int main(int argc, char** argv) {
             wish_relay_client_t* relay;
             
             LL_FOREACH(core->relay_db, relay) {
-                if (relay->curr_state == WISH_RELAY_CLIENT_OPEN) {
+                if (relay->curr_state == WISH_RELAY_CLIENT_CONNECTING) {
                     FD_SET(relay->sockfd, &wfds);
                     update_max_fd(relay->sockfd, &max_fd);
                 }
