@@ -13,7 +13,7 @@
 #include "utlist.h"
 
 void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay) {
-    //printf("Relay control connection established\n");
+    WISHDEBUG(LOG_CRITICAL, "Relay control connection established");
     relay->curr_state = WISH_RELAY_CLIENT_OPEN;
 }
 
@@ -38,12 +38,11 @@ static void wish_relay_client_check_connections(wish_core_t* core) {
 
     LL_FOREACH(core->relay_db, relay) {
         switch(relay->curr_state) {
-            case WISH_RELAY_CLIENT_CONNECTING: {
+            case WISH_RELAY_CLIENT_CONNECTING:
                 if (wish_time_get_relative(core) > (relay->last_input_timestamp + RELAY_CLIENT_CONNECT_TIMEOUT)) {
                     wish_relay_client_close(core, relay);
                 }
                 break;
-            }
             case WISH_RELAY_CLIENT_INITIAL:
                 if (core->loaded_num_ids > 0) {
                     // Assume first identity in db is the one we want
@@ -115,6 +114,9 @@ void wish_relay_client_add(wish_core_t* core, const char* host) {
  * from relay server and take actions accordingly */
 void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
     switch (relay->curr_state) {
+    case WISH_RELAY_CLIENT_CONNECTING:
+        
+        break;
     case WISH_RELAY_CLIENT_OPEN:
         /* Establishing a Relay control connection:
          * After opening the TCP socket, the relay client must
