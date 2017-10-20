@@ -118,9 +118,6 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     // [{ luid, ruid, rhid }, op, args]
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    int buf_len = WISH_PORT_RPC_BUFFER_SZ;
-    uint8_t buf[buf_len];
-
     bson_iterator it;
     
     bson_iterator_from_buffer(&it, args);
@@ -190,7 +187,9 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     
     bson ba;
     bson_init_buffer(&ba, abuf, abuf_len);
+    bson_append_string(&ba, "op", op);
     bson_append_element(&ba, "args", &it);
+    bson_append_int(&ba, "id", 0);
     bson_finish(&ba);
     
     wish_connection_t* connection = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
@@ -205,28 +204,21 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     
-    size_t buffer_max_len = abuf_len+128;
-    uint8_t buffer[buffer_max_len];
-    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, op, bson_data(&ba), bson_size(&ba), rpc_callback, buffer, buffer_max_len);
+    rpc_client_req* mreq = wish_rpc_client_request(core->core_rpc_client, &ba, rpc_callback, connection);
 
-    if (id == 0) {
+    if (mreq == NULL) {
         wish_rpc_server_error_msg(req, 39, "wish rpc client error");
         return;
     }
     
-    rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
-    mreq->cb_context = connection;
     mreq->passthru_ctx = req;
 
-    bson rreq;
-    bson_init_with_data(&rreq, buffer);
-    
-    size_t request_max_len = abuf_len+256;
-    uint8_t request[request_max_len];
+    size_t buf_len = abuf_len+256;
+    uint8_t buf[buf_len];
     
     bson b;
-    bson_init_buffer(&b, request, request_max_len);
-    bson_append_bson(&b, "req", &rreq);
+    bson_init_buffer(&b, buf, buf_len);
+    bson_append_bson(&b, "req", &ba);
     bson_finish(&b);
     
     if (b.err) {
@@ -235,15 +227,6 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     }
     
     wish_core_send_message(core, connection, bson_data(&b), bson_size(&b));
-    
-    /*
-    bson bs;
-    bson_init_buffer(&bs, buf, buf_len);
-    bson_append_bool(&bs, "data", true);
-    bson_finish(&bs);
-    
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
-    */
 }
 
 /**

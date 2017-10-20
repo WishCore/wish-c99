@@ -635,37 +635,29 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t* connection)
     bson cert;
     bson_init_with_data(&cert, signed_cert.base);
     
-    char buf_base[WISH_PORT_RPC_BUFFER_SZ];
-    
-    bin buf;
-    buf.base = buf_base;
-    buf.len = WISH_PORT_RPC_BUFFER_SZ;
+    char buf[WISH_PORT_RPC_BUFFER_SZ];
     
     bson b;
-    bson_init_buffer(&b, buf.base, buf.len);
+    bson_init_buffer(&b, buf, WISH_PORT_RPC_BUFFER_SZ);
+    bson_append_string(&b, "op", "friendRequest");
     bson_append_start_array(&b, "args");
     bson_append_bson(&b, "0", &cert);
     bson_append_finish_array(&b);
+    bson_append_int(&b, "id", 0);
     bson_finish(&b);
     
     //bson_visit("Signed cert buffer: ", bson_data(&b));
 
-    size_t buffer_len = 1024;
-    uint8_t buffer[buffer_len];
-    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "friendRequest", (uint8_t*)bson_data(&b), bson_size(&b), friend_req_callback, buffer, buffer_len);
-
-    rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
-    mreq->cb_context = connection;
-
-    bson req;
-    bson_init_with_data(&req, buffer);
+    rpc_client_req* mreq = wish_rpc_client_request(core->core_rpc_client, &b, friend_req_callback, connection);
+    
+    if (mreq == NULL) { WISHDEBUG(LOG_CRITICAL, "Failed sending friend request. rpc_client_request returned NULL."); return; }
     
     size_t request_max_len = 1024;
     uint8_t request[request_max_len];
     
     bson bs;
     bson_init_buffer(&bs, request, request_max_len);
-    bson_append_bson(&bs, "req", &req);
+    bson_append_bson(&bs, "req", &b);
     bson_finish(&bs);
     
     wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
@@ -791,26 +783,35 @@ void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t* connecti
 }
 
 void wish_core_send_peers_rpc_req(wish_core_t* core, wish_connection_t* connection) {
-    size_t buffer_max_len = 75;
-    uint8_t buffer[buffer_max_len];
-    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "peers", NULL, 0, peers_callback, buffer, buffer_max_len);
-
-    rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
-    mreq->cb_context = connection;
-    
-
-    bson req;
-    bson_init_with_data(&req, buffer);
-    
-    size_t request_max_len = 256;
-    uint8_t request[request_max_len];
+    size_t buf_len = 64;
+    uint8_t buf[buf_len];
     
     bson bs;
-    bson_init_buffer(&bs, request, request_max_len);
-    bson_append_bson(&bs, "req", &req);
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_append_string(&bs, "op", "peers");
+    bson_append_start_array(&bs, "args");
+    bson_append_finish_array(&bs);
+    bson_append_int(&bs, "id", 0);
     bson_finish(&bs);
     
-    wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
+    rpc_client_req* req = wish_rpc_client_request(core->core_rpc_client, &bs, peers_callback, connection);
+    
+    if (req == NULL) { WISHDEBUG(LOG_CRITICAL, "failed sending peers request, rpc_client_request returned NULL"); return; }
+
+    size_t obuf_len = buf_len+16;
+    uint8_t obuf[obuf_len];
+    
+    bson b;
+    bson_init_buffer(&b, obuf, obuf_len);
+    bson_append_bson(&b, "req", &bs);
+    bson_finish(&b);
+    
+    if (b.err) {
+        WISHDEBUG(LOG_CRITICAL, "Building req failed.");
+        return;
+    }
+    
+    wish_core_send_message(core, connection, bson_data(&b), bson_size(&b));
 }
 
 /**
