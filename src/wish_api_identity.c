@@ -517,7 +517,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         bson_iterator_from_buffer(&it, args);
         
         if ( bson_find_fieldpath_value("1.meta", &it) != BSON_EOO ) {
-            WISHDEBUG(LOG_CRITICAL, "1.meta");
+            //WISHDEBUG(LOG_CRITICAL, "1.meta");
             bson_append_field_from_iterator(&it, &b);
         }
 
@@ -795,7 +795,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("1.meta", &it) == BSON_BINDATA ) {
-        WISHDEBUG(LOG_CRITICAL, "1.meta");
+        //WISHDEBUG(LOG_CRITICAL, "1.meta");
         bson_iterator meta;
         bson_iterator_from_buffer(&meta, bson_iterator_bin_data(&it));
 
@@ -818,8 +818,8 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         wish_rpc_server_error_msg(req, 351, "No transports available.");
     }
     
-    WISHDEBUG(LOG_CRITICAL, "alias for remote friend req: %s", alias);
-    WISHDEBUG(LOG_CRITICAL, "tranport for remote friend req: %s", transport);
+    //WISHDEBUG(LOG_CRITICAL, "alias for remote friend req: %s", alias);
+    //WISHDEBUG(LOG_CRITICAL, "tranport for remote friend req: %s", transport);
 
     // check optional argument 3; 
     bson_find_from_buffer(&it, args, "2");
@@ -828,7 +828,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     
     if (bson_iterator_type(&it) == BSON_OBJECT) {
         const char* freq_meta_bson = bson_iterator_value(&it);
-        bson_visit("We should add this meta data to the friend request", freq_meta_bson);
+        //bson_visit("We should add this meta data to the friend request", freq_meta_bson);
         
         bson tmp;
         bson_init_with_data(&tmp, freq_meta_bson);
@@ -847,7 +847,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
             return;
         }
 
-        WISHDEBUG(LOG_CRITICAL, "Made copy of friend_req_meta data.");
+        //WISHDEBUG(LOG_CRITICAL, "Made copy of friend_req_meta data.");
         memcpy(freq_meta, freq_meta_bson, freq_meta_size);
     }
     
@@ -863,14 +863,8 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     
     wish_parse_transport_ip_port(transport, strnlen(transport, 32), &ip, &port);
     
-    WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip.addr[0], ip.addr[1], ip.addr[2], ip.addr[3]);
-
+    //WISHDEBUG(LOG_CRITICAL, "Will start a friend req connection to: %u.%u.%u.%u\n", ip.addr[0], ip.addr[1], ip.addr[2], ip.addr[3]);
     wish_open_connection(core, connection, &ip, port, false);
-    
-    
-    
-    
-    
     
     uint8_t buffer[WISH_PORT_RPC_BUFFER_SZ];
 
@@ -920,8 +914,8 @@ void wish_api_identity_friend_request_list(rpc_server_req* req, const uint8_t* a
             bson b;
             bson_init_with_data(&b, elt->signed_meta);
 
-            WISHDEBUG(LOG_CRITICAL, "appending signed meta %d bytes", bson_size(&b));
-            
+            //WISHDEBUG(LOG_CRITICAL, "appending signed meta %d bytes", bson_size(&b));
+            // FIXME verify validity of bson to be appended
             bson_append_bson(&bs, "meta", &b);
         }
         
@@ -951,7 +945,7 @@ void wish_api_identity_friend_request_list(rpc_server_req* req, const uint8_t* a
 static return_t wish_ldiscover_entry_from_bson(const char* signed_meta, wish_ldiscover_t* out) {
     if (!signed_meta || !out) { return RET_E_INVALID_INPUT; }
     
-    bson_visit("wish_ldiscover_entry_from_bson", signed_meta);
+    //bson_visit("wish_ldiscover_entry_from_bson", signed_meta);
 
     bson_iterator it;
     
@@ -970,8 +964,8 @@ static return_t wish_ldiscover_entry_from_bson(const char* signed_meta, wish_ldi
     if (bson_iterator_type(&it) != BSON_BINDATA) { return RET_E_INVALID_INPUT; }
     bson_init_with_data(&meta, bson_iterator_bin_data(&it));
 
-    bson_visit("data", bson_data(&data));
-    bson_visit("meta", bson_data(&meta));
+    //bson_visit("data", bson_data(&data));
+    //bson_visit("meta", bson_data(&meta));
 
     
     // Now we have data and meta fields from the cert
@@ -1083,7 +1077,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
         if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
             if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
-                WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
+                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
                 wish_connection = &core->connection_pool[i];
                 break;
             }
@@ -1127,7 +1121,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     }
 
     
-    WISHDEBUG(LOG_CRITICAL, "Accepting friend request");
+    //WISHDEBUG(LOG_CRITICAL, "Accepting friend request");
     
     /* The friend request has been accepted, send our certificate as a RPC response to the remote core that originally sent us the core-to-core friend request. */
     size_t signed_cert_buffer_len = 1024;
@@ -1172,7 +1166,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     bson_append_bson(&b, "data", &cert);
     bson_finish(&b);
     
-    bson_visit("Signed cert buffer: ", bson_data(&b));
+    //bson_visit("Signed cert buffer: ", bson_data(&b));
     
     if (elt->signed_meta) {
         wish_ldiscover_t entry;
@@ -1200,7 +1194,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
 
     wish_rpc_server_send(&(elt->friend_rpc_req), bson_data(&b), bson_size(&b));
     
-    WISHDEBUG(LOG_CRITICAL, "Send friend req reply, closing connection now");
+    //WISHDEBUG(LOG_CRITICAL, "Send friend req reply, closing connection now");
     wish_close_connection(core, wish_connection);
             
     
@@ -1296,7 +1290,7 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
         if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
             if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
-                WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
+                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
                 wish_connection = &core->connection_pool[i];
                 break;
             }
@@ -1389,7 +1383,7 @@ void wish_report_identity_to_local_services(wish_core_t* core, wish_identity_t* 
                             WISHDEBUG(LOG_CRITICAL, "BSON error when creating peer message: %i %s len %i", bs.err, bs.errstr, bs.dataSize);
                         }
                         else {
-                            WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_func: Sending online message to app %s:", service_registry[i].name);
+                            //WISHDEBUG(LOG_CRITICAL, "wish_core_app_rpc_func: Sending online message to app %s:", service_registry[i].name);
                             //bson_visit("Sending peer message to app:", buffer);
                             send_core_to_app(core, service_registry[i].wsid, (uint8_t *) bson_data(&bs), bson_size(&bs));
                         }

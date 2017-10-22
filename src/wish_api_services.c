@@ -148,78 +148,48 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     /* Destination is determined to be a remote service on a remote core. */
     wish_connection_t* connection = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
 
-    /* Build the actual on-wire message:
-     *
-     * req: {
-     *  op: 'send'
-     *  args: [ lsid, rsid, protocol, payload ]
-     * }
-     */
-    
-    size_t args_buffer_len = 2*(WISH_WSID_LEN) + protocol_len + payload_len + 128;
-    uint8_t args_buffer[args_buffer_len];
-    bson bs; 
-    bson_init_buffer(&bs, args_buffer, args_buffer_len);
-    bson_append_start_array(&bs, "args");
-    bson_append_binary(&bs, "0", wsid, WISH_WSID_LEN);
-    bson_append_binary(&bs, "1", rsid, WISH_WSID_LEN);
-    bson_append_string(&bs, "2", protocol);
-    bson_append_binary(&bs, "3", payload, payload_len);
-    bson_append_finish_array(&bs);
-    bson_finish(&bs);
-    
-    if (bs.err) {
-        WISHDEBUG(LOG_CRITICAL, "BSON write error, args_buffer");
-        return;
-    }
+    // We will just send data and not expect response, not registering a request
+    //  wish_rpc_client_request(core->core_rpc_client, &bs, NULL);
 
-    size_t client_req_len = args_buffer_len + MAX_RPC_OP_LEN + 128;
-    uint8_t client_req[client_req_len];
-    
-    wish_rpc_client_bson(core->core_rpc_client, "send", bson_data(&bs), bson_size(&bs), NULL, client_req, client_req_len);
-
-    
-    //WISHDEBUG(LOG_CRITICAL, "Sending services.send");
     if (connection != NULL && connection->context_state == WISH_CONTEXT_CONNECTED) {
         
-        size_t req_len = client_req_len + 128;
-        uint8_t req_buf[req_len];
+        /* Build the actual on-wire message:
+         *
+         * req: {
+         *  op: 'send'
+         *  args: [ lsid, rsid, protocol, payload ]
+         * }
+         */
 
-        bson_iterator it;
-        bson_find_from_buffer(&it, client_req, "op");
-        const char* op = bson_iterator_string(&it);
-        
-        bool has_id = false;
-        bson_find_from_buffer(&it, client_req, "id");
-        if(bson_iterator_type(&it) == BSON_INT) {
-            // we have an id
-            has_id = true;
+        size_t buf_len = 2*(WISH_WSID_LEN) + protocol_len + payload_len + 128;
+        uint8_t buf[buf_len];
+        bson bs; 
+        bson_init_buffer(&bs, buf, buf_len);
+        bson_append_start_object(&bs, "req");
+        bson_append_string(&bs, "op", "send");
+        bson_append_start_array(&bs, "args");
+        bson_append_binary(&bs, "0", wsid, WISH_WSID_LEN);
+        bson_append_binary(&bs, "1", rsid, WISH_WSID_LEN);
+        bson_append_string(&bs, "2", protocol);
+        bson_append_binary(&bs, "3", payload, payload_len);
+        bson_append_finish_array(&bs);
+        bson_append_finish_object(&bs);
+        bson_finish(&bs);
+
+        if (bs.err) {
+            WISHDEBUG(LOG_CRITICAL, "BSON write error, args_buffer");
+            return;
         }
-        int id = bson_iterator_int(&it);
         
-        bson_find_from_buffer(&it, client_req, "args");
+        int send_ret = wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
         
-        bson b;
-        bson_init_buffer(&b, req_buf, req_len);
-        bson_append_start_object(&b, "req");
-        bson_append_string(&b, "op", op);
-        bson_append_element(&b, "args", &it);
-        if (has_id == true) { bson_append_int(&b, "id", id); }
-        bson_append_finish_object(&b);
-        bson_finish(&b);
-        
-        //bson_visit("About to send this to the remote core (should be req: { op, args[, id] }):", req_buf);
-        
-        
-        int send_ret = wish_core_send_message(core, connection, bson_data(&b), bson_size(&b));
         if (send_ret != 0) {
             /* Sending failed. Propagate RPC error */
             WISHDEBUG(LOG_CRITICAL, "Core app RPC: Sending not possible at this time");
             if(req->id != 0) {
                 wish_rpc_server_error_msg(req, 506, "Failed sending message to remote core.");
             }
-        }
-        else {
+        } else {
             /* Sending successful */
             if(req->id != 0) {
                 // Client expecting response. Send ack to client
@@ -229,12 +199,8 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
                 wish_rpc_server_delete_rpc_ctx(req);
             }
         }
-    }
-    else {
+    } else {
         WISHDEBUG(LOG_CRITICAL, "Could not find a suitable wish connection to send data.");
-        //wish_debug_print_array(LOG_DEBUG, "should be luid:", luid, WISH_ID_LEN);
-        //wish_debug_print_array(LOG_DEBUG, "should be ruid:", ruid, WISH_ID_LEN);
-        //wish_debug_print_array(LOG_DEBUG, "should be rhid:", rhid, WISH_ID_LEN);
     }
 }
 

@@ -71,7 +71,7 @@ wish_connection_t* wish_connection_init(wish_core_t* core, const uint8_t* luid, 
 
     connection->curr_transport_state = TRANSPORT_STATE_INITIAL;
     connection->curr_protocol_state = PROTO_STATE_INITIAL;
-    connection->rsid_list_head = NULL;
+    connection->apps = NULL;
 
     return connection;
 }
@@ -326,7 +326,7 @@ again:
                                 /* Normal situation, proceed */
                             }
                             else if (conn_type ==  WISH_WIRE_TYPE_FRIEND_REQ) {
-                                WISHDEBUG(LOG_CRITICAL, "Friend req");           
+                                //WISHDEBUG(LOG_CRITICAL, "Friend req");           
                                 connection->friend_req_connection = true;
                             } else {
                                 WISHDEBUG(LOG_CRITICAL, "Unknown connection type");
@@ -361,7 +361,7 @@ again:
                     }
                     else {
                         /* Friend request connection */
-                        WISHDEBUG(LOG_CRITICAL, "Skipping UID check in handshake, because friend request connection");
+                        //WISHDEBUG(LOG_CRITICAL, "Skipping UID check in handshake, because friend request connection");
                     }
 
                     memcpy(connection->luid, dst_id, WISH_ID_LEN);
@@ -567,8 +567,8 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
          * the element */
         struct wish_remote_service *service;
         struct wish_remote_service *tmp;
-        LL_FOREACH_SAFE(connection->rsid_list_head, service, tmp) {
-            LL_DELETE(connection->rsid_list_head, service);
+        LL_FOREACH_SAFE(connection->apps, service, tmp) {
+            LL_DELETE(connection->apps, service);
             wish_platform_free(service);
         }
 
@@ -861,7 +861,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 connection->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
             } else {
                 /* Friend request connection */
-                WISHDEBUG(LOG_CRITICAL, "Outgoing friend req: Skipping server signature check");
+                //WISHDEBUG(LOG_CRITICAL, "Outgoing friend req: Skipping server signature check");
                 connection->curr_protocol_state = PROTO_STATE_WISH_HANDSHAKE;
             }
         }
@@ -892,7 +892,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             connection->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
 
             if (connection->friend_req_connection) {
-                WISHDEBUG(LOG_CRITICAL, "Sending friend request RPC");
+                //WISHDEBUG(LOG_CRITICAL, "Sending friend request RPC");
                 /* FIXME: this should just call a "connection established" handler instead, which would in turn call the RPC client for sending the friend req */
                 wish_core_send_friend_req(core, connection);
                 connection->context_state = WISH_CONTEXT_CONNECTED;
@@ -1053,7 +1053,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                     = PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE;
             } else {
                 /* Incoming friend request connection */
-                WISHDEBUG(LOG_CRITICAL, "Incoming friend req connection, skipping client hash check");
+                //WISHDEBUG(LOG_CRITICAL, "Incoming friend req connection, skipping client hash check");
                 connection->curr_protocol_state = PROTO_SERVER_STATE_WISH_SEND_HANDSHAKE;
             }
         }
@@ -1370,8 +1370,8 @@ void wish_core_init(wish_core_t* core) {
 }
 
 
-int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t *ctx) {
-    return ring_buffer_space(&(ctx->rx_ringbuf));
+int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t* connection) {
+    return ring_buffer_space(&(connection->rx_ringbuf));
 }
 
 

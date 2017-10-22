@@ -13,7 +13,7 @@
 #include "utlist.h"
 
 void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay) {
-    //printf("Relay control connection established\n");
+    WISHDEBUG(LOG_CRITICAL, "Relay control connection established");
     relay->curr_state = WISH_RELAY_CLIENT_OPEN;
 }
 
@@ -38,12 +38,11 @@ static void wish_relay_client_check_connections(wish_core_t* core) {
 
     LL_FOREACH(core->relay_db, relay) {
         switch(relay->curr_state) {
-            case WISH_RELAY_CLIENT_CONNECTING: {
+            case WISH_RELAY_CLIENT_CONNECTING:
                 if (wish_time_get_relative(core) > (relay->last_input_timestamp + RELAY_CLIENT_CONNECT_TIMEOUT)) {
                     wish_relay_client_close(core, relay);
                 }
                 break;
-            }
             case WISH_RELAY_CLIENT_INITIAL:
                 if (core->loaded_num_ids > 0) {
                     // Assume first identity in db is the one we want
@@ -115,6 +114,9 @@ void wish_relay_client_add(wish_core_t* core, const char* host) {
  * from relay server and take actions accordingly */
 void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
     switch (relay->curr_state) {
+    case WISH_RELAY_CLIENT_CONNECTING:
+        
+        break;
     case WISH_RELAY_CLIENT_OPEN:
         /* Establishing a Relay control connection:
          * After opening the TCP socket, the relay client must
@@ -162,10 +164,10 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
                 /* Keepalive received - just ignore it */
                 WISHDEBUG(LOG_DEBUG, "Relay: received keep-alive");
                 break;
-            case ':':
+            case ':': {
                 /* We have a connection attempt to the relayed uid -
                  * Start accepting it! */
-                WISHDEBUG(LOG_CRITICAL, "Relay: connection attempt!");
+                //WISHDEBUG(LOG_CRITICAL, "Relay: connection attempt!");
 
                 /* Action plan: Open new Wish connection
                  * then send the session ID 
@@ -177,21 +179,22 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
                  * The actual IDs will be established during handshake
                  * */
                 uint8_t null_id[WISH_ID_LEN] = { 0 };
-                wish_connection_t *new_ctx = wish_connection_init(core, null_id, null_id);
+                wish_connection_t* connection = wish_connection_init(core, null_id, null_id);
                 /* Register the relay context to the newly created wish
                  * context, this is because we need to send over the
                  * relay session id */
-                if (new_ctx == NULL) {
+                if (connection == NULL) {
                     WISHDEBUG(LOG_CRITICAL, "Cannot accept new connections at this time. Please try again later!");
                     break;
                 }
-                new_ctx->relay = relay;
-                new_ctx->via_relay = true;
+                connection->relay = relay;
+                connection->via_relay = true;
 
                 /* FIXME Implement some kind of abstraction for IP
                  * addresses */
-                wish_open_connection(core, new_ctx, &(relay->ip), relay->port, true);
+                wish_open_connection(core, connection, &(relay->ip), relay->port, true);
                 break;
+            }
             default:
                 WISHDEBUG(LOG_CRITICAL, "Relay error: Unexepected data");
                 break;

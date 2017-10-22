@@ -92,6 +92,7 @@ static void peers_op_handler(rpc_server_req* req, const uint8_t *args) {
                 bson_append_int(&bs, "sig", req->id);
                 bson_append_start_object(&bs, "data");
                 bson_append_binary(&bs, "rsid", registry[i].wsid, WISH_WSID_LEN);
+                bson_append_string(&bs, "name", registry[i].name);
 
                 /* FIXME protocols[0][0]??? It will only include first of
                  * the protocols */
@@ -120,10 +121,10 @@ static void peers_op_handler(rpc_server_req* req, const uint8_t *args) {
  * service to the wish connection context, but checks first if it exists
  * in the list or not. 
  */
-static void wish_core_add_remote_service(wish_connection_t *ctx, const uint8_t rsid[WISH_WSID_LEN], const char *protocol) {
-    struct wish_remote_service *tmp;
+static void wish_core_add_remote_service(wish_connection_t* connection, const char* name, const uint8_t rsid[WISH_WSID_LEN], const char *protocol) {
+    wish_remote_app* tmp;
     /* Find out if we already know this peer */
-    LL_FOREACH(ctx->rsid_list_head, tmp) {
+    LL_FOREACH(connection->apps, tmp) {
         if (memcmp(tmp->rsid, rsid, WISH_WSID_LEN) == 0) {
             if (strncmp(tmp->protocol, protocol, 
                     WISH_PROTOCOL_NAME_MAX_LEN) == 0) {
@@ -135,15 +136,15 @@ static void wish_core_add_remote_service(wish_connection_t *ctx, const uint8_t r
     }
     /* If we got this far, the peer is a new one */
 
-    struct wish_remote_service *new_service
-        = wish_platform_malloc(sizeof (struct wish_remote_service));
-    if (new_service == NULL) {
+    wish_remote_app* app = wish_platform_malloc(sizeof(wish_remote_app));
+    if (app == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Out of memory when adding context peer!");
         return;
     }
-    memcpy(new_service->rsid, rsid, WISH_WSID_LEN);
-    strncpy(new_service->protocol, protocol, WISH_PROTOCOL_NAME_MAX_LEN);
-    LL_APPEND(ctx->rsid_list_head, new_service);
+    if (name) { strncpy(app->name, name, WISH_APP_NAME_MAX_LEN); }
+    memcpy(app->rsid, rsid, WISH_WSID_LEN);
+    strncpy(app->protocol, protocol, WISH_PROTOCOL_NAME_MAX_LEN);
+    LL_APPEND(connection->apps, app);
 }
 
 /** 
@@ -191,6 +192,15 @@ void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, 
     const uint8_t *rsid = bson_iterator_bin_data(&it);
 
     bson_iterator_from_buffer(&it, payload);
+
+    const uint8_t* name = NULL;
+    
+    if (bson_find_fieldpath_value("data.name", &it) == BSON_STRING) {
+        //WISHDEBUG(LOG_CRITICAL, "No data.name in peers_callback!");
+        name = bson_iterator_string(&it);
+    }
+
+    bson_iterator_from_buffer(&it, payload);
     
     if (bson_find_fieldpath_value("data.online", &it) != BSON_BOOL) {
         WISHDEBUG(LOG_CRITICAL, "No data.online in peers_callback!");
@@ -203,7 +213,7 @@ void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, 
      * from before). This is information needs to be saved here so that
      * we can send online/offline messages to a service in case the
      * service reconnects or connection is lost */
-    wish_core_add_remote_service(connection, rsid, protocol);
+    wish_core_add_remote_service(connection, name, rsid, protocol);
 
     
     /* Build Core-to-App message indicating the new peer */
@@ -410,7 +420,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
         bson_init_with_data(&tmp, signed_meta_bson);
         
         int signed_meta_bson_size = bson_size(&tmp);
-        WISHDEBUG(LOG_CRITICAL, "Argument 3 signed meta size: %d", signed_meta_bson_size);
+
         if (signed_meta_bson_size > 512) {
             // we should return error
             wish_rpc_server_error_msg(req, 340, "Argument 3 too big");
@@ -498,8 +508,8 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     memcpy(connection->luid, recepient_uid, WISH_ID_LEN);
     memcpy(connection->ruid, new_id->uid, WISH_ID_LEN);
 
-    WISHDEBUG(LOG_CRITICAL, "Friend request to luid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
-    WISHDEBUG(LOG_CRITICAL, "Friend request from ruid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
+    //WISHDEBUG(LOG_CRITICAL, "Friend request to luid: %02x %02x %02x %02x", connection->luid[0], connection->luid[1], connection->luid[2], connection->luid[3]);
+    //WISHDEBUG(LOG_CRITICAL, "Friend request from ruid: %02x %02x %02x %02x", connection->ruid[0], connection->ruid[1], connection->ruid[2], connection->ruid[3]);
 
     int buf_len = 1024;
     char buf[buf_len];
@@ -517,7 +527,17 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
 static void friend_req_callback(rpc_client_req* req, void* context, const uint8_t* payload, size_t payload_len) {
     wish_core_t *core = req->client->context;
     
-    bson_visit("Friend req callback, payload: ", payload);
+    //bson_visit("Friend req callback, payload: ", payload);
+    /*
+    data: {
+        data: Buffer(0x6b 00 00 00 ...)
+        meta: Buffer(0x38 00 00 00 ...)
+        signatures: [
+            0: {
+                uid: Buffer(0x33 1d 0c a6 ...)
+                sign: Buffer(0xc9 78 a7 0b ...)
+    ack: 4
+    */
     
     bson_iterator data_it;
     bson_iterator_from_buffer(&data_it, payload);
@@ -528,7 +548,13 @@ static void friend_req_callback(rpc_client_req* req, void* context, const uint8_
     }
     
     uint8_t *cert_data = (uint8_t *) bson_iterator_bin_data(&data_it);
-    bson_visit("Friend req callback, cert data: ", cert_data);
+    
+    //bson_visit("Friend req callback, cert data: ", cert_data);
+    /*    
+    alias: 'Bob'
+    uid: Buffer(0x33 1d 0c a6 ...)
+    pubkey: Buffer(0x03 7c 37 a7 ...)
+    */
          
     /* FIXME TODO: verify cert signatures */
       
@@ -549,7 +575,6 @@ static void friend_req_callback(rpc_client_req* req, void* context, const uint8_
     }
     
     uint8_t *meta_data = (uint8_t *) bson_iterator_bin_data(&data_it);
-    bson_visit("Friend req callback, meta data: ", cert_data);
     
     /* Add the friend request metadata to the internal identity structure */
     bson meta_bson;
@@ -610,37 +635,29 @@ void wish_core_send_friend_req(wish_core_t* core, wish_connection_t* connection)
     bson cert;
     bson_init_with_data(&cert, signed_cert.base);
     
-    char buf_base[WISH_PORT_RPC_BUFFER_SZ];
-    
-    bin buf;
-    buf.base = buf_base;
-    buf.len = WISH_PORT_RPC_BUFFER_SZ;
+    char buf[WISH_PORT_RPC_BUFFER_SZ];
     
     bson b;
-    bson_init_buffer(&b, buf.base, buf.len);
+    bson_init_buffer(&b, buf, WISH_PORT_RPC_BUFFER_SZ);
+    bson_append_string(&b, "op", "friendRequest");
     bson_append_start_array(&b, "args");
     bson_append_bson(&b, "0", &cert);
     bson_append_finish_array(&b);
+    bson_append_int(&b, "id", 0);
     bson_finish(&b);
     
-    bson_visit("Signed cert buffer: ", bson_data(&b));
+    //bson_visit("Signed cert buffer: ", bson_data(&b));
 
-    size_t buffer_len = 1024;
-    uint8_t buffer[buffer_len];
-    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "friendRequest", (uint8_t*)bson_data(&b), bson_size(&b), friend_req_callback, buffer, buffer_len);
-
-    rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
-    mreq->cb_context = connection;
-
-    bson req;
-    bson_init_with_data(&req, buffer);
+    rpc_client_req* mreq = wish_rpc_client_request(core->core_rpc_client, &b, friend_req_callback, connection);
+    
+    if (mreq == NULL) { WISHDEBUG(LOG_CRITICAL, "Failed sending friend request. rpc_client_request returned NULL."); return; }
     
     size_t request_max_len = 1024;
     uint8_t request[request_max_len];
     
     bson bs;
     bson_init_buffer(&bs, request, request_max_len);
-    bson_append_bson(&bs, "req", &req);
+    bson_append_bson(&bs, "req", &b);
     bson_finish(&bs);
     
     wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
@@ -761,31 +778,40 @@ void wish_core_feed_to_rpc_server(wish_core_t* core, wish_connection_t *connecti
  * Feed to core's RPC client response handler. 
  * You should feed the document which is as the element 'res' 
  */
-void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t *ctx, const uint8_t *data, size_t len) {
-    wish_rpc_client_handle_res(core->core_rpc_client, ctx, data, len);
+void wish_core_feed_to_rpc_client(wish_core_t* core, wish_connection_t* connection, const uint8_t *data, size_t len) {
+    wish_rpc_client_handle_res(core->core_rpc_client, connection, data, len);
 }
 
-void wish_core_send_peers_rpc_req(wish_core_t* core, wish_connection_t *ctx) {
-    size_t buffer_max_len = 75;
-    uint8_t buffer[buffer_max_len];
-    wish_rpc_id_t id = wish_rpc_client_bson(core->core_rpc_client, "peers", NULL, 0, peers_callback, buffer, buffer_max_len);
-
-    rpc_client_req* mreq = find_request_entry(core->core_rpc_client, id);
-    mreq->cb_context = ctx;
-    
-
-    bson req;
-    bson_init_with_data(&req, buffer);
-    
-    size_t request_max_len = 256;
-    uint8_t request[request_max_len];
+void wish_core_send_peers_rpc_req(wish_core_t* core, wish_connection_t* connection) {
+    size_t buf_len = 64;
+    uint8_t buf[buf_len];
     
     bson bs;
-    bson_init_buffer(&bs, request, request_max_len);
-    bson_append_bson(&bs, "req", &req);
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_append_string(&bs, "op", "peers");
+    bson_append_start_array(&bs, "args");
+    bson_append_finish_array(&bs);
+    bson_append_int(&bs, "id", 0);
     bson_finish(&bs);
     
-    wish_core_send_message(core, ctx, bson_data(&bs), bson_size(&bs));
+    rpc_client_req* req = wish_rpc_client_request(core->core_rpc_client, &bs, peers_callback, connection);
+    
+    if (req == NULL) { WISHDEBUG(LOG_CRITICAL, "failed sending peers request, rpc_client_request returned NULL"); return; }
+
+    size_t obuf_len = buf_len+16;
+    uint8_t obuf[obuf_len];
+    
+    bson b;
+    bson_init_buffer(&b, obuf, obuf_len);
+    bson_append_bson(&b, "req", &bs);
+    bson_finish(&b);
+    
+    if (b.err) {
+        WISHDEBUG(LOG_CRITICAL, "Building req failed.");
+        return;
+    }
+    
+    wish_core_send_message(core, connection, bson_data(&b), bson_size(&b));
 }
 
 /**
@@ -814,12 +840,12 @@ void wish_core_send_peers_rpc_req(wish_core_t* core, wish_connection_t *ctx) {
  * rhid are taken. 
  *
  */
-void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_t *ctx, bool online) {
-    struct wish_remote_service *service;
-    struct wish_remote_service *tmp;
+void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_t *connection, bool online) {
+    wish_remote_app* service;
+    wish_remote_app* tmp;
     /* Generate and send sparate peer status update messages for each
      * remote service associated with the wish context */
-    LL_FOREACH_SAFE(ctx->rsid_list_head, service, tmp) {
+    LL_FOREACH_SAFE(connection->apps, service, tmp) {
         
         if ( strnlen(service->protocol, 5) == 0 ) {
             // no protocol, no peer
@@ -837,9 +863,9 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
         
         /* luid, ruid and rhid come from the wish context */
         bson_append_start_object(&bs, "peer");
-        bson_append_binary(&bs, "luid", ctx->luid, WISH_ID_LEN);
-        bson_append_binary(&bs, "ruid", ctx->ruid, WISH_ID_LEN);
-        bson_append_binary(&bs, "rhid", ctx->rhid, WISH_WHID_LEN);
+        bson_append_binary(&bs, "luid", connection->luid, WISH_ID_LEN);
+        bson_append_binary(&bs, "ruid", connection->ruid, WISH_ID_LEN);
+        bson_append_binary(&bs, "rhid", connection->rhid, WISH_WHID_LEN);
         bson_append_binary(&bs, "rsid", service->rsid, WISH_WSID_LEN);
         bson_append_string(&bs, "protocol", service->protocol);
         bson_append_bool(&bs, "online", online);
@@ -869,7 +895,7 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
 
         if (online == false) {
             /* Delete service from list */
-            LL_DELETE(ctx->rsid_list_head, service);
+            LL_DELETE(connection->apps, service);
             wish_platform_free(service);
         }
     }
@@ -884,15 +910,15 @@ void wish_send_online_offline_signal_to_apps(wish_core_t* core, wish_connection_
  * @param core Wish Core
  * @param ctx The connection context of the severed link
  */
-void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t *ctx) {
+void wish_cleanup_core_rpc_server(wish_core_t* core, wish_connection_t* connection) {
     rpc_server_req* elm = NULL;
     rpc_server_req* tmp = NULL;
             
     //WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up client.");
-    wish_rpc_client_end_by_ctx(core->core_rpc_client, ctx);
+    wish_rpc_client_end_by_ctx(core->core_rpc_client, connection);
     
     LL_FOREACH_SAFE(core->core_api->requests, elm, tmp) {
-        if (elm->ctx == (void*) ctx) {
+        if (elm->ctx == (void*) connection) {
             //WISHDEBUG(LOG_CRITICAL, "Core disconnect clean up: Deleting outstanding rpc request: %s", elm->op);
             LL_DELETE(core->core_api->requests, elm);
             

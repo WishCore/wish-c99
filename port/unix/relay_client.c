@@ -34,7 +34,7 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_t* relay, uint8
     /* FIXME this has to be split into port-specific and generic
      * components. For example, setting up the RB, next state, expect
      * byte, copying of id is generic to all ports */
-    relay->curr_state = WISH_RELAY_CLIENT_OPEN;
+    relay->curr_state = WISH_RELAY_CLIENT_CONNECTING;
     ring_buffer_init(&(relay->rx_ringbuf), relay->rx_ringbuf_storage, RELAY_CLIENT_RX_RB_LEN);
     memcpy(relay->uid, uid, WISH_ID_LEN);
 
