@@ -65,7 +65,7 @@ static void methods(rpc_server_req* req, const uint8_t* args) {
     bson_append_finish_object(&bs);
     bson_finish(&bs);
     
-    wish_rpc_server_send(req, bs.data, bson_size(&bs));
+    rpc_server_send(req, bs.data, bson_size(&bs));
     bson_destroy(&bs);
 }
 
@@ -85,7 +85,7 @@ static void version(rpc_server_req* req, const uint8_t* args) {
     bson_append_string(&bs, "data", WISH_CORE_VERSION_STRING);
     bson_finish(&bs);
     
-    wish_rpc_server_send(req, bs.data, bson_size(&bs));
+    rpc_server_send(req, bs.data, bson_size(&bs));
     bson_destroy(&bs);
 }
 
@@ -105,11 +105,11 @@ static void host_config(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
 
     if (bs.err) {
-        wish_rpc_server_error_msg(req, 305, "Failed writing bson.");
+        rpc_server_error_msg(req, 305, "Failed writing bson.");
         return;
     }
     
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 handler methods_h =                                   { .op = "methods",                           .handler = methods, .args = "(void): string" };
@@ -178,55 +178,55 @@ static void wish_core_app_rpc_send(rpc_server_req* req, const bson* bs) {
  * @param core
  */
 void wish_core_app_rpc_init(wish_core_t* core) {
-    core->app_api = wish_rpc_server_init_size(core, wish_core_app_rpc_send, WISH_PORT_APP_RPC_POOL_SZ);
-    wish_rpc_server_set_name(core->app_api, "core-from-app");
+    core->app_api = rpc_server_init_size(core, wish_core_app_rpc_send, WISH_PORT_APP_RPC_POOL_SZ);
+    rpc_server_set_name(core->app_api, "core-from-app");
     
-    wish_rpc_server_register(core->app_api, &methods_h);
-    wish_rpc_server_register(core->app_api, &signals_h);
-    wish_rpc_server_register(core->app_api, &version_h);
+    rpc_server_register(core->app_api, &methods_h);
+    rpc_server_register(core->app_api, &signals_h);
+    rpc_server_register(core->app_api, &version_h);
     
-    wish_rpc_server_register(core->app_api, &services_send_h);
-    wish_rpc_server_register(core->app_api, &services_list_h);
+    rpc_server_register(core->app_api, &services_send_h);
+    rpc_server_register(core->app_api, &services_list_h);
     
-    wish_rpc_server_register(core->app_api, &identity_list_h);
-    wish_rpc_server_register(core->app_api, &identity_create_h);
-    wish_rpc_server_register(core->app_api, &identity_export_h);
-    wish_rpc_server_register(core->app_api, &identity_import_h);
-    wish_rpc_server_register(core->app_api, &identity_get_h);
-    wish_rpc_server_register(core->app_api, &identity_remove_h);
-    wish_rpc_server_register(core->app_api, &identity_sign_h);
-    wish_rpc_server_register(core->app_api, &identity_verify_h);
-    wish_rpc_server_register(core->app_api, &identity_friend_request_h);
-    wish_rpc_server_register(core->app_api, &identity_friend_request_list_h);
-    wish_rpc_server_register(core->app_api, &identity_friend_request_accept_h);
-    wish_rpc_server_register(core->app_api, &identity_friend_request_decline_h);
-    wish_rpc_server_register(core->app_api, &directory_find_h);
+    rpc_server_register(core->app_api, &identity_list_h);
+    rpc_server_register(core->app_api, &identity_create_h);
+    rpc_server_register(core->app_api, &identity_export_h);
+    rpc_server_register(core->app_api, &identity_import_h);
+    rpc_server_register(core->app_api, &identity_get_h);
+    rpc_server_register(core->app_api, &identity_remove_h);
+    rpc_server_register(core->app_api, &identity_sign_h);
+    rpc_server_register(core->app_api, &identity_verify_h);
+    rpc_server_register(core->app_api, &identity_friend_request_h);
+    rpc_server_register(core->app_api, &identity_friend_request_list_h);
+    rpc_server_register(core->app_api, &identity_friend_request_accept_h);
+    rpc_server_register(core->app_api, &identity_friend_request_decline_h);
+    rpc_server_register(core->app_api, &directory_find_h);
     
-    wish_rpc_server_register(core->app_api, &connections_list_h);
-    wish_rpc_server_register(core->app_api, &connections_apps_h);
-    wish_rpc_server_register(core->app_api, &connections_request_h);
-    wish_rpc_server_register(core->app_api, &connections_disconnect_h);
-    wish_rpc_server_register(core->app_api, &connections_check_connections_h);
+    rpc_server_register(core->app_api, &connections_list_h);
+    rpc_server_register(core->app_api, &connections_apps_h);
+    rpc_server_register(core->app_api, &connections_request_h);
+    rpc_server_register(core->app_api, &connections_disconnect_h);
+    rpc_server_register(core->app_api, &connections_check_connections_h);
 
-    wish_rpc_server_register(core->app_api, &api_acl_check_h);
-    wish_rpc_server_register(core->app_api, &api_acl_allow_h);
-    wish_rpc_server_register(core->app_api, &api_acl_remove_allow_h);
-    wish_rpc_server_register(core->app_api, &api_acl_add_user_roles_h);
-    wish_rpc_server_register(core->app_api, &api_acl_remove_user_roles_h);
-    wish_rpc_server_register(core->app_api, &api_acl_user_roles_h);
-    wish_rpc_server_register(core->app_api, &api_acl_what_resources_h);
-    wish_rpc_server_register(core->app_api, &api_acl_allowed_permissions_h);
+    rpc_server_register(core->app_api, &api_acl_check_h);
+    rpc_server_register(core->app_api, &api_acl_allow_h);
+    rpc_server_register(core->app_api, &api_acl_remove_allow_h);
+    rpc_server_register(core->app_api, &api_acl_add_user_roles_h);
+    rpc_server_register(core->app_api, &api_acl_remove_user_roles_h);
+    rpc_server_register(core->app_api, &api_acl_user_roles_h);
+    rpc_server_register(core->app_api, &api_acl_what_resources_h);
+    rpc_server_register(core->app_api, &api_acl_allowed_permissions_h);
 
-    wish_rpc_server_register(core->app_api, &relay_list_h);
-    wish_rpc_server_register(core->app_api, &relay_add_h);
-    wish_rpc_server_register(core->app_api, &relay_remove_h);
+    rpc_server_register(core->app_api, &relay_list_h);
+    rpc_server_register(core->app_api, &relay_add_h);
+    rpc_server_register(core->app_api, &relay_remove_h);
     
-    wish_rpc_server_register(core->app_api, &wld_list_h);
-    wish_rpc_server_register(core->app_api, &wld_clear_h);
-    wish_rpc_server_register(core->app_api, &wld_announce_h);
-    wish_rpc_server_register(core->app_api, &wld_friend_request_h);
+    rpc_server_register(core->app_api, &wld_list_h);
+    rpc_server_register(core->app_api, &wld_clear_h);
+    rpc_server_register(core->app_api, &wld_announce_h);
+    rpc_server_register(core->app_api, &wld_friend_request_h);
     
-    wish_rpc_server_register(core->app_api, &host_config_h);
+    rpc_server_register(core->app_api, &host_config_h);
 }
 
 void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH_ID_LEN], const uint8_t *data) {
@@ -241,7 +241,7 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH
     bson bs;
     bson_init_with_data(&bs, data);
     
-    wish_rpc_server_receive(core->app_api, NULL, app, &bs);
+    rpc_server_receive(core->app_api, NULL, app, &bs);
 }
 
 // Move implementation to wish-rpc-c99, just call it from here
