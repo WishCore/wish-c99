@@ -1129,7 +1129,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     uint8_t *signed_cert_buffer = wish_platform_malloc(signed_cert_buffer_len);
     if (signed_cert_buffer == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Out of memory in wish_api_identity_friend_request_accept (1)");
-        wish_rpc_server_error_msg(req, 344, "Out of memory (1)");
+        rpc_server_error_msg(req, 344, "Out of memory (1)");
         return;
     }
 #else
@@ -1150,7 +1150,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     if (buf_base == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Out of memory in wish_api_identity_friend_request_accept (2)");
         wish_platform_free(signed_cert_buffer);
-        wish_rpc_server_error_msg(req, 344, "Out of memory (2)");
+        rpc_server_error_msg(req, 344, "Out of memory (2)");
         return;
     }
 #else
