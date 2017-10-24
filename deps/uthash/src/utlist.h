@@ -26,8 +26,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define UTLIST_VERSION 2.0.1
 
-//#include <assert.h>
+#ifdef WISH_PORT_WITH_ASSERT
+/* Include the real assert() function */
+#include <assert.h>
+#else
+/* On platforms that do not have a working assert(), a dummy declaration
+ * is used. */
 #define assert(x)
+#endif //WISH_PORT_WITH_ASSERT
+
 
 /*
  * This file contains macros to manipulate singly and doubly-linked lists.
