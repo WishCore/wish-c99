@@ -13,13 +13,13 @@ void wish_core_signals(rpc_server_req* req, const uint8_t* args) {
     bson_append_finish_array(&bs);
     bson_finish(&bs);
 
-    wish_rpc_server_emit(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_emit(req, bson_data(&bs), bson_size(&bs));
     //wish_core_signals_emit_string(core, "ok");
 }
 
 void wish_core_signals_emit(wish_core_t* core, bson* signal) {
-    wish_rpc_server_emit_broadcast(core->app_api, "signals", bson_data(signal), bson_size(signal));
-    wish_rpc_server_emit_broadcast(core->core_api, "signals", bson_data(signal), bson_size(signal));
+    rpc_server_emit_broadcast(core->app_api, "signals", bson_data(signal), bson_size(signal));
+    rpc_server_emit_broadcast(core->core_api, "signals", bson_data(signal), bson_size(signal));
 }
 
 void wish_core_signals_emit_string(wish_core_t* core, char* string) {
@@ -33,7 +33,7 @@ void wish_core_signals_emit_string(wish_core_t* core, char* string) {
     bson_append_finish_array(&bs);
     bson_finish(&bs);
     
-    wish_rpc_server_emit_broadcast(core->app_api, "signals", bson_data(&bs), bson_size(&bs));
-    wish_rpc_server_emit_broadcast(core->core_api, "signals", bson_data(&bs), bson_size(&bs));
+    rpc_server_emit_broadcast(core->app_api, "signals", bson_data(&bs), bson_size(&bs));
+    rpc_server_emit_broadcast(core->core_api, "signals", bson_data(&bs), bson_size(&bs));
 }
 

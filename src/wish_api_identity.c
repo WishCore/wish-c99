@@ -41,7 +41,7 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     
     if ( bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
         WISHDEBUG(LOG_CRITICAL, "Could not get argument[0]: uid, expecting Buffer(32)");
-        wish_rpc_server_error_msg(req, 8, "Missing export uid argument, expecting Buffer(32)");
+        rpc_server_error_msg(req, 8, "Missing export uid argument, expecting Buffer(32)");
         return;
     }
 
@@ -50,7 +50,7 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     wish_identity_t id;
     
     if ( RET_SUCCESS != wish_identity_load(uid, &id) ) {
-        wish_rpc_server_error_msg(req, 343, "Failed to load identity.");
+        rpc_server_error_msg(req, 343, "Failed to load identity.");
         return;
     }
 
@@ -61,7 +61,7 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     buf.len = WISH_PORT_RPC_BUFFER_SZ;
     
     if ( RET_SUCCESS != wish_identity_export(core, &id, NULL, &buf) ) {
-        wish_rpc_server_error_msg(req, 92, "Internal export failed.");
+        rpc_server_error_msg(req, 92, "Internal export failed.");
         return;
     }
     
@@ -79,7 +79,7 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     bson_append_bson(&b, "data", &bs);
     bson_finish(&b);
     
-    wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
+    rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
 /**
@@ -101,7 +101,7 @@ void wish_api_identity_import(rpc_server_req* req, const uint8_t* args) {
     
     if ( bson_iterator_type(&it) != BSON_BINDATA) {
         WISHDEBUG(LOG_CRITICAL, "Expected argument 1 to be Buffer");
-        wish_rpc_server_error_msg(req, 76, "Expected argument 1 to be Buffer");
+        rpc_server_error_msg(req, 76, "Expected argument 1 to be Buffer");
         return;
     }
 
@@ -115,13 +115,13 @@ void wish_api_identity_import(rpc_server_req* req, const uint8_t* args) {
     if (wish_identity_from_bson(&id, &i)) {
         /* ...it failed somehow.. */
         WISHDEBUG(LOG_CRITICAL, "There was an error when populating the new id struct");
-        wish_rpc_server_error_msg(req, 76, "There was an error when populating the new id struct");
+        rpc_server_error_msg(req, 76, "There was an error when populating the new id struct");
         return;
     }
 
     if (wish_identity_exists(id.uid)>0) {
         // it already exists, bail!
-        wish_rpc_server_error_msg(req, 202, "Identity already exists.");
+        rpc_server_error_msg(req, 202, "Identity already exists.");
         return;
     }
     
@@ -133,7 +133,7 @@ void wish_api_identity_import(rpc_server_req* req, const uint8_t* args) {
     
     if( ret != 0 ) {
         WISHDEBUG(LOG_CRITICAL, "wish_save_identity_entry return other than success (0): %d", ret);
-        wish_rpc_server_error_msg(req, 201, "Too many identities.");
+        rpc_server_error_msg(req, 201, "Too many identities.");
         return;
     }
 
@@ -149,7 +149,7 @@ void wish_api_identity_import(rpc_server_req* req, const uint8_t* args) {
     bson_append_finish_object(&bs);
     bson_finish(&bs);
     
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 /* This is the Call-back function invoked by the core's "app" RPC
@@ -191,7 +191,7 @@ void wish_api_identity_list(rpc_server_req* req, const uint8_t* args) {
 
         if ( RET_SUCCESS != wish_identity_load(uid_list[i].uid, &identity) ) {
             WISHDEBUG(LOG_CRITICAL, "Could not load identity");
-            wish_rpc_server_error_msg(req, 997, "Could not load identity");
+            rpc_server_error_msg(req, 997, "Could not load identity");
         }
 
         bson_append_binary(&bs, "uid", identity.uid, WISH_UID_LEN);
@@ -206,9 +206,9 @@ void wish_api_identity_list(rpc_server_req* req, const uint8_t* args) {
     
     if (bs.err) {
         WISHDEBUG(LOG_CRITICAL, "BSON error in identity_list_handler");
-        wish_rpc_server_error_msg(req, 997, "BSON error in identity_list_handler");
+        rpc_server_error_msg(req, 997, "BSON error in identity_list_handler");
     } else {
-        wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+        rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     }
     
     bson_destroy(&bs);
@@ -242,12 +242,12 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
     
     if (bson_find_fieldpath_value("0", &it) != BSON_BINDATA) {
-        wish_rpc_server_error_msg(req, 308, "Argument 1 must be Buffer");
+        rpc_server_error_msg(req, 308, "Argument 1 must be Buffer");
         return;
     }
     
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
-        wish_rpc_server_error_msg(req, 308, "Argument 1 must be Buffer(32)");
+        rpc_server_error_msg(req, 308, "Argument 1 must be Buffer(32)");
         return;
     }
     
@@ -257,7 +257,7 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
 
     if ( RET_SUCCESS != wish_identity_load(arg_uid, &identity) ) {
         WISHDEBUG(LOG_CRITICAL, "Could not load identity");
-        wish_rpc_server_error_msg(req, 997, "Could not load identity");
+        rpc_server_error_msg(req, 997, "Could not load identity");
         return;
     }
 
@@ -282,9 +282,9 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
 
     if (bs.err) {
         WISHDEBUG(LOG_CRITICAL, "BSON error in identity_get_handler");
-        wish_rpc_server_error_msg(req, 997, "BSON error in identity_get_handler");
+        rpc_server_error_msg(req, 997, "BSON error in identity_get_handler");
     } else {
-        wish_rpc_server_send(req, bs.data, bson_size(&bs));
+        rpc_server_send(req, bs.data, bson_size(&bs));
     }
     bson_destroy(&bs);
 }
@@ -313,7 +313,7 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
     
     if ( bson_find_fieldpath_value("0", &it) != BSON_STRING ) {
-        wish_rpc_server_error_msg(req, 309, "Argument 1 must be string");
+        rpc_server_error_msg(req, 309, "Argument 1 must be string");
         return;
     }
     
@@ -395,7 +395,7 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
         bson_finish(&bs);
 
         if (bs.err != 0) {
-            wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+            rpc_server_error_msg(req, 344, "Failed writing reponse.");
             return;
         }
 
@@ -409,11 +409,11 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
             }
         }
         
-        wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+        rpc_server_send(req, bson_data(&bs), bson_size(&bs));
         
         wish_core_signals_emit_string(core, "identity");
     } else {
-        wish_rpc_server_error_msg(req, 343, "Invalid argument. Expecting 32 byte bin data.");
+        rpc_server_error_msg(req, 343, "Invalid argument. Expecting 32 byte bin data.");
         return;
     }
 }
@@ -440,7 +440,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
     bson_find_from_buffer(&it, args, "0");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
-        wish_rpc_server_error_msg(req, 345, "Invalid uid.");
+        rpc_server_error_msg(req, 345, "Invalid uid.");
         return;
     }
 
@@ -451,7 +451,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
     // check if we can make a signature with this identity
     if (wish_identity_load(luid, &uid) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not load identity");
-        wish_rpc_server_error_msg(req, 345, "Could not load identity.");
+        rpc_server_error_msg(req, 345, "Could not load identity.");
         return;
     }
     
@@ -485,11 +485,11 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         bson_finish(&bs);
 
         if(bs.err != 0) {
-            wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+            rpc_server_error_msg(req, 344, "Failed writing reponse.");
             return;
         }
 
-        wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+        rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     } else if (bson_iterator_type(&it) == BSON_OBJECT) {
         // sign object { data: Buffer(n) }
 
@@ -503,7 +503,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         if ( bson_find_fieldpath_value("1.data", &it) != BSON_BINDATA ) {
             WISHDEBUG(LOG_CRITICAL, "1.data not bin data");
             
-            wish_rpc_server_error_msg(req, 345, "Second arg object does not have { data: <Buffer> }.");
+            rpc_server_error_msg(req, 345, "Second arg object does not have { data: <Buffer> }.");
             return;
         }
 
@@ -540,7 +540,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         
         // add signature by uid
         if ( RET_SUCCESS != wish_identity_sign(core, &uid, &data, &claim, &signature) ) {
-            wish_rpc_server_error_msg(req, 345, "Failed producing signature");
+            rpc_server_error_msg(req, 345, "Failed producing signature");
             return;
         }
         
@@ -562,14 +562,14 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         bson_finish(&b);
 
         if(b.err != 0) {
-            wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+            rpc_server_error_msg(req, 344, "Failed writing reponse.");
             return;
         }
         
-        wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
+        rpc_server_send(req, bson_data(&b), bson_size(&b));
         return;
     } else {
-        wish_rpc_server_error_msg(req, 345, "Second arg not valid hash or object.");
+        rpc_server_error_msg(req, 345, "Second arg not valid hash or object.");
         return;
     }
 }
@@ -604,7 +604,7 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
     bson_find_from_buffer(&it, args, "0");
     
     if(bson_iterator_type(&it) != BSON_OBJECT) {
-        wish_rpc_server_error_msg(req, 345, "Expected object");
+        rpc_server_error_msg(req, 345, "Expected object");
         return;
     }
 
@@ -618,7 +618,7 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
     if ( bson_find_fieldpath_value("0.data", &it) != BSON_BINDATA ) {
         WISHDEBUG(LOG_CRITICAL, "0.data not bin data");
 
-        wish_rpc_server_error_msg(req, 345, "Object does not have { data: <Buffer> }.");
+        rpc_server_error_msg(req, 345, "Object does not have { data: <Buffer> }.");
         return;
     }
 
@@ -709,11 +709,11 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&b);
     
     if(b.err != 0) {
-        wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+        rpc_server_error_msg(req, 344, "Failed writing reponse.");
         return;
     }
     
-    wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
+    rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
 /**
@@ -733,7 +733,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     const char* luid = NULL;
     
     if (bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
-        wish_rpc_server_error_msg(req, 345, "Expected luid: Buffer(32)");
+        rpc_server_error_msg(req, 345, "Expected luid: Buffer(32)");
         return;
     }
     
@@ -742,7 +742,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     bson_find_from_buffer(&it, args, "1");
     
     if(bson_iterator_type(&it) != BSON_OBJECT) {
-        wish_rpc_server_error_msg(req, 345, "Expected object");
+        rpc_server_error_msg(req, 345, "Expected object");
         return;
     }
 
@@ -751,7 +751,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     if ( bson_find_fieldpath_value("1.data", &it) != BSON_BINDATA ) {
         WISHDEBUG(LOG_CRITICAL, "1.data not bin data");
 
-        wish_rpc_server_error_msg(req, 345, "Object does not have { data: <Buffer> }.");
+        rpc_server_error_msg(req, 345, "Object does not have { data: <Buffer> }.");
         return;
     }
 
@@ -765,7 +765,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     bson_find_fieldpath_value("uid", &data);
     
     if (bson_iterator_type(&data) != BSON_BINDATA || bson_iterator_bin_len(&data) != WISH_UID_LEN ) {
-        wish_rpc_server_error_msg(req, 351, "uid not Buffer(32)");
+        rpc_server_error_msg(req, 351, "uid not Buffer(32)");
         return;
     }
 
@@ -775,7 +775,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     bson_find_fieldpath_value("pubkey", &data);
     
     if (bson_iterator_type(&data) != BSON_BINDATA || bson_iterator_bin_len(&data) != WISH_PUBKEY_LEN ) {
-        wish_rpc_server_error_msg(req, 351, "pubkey not Buffer(32)");
+        rpc_server_error_msg(req, 351, "pubkey not Buffer(32)");
         return;
     }
 
@@ -785,7 +785,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     bson_find_fieldpath_value("alias", &data);
     
     if (bson_iterator_type(&data) != BSON_STRING) {
-        wish_rpc_server_error_msg(req, 351, "alias not string");
+        rpc_server_error_msg(req, 351, "alias not string");
         return;
     }
 
@@ -803,7 +803,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         bson_find_fieldpath_value("transports.0", &meta);
 
         if (bson_iterator_type(&meta) != BSON_STRING) {
-            wish_rpc_server_error_msg(req, 351, "transports not string");
+            rpc_server_error_msg(req, 351, "transports not string");
             return;
         }
 
@@ -815,7 +815,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     }
     
     if (transport == NULL) {
-        wish_rpc_server_error_msg(req, 351, "No transports available.");
+        rpc_server_error_msg(req, 351, "No transports available.");
     }
     
     //WISHDEBUG(LOG_CRITICAL, "alias for remote friend req: %s", alias);
@@ -836,14 +836,14 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         int freq_meta_size = bson_size(&tmp);
         if (freq_meta_size > 512) {
             // we should return error
-            wish_rpc_server_error_msg(req, 340, "Argument 3 too big");
+            rpc_server_error_msg(req, 340, "Argument 3 too big");
             return;
         }
         
         freq_meta = wish_platform_malloc(freq_meta_size);
         
         if (freq_meta == NULL) {
-            wish_rpc_server_error_msg(req, 340, "Failed allocating memory for friend request meta data.");
+            rpc_server_error_msg(req, 340, "Failed allocating memory for friend request meta data.");
             return;
         }
 
@@ -874,11 +874,11 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     bson_finish(&b);
 
     if(b.err != 0) {
-        wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+        rpc_server_error_msg(req, 344, "Failed writing reponse.");
         return;
     }
 
-    wish_rpc_server_send(req, bson_data(&b), bson_size(&b));
+    rpc_server_send(req, bson_data(&b), bson_size(&b));
 }
 
 /**
@@ -926,11 +926,11 @@ void wish_api_identity_friend_request_list(rpc_server_req* req, const uint8_t* a
     bson_finish(&bs);
 
     if(bs.err != 0) {
-        wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+        rpc_server_error_msg(req, 344, "Failed writing reponse.");
         return;
     }
 
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 /*
@@ -1025,7 +1025,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     bson_find_from_buffer(&it, args, "0");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
-        wish_rpc_server_error_msg(req, 345, "Invalid luid.");
+        rpc_server_error_msg(req, 345, "Invalid luid.");
         return;
     }
 
@@ -1035,7 +1035,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     bson_find_from_buffer(&it, args, "1");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
-        wish_rpc_server_error_msg(req, 345, "Invalid ruid.");
+        rpc_server_error_msg(req, 345, "Invalid ruid.");
         return;
     }
 
@@ -1057,7 +1057,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     }
     
     if (!found) {
-        wish_rpc_server_error_msg(req, 356, "No such friend request found.");
+        rpc_server_error_msg(req, 356, "No such friend request found.");
         return;
     }
     
@@ -1092,7 +1092,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     }
 
     if (!found) {
-        wish_rpc_server_error_msg(req, 344, "Friend request connection not found while trying to accept.");
+        rpc_server_error_msg(req, 344, "Friend request connection not found while trying to accept.");
         return;
     }
 
@@ -1182,7 +1182,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
             wish_ldiscover_add(core, &entry);
         } else {
             WISHDEBUG(LOG_CRITICAL, "wish_ldiscover_entry_from_bson returned error");
-            wish_rpc_server_error_msg(req, 344, "Failed creating wld entry from signed_meta");
+            rpc_server_error_msg(req, 344, "Failed creating wld entry from signed_meta");
             wish_platform_free(elt);
 #ifdef COMPILING_FOR_ESP8266
             wish_platform_free(signed_cert_buffer);
@@ -1192,7 +1192,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
         }
     }
 
-    wish_rpc_server_send(&(elt->friend_rpc_req), bson_data(&b), bson_size(&b));
+    rpc_server_send(&(elt->friend_rpc_req), bson_data(&b), bson_size(&b));
     
     //WISHDEBUG(LOG_CRITICAL, "Send friend req reply, closing connection now");
     wish_close_connection(core, wish_connection);
@@ -1209,7 +1209,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     bson_finish(&bs);
 
     if(bs.err != 0) {
-        wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+        rpc_server_error_msg(req, 344, "Failed writing reponse.");
 #ifdef COMPILING_FOR_ESP8266
         wish_platform_free(signed_cert_buffer);
         wish_platform_free(buf_base);
@@ -1217,7 +1217,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
         return;
     }
 
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     wish_platform_free(elt);
 #ifdef COMPILING_FOR_ESP8266
     wish_platform_free(signed_cert_buffer);
@@ -1239,7 +1239,7 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
     bson_find_from_buffer(&it, args, "0");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
-        wish_rpc_server_error_msg(req, 345, "Invalid luid.");
+        rpc_server_error_msg(req, 345, "Invalid luid.");
         return;
     }
 
@@ -1249,7 +1249,7 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
     bson_find_from_buffer(&it, args, "1");
     
     if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
-        wish_rpc_server_error_msg(req, 345, "Invalid ruid.");
+        rpc_server_error_msg(req, 345, "Invalid ruid.");
         return;
     }
 
@@ -1271,7 +1271,7 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
     }
     
     if (!found) {
-        wish_rpc_server_error_msg(req, 356, "No such friend request found.");
+        rpc_server_error_msg(req, 356, "No such friend request found.");
         return;
     }
     
@@ -1305,7 +1305,7 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
     }
 
     if (!found) {
-        wish_rpc_server_error_msg(req, 344, "Friend request connection not found while trying to accept.");
+        rpc_server_error_msg(req, 344, "Friend request connection not found while trying to accept.");
         return;
     }
     
@@ -1314,7 +1314,7 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
     WISHDEBUG(LOG_CRITICAL, "Declining friend request (informing requester) and closing connection");
     
     /* Send a relationship decline notification to remote core, as an RPC error */
-    wish_rpc_server_error_msg(&(elt->friend_rpc_req), 123, "Declining friend request.");
+    rpc_server_error_msg(&(elt->friend_rpc_req), 123, "Declining friend request.");
     wish_close_connection(core, wish_connection);
     
     int buffer_len = WISH_PORT_RPC_BUFFER_SZ;
@@ -1327,11 +1327,11 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
     bson_finish(&bs);
 
     if(bs.err != 0) {
-        wish_rpc_server_error_msg(req, 344, "Failed writing reponse.");
+        rpc_server_error_msg(req, 344, "Failed writing reponse.");
         return;
     }
 
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
     wish_platform_free(elt);
 }
 

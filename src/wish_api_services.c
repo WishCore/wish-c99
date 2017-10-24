@@ -27,12 +27,12 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("0.luid", &it) != BSON_BINDATA ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (luid not BSON_BINDATA)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (luid not BSON_BINDATA)");
         return;
     }
     
     if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (luid length)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (luid length)");
         return;
     }
     
@@ -41,12 +41,12 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("0.ruid", &it) != BSON_BINDATA ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (ruid not BSON_BINDATA)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (ruid not BSON_BINDATA)");
         return;
     }
     
     if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (ruid length)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (ruid length)");
         return;
     }
     
@@ -55,12 +55,12 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("0.rhid", &it) != BSON_BINDATA ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (rhid not BSON_BINDATA)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (rhid not BSON_BINDATA)");
         return;
     }
     
     if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (rhid length)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (rhid length)");
         return;
     }
     
@@ -69,12 +69,12 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("0.rsid", &it) != BSON_BINDATA ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (rsid not BSON_BINDATA)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (rsid not BSON_BINDATA)");
         return;
     }
     
     if ( bson_iterator_bin_len(&it) != WISH_UID_LEN ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (rsid length)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (rsid length)");
         return;
     }
     
@@ -83,14 +83,14 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("0.protocol", &it) != BSON_STRING ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (protocol not BSON_STRING)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (protocol not BSON_STRING)");
         return;
     }
     
     int protocol_len = bson_iterator_string_len(&it);
     
     if ( protocol_len > WISH_PROTOCOL_NAME_MAX_LEN ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid peer. (protocol name length)");
+        rpc_server_error_msg(req, 311, "Invalid peer. (protocol name length)");
         return;
     }
     
@@ -99,7 +99,7 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("1", &it) != BSON_BINDATA ) {
-        wish_rpc_server_error_msg(req, 311, "Invalid payload.");
+        rpc_server_error_msg(req, 311, "Invalid payload.");
         return;
     }
     
@@ -186,18 +186,10 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
         if (send_ret != 0) {
             /* Sending failed. Propagate RPC error */
             WISHDEBUG(LOG_CRITICAL, "Core app RPC: Sending not possible at this time");
-            if(req->id != 0) {
-                wish_rpc_server_error_msg(req, 506, "Failed sending message to remote core.");
-            }
+            rpc_server_error_msg(req, 506, "Failed sending message to remote core.");
         } else {
             /* Sending successful */
-            if(req->id != 0) {
-                // Client expecting response. Send ack to client
-                wish_rpc_server_send(req, NULL, 0);
-            } else {
-                /* Client not expecting response */
-                wish_rpc_server_delete_rpc_ctx(req);
-            }
+            rpc_server_send(req, NULL, 0);
         }
     } else {
         WISHDEBUG(LOG_CRITICAL, "Could not find a suitable wish connection to send data.");
@@ -254,5 +246,5 @@ void wish_api_services_list(rpc_server_req* req, const uint8_t* args) {
     bson_append_finish_array(&bs);
     bson_finish(&bs);
     
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }

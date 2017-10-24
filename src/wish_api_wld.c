@@ -69,11 +69,11 @@ void wish_api_wld_list(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        wish_rpc_server_error_msg(req, 303, "Failed writing bson.");
+        rpc_server_error_msg(req, 303, "Failed writing bson.");
         return;
     }
     
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 /**
@@ -97,11 +97,11 @@ void wish_api_wld_announce(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        wish_rpc_server_error_msg(req, 303, "Failed writing bson.");
+        rpc_server_error_msg(req, 303, "Failed writing bson.");
         return;
     }
     
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 /**
@@ -132,11 +132,11 @@ void wish_api_wld_clear(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        wish_rpc_server_error_msg(req, 303, "Failed writing bson.");
+        rpc_server_error_msg(req, 303, "Failed writing bson.");
         return;
     }
     
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }
 
 /**
@@ -164,12 +164,12 @@ void wish_api_wld_friend_request(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
     
     if (bson_find_fieldpath_value("0", &it) != BSON_BINDATA) {
-        wish_rpc_server_error_msg(req, 307, "Argument 1 not Buffer.");
+        rpc_server_error_msg(req, 307, "Argument 1 not Buffer.");
         return;
     }
     
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
-        wish_rpc_server_error_msg(req, 307, "Argument 1 not Buffer(32).");
+        rpc_server_error_msg(req, 307, "Argument 1 not Buffer(32).");
         return;
     }
     
@@ -179,12 +179,12 @@ void wish_api_wld_friend_request(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if (bson_find_fieldpath_value("1", &it) != BSON_BINDATA) {
-        wish_rpc_server_error_msg(req, 307, "Argument 2 not Buffer.");
+        rpc_server_error_msg(req, 307, "Argument 2 not Buffer.");
         return;
     }
 
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
-        wish_rpc_server_error_msg(req, 307, "Argument 2 not Buffer(32).");
+        rpc_server_error_msg(req, 307, "Argument 2 not Buffer(32).");
         return;
     }
 
@@ -194,12 +194,12 @@ void wish_api_wld_friend_request(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if (bson_find_fieldpath_value("2", &it) != BSON_BINDATA) {
-        wish_rpc_server_error_msg(req, 307, "Argument 3 not Buffer.");
+        rpc_server_error_msg(req, 307, "Argument 3 not Buffer.");
         return;
     }
 
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
-        wish_rpc_server_error_msg(req, 307, "Argument 3 not Buffer(32).");
+        rpc_server_error_msg(req, 307, "Argument 3 not Buffer(32).");
         return;
     }
 
@@ -224,7 +224,7 @@ void wish_api_wld_friend_request(rpc_server_req* req, const uint8_t* args) {
     }
     
     if(!found) {
-        wish_rpc_server_error_msg(req, 304, "Wld entry not found.");
+        rpc_server_error_msg(req, 304, "Wld entry not found.");
         return;
     }
 
@@ -245,9 +245,9 @@ void wish_api_wld_friend_request(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
     
     if (bs.err) {
-        wish_rpc_server_error_msg(req, 303, "Failed writing bson.");
+        rpc_server_error_msg(req, 303, "Failed writing bson.");
         return;
     }
     
-    wish_rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
 }

@@ -112,11 +112,11 @@ void send_wish_api(uint8_t *buffer, size_t buffer_len);
  * request over Service IPC layer to core returns. Can be NULL if no cb
  * is needed
  */
-wish_rpc_id_t wish_app_send(wish_app_t *app, wish_protocol_peer_t* peer, uint8_t *buffer, size_t len, rpc_client_callback cb);
+rpc_id wish_app_send(wish_app_t *app, wish_protocol_peer_t* peer, uint8_t *buffer, size_t len, rpc_client_callback cb);
 
-wish_rpc_id_t wish_app_core(wish_app_t *app, char* op, uint8_t *buffer, size_t len, rpc_client_callback cb);
+rpc_id wish_app_core(wish_app_t *app, char* op, uint8_t *buffer, size_t len, rpc_client_callback cb);
 
-wish_rpc_id_t wish_app_core_with_cb_context(wish_app_t *app, char* op, uint8_t *buffer, size_t len, rpc_client_callback cb, void* cb_ctx);
+rpc_id wish_app_core_with_cb_context(wish_app_t *app, char* op, uint8_t *buffer, size_t len, rpc_client_callback cb, void* cb_ctx);
 
 void wish_app_send_app_to_core(wish_app_t* app, uint8_t* frame, int frame_len);
 
