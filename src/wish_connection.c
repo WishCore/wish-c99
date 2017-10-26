@@ -519,11 +519,10 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
                 //WISHDEBUG(LOG_CRITICAL, "Connection TCP_DISCONNECTED: %s > %s (%u.%u.%u.%u:%hu)",
                 //        lu.alias, ru.alias, conn->remote_ip_addr[0], conn->remote_ip_addr[1], conn->remote_ip_addr[2], conn->remote_ip_addr[3], conn->remote_port);
             }
-            
-            
+
             int i = 0;
             bool other_connection_found = false;
-#if 1
+
             for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
                 wish_connection_t *other_conn = &(core->connection_pool[i]);
                 if (conn == other_conn) {
@@ -549,7 +548,6 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
                     }
                 }
             }
-#endif
 
             if (!other_connection_found) {
                 wish_send_online_offline_signal_to_apps(core, connection, false);
@@ -558,6 +556,15 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
         
         /* Delete any outstanding RPC request contexts */
         wish_cleanup_core_rpc_server(core, connection);
+
+        /* If the connection were to be closed when its protocol state is
+         * PROTO_SERVER_STATE_DH, then we must free the server_dhm_context
+         * here. Normally it is done when handling input from peer,
+         * in wish_core_handle_payload() */
+        if (connection->curr_protocol_state == PROTO_SERVER_STATE_DH) {
+            mbedtls_dhm_free(connection->server_dhm_ctx);
+            wish_platform_free(connection->server_dhm_ctx);
+        }
 
         /* Do some housework to ensure the stack is left in consistent
          * state */
