@@ -1,11 +1,13 @@
-Quick build instructions
+# Quick build instructions
 
 Build using cmake:
 
+```sh
 mkdir build
 cd build 
 cmake ..
 make
+```
 
 Build using make (deprecated):
 
