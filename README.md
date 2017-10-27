@@ -1,24 +1,25 @@
 # Quick build instructions
 
-Build using cmake:
+## Debug build using cmake:
 
 ```sh
 mkdir build
 cd build 
-cmake ..
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
 Build using make (deprecated):
 
+```sh
 $ make -f make-linux.mk
+```
 
 
 
-Cross-compile build for ESP8266
+# Cross-compile build for ESP8266
 
-
-Wish/Mist C implementation for esp8266
+## Wish/Mist C implementation for esp8266
 
 This is the repository for the proof-of-concept ANSI C implementation of
 the Wish/Mist IoT communications stack.
