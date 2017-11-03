@@ -79,10 +79,14 @@ typedef unsigned char uint8_t;
 #endif
 
 #ifndef uthash_fatal
+#ifndef COMPILING_FOR_ESP8266
+#define uthash_fatal(msg) exit(-1)        /* fatal error (out of memory,etc) */
+#else
 #define uthash_fatal(msg) { \
     wish_platform_printf("uthash out of memory\n"); \
     while (1); \
 } /* fatal error (out of memory,etc) */
+#endif  //COMPILING_FOR_ESP8266
 #endif
 #ifndef uthash_malloc
 #define uthash_malloc(sz) wish_platform_malloc(sz)      /* malloc fcn                      */
