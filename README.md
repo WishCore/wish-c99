@@ -17,7 +17,7 @@ $ make -f make-linux.mk
 
 
 
-# Cross-compile build for ESP8266
+# Cross-compile build for ESP8266 (This should be moved to the ESP8266 port)
 
 ## Wish/Mist C implementation for esp8266
 
@@ -25,17 +25,7 @@ This is the repository for the proof-of-concept ANSI C implementation of
 the Wish/Mist IoT communications stack.
 
 This software targets the Olimex ESP8266-EVB hardware. It is a
-nearly-fully functional Wish/Mist node, offering Wish "chat" service and a
-Mist node making it possible to toggle the on-board relay on and off.
-
-The Mist service includes a reply to the "control.model" command, as
-well as "control.follow" and "control.write". Any writes targetting the
-"relay" endpoint feature will be replied by a "follow" reply indicating
-the new state.  Note however, that currently all the Mist service messages have
-hard-coded source and destination WSIDs! For this reason, it will only
-work with traditional Mist-UI.
-
-The Mist command "control.map" is not supported.
+nearly-fully functional Wish Core, offering Wish "chat" service.
 
 The chat service replies to any messages by telling how much it has has
 free space on the TCP receive ring buffer and heap, but sometimes it
@@ -59,7 +49,7 @@ Wish user identity hashes are also hard-coded (in the begining of
 wish/wish_io.c). The implemenatation currently only supports one Wish
 connection. No "incoming" Wish connections are accepted by this node.
 
-Overall, this software shows that Wish/Mist can clearly be implemeted on
+Overall, this software shows that Wish can be implemeted on
 microcontroller platforms offering just some 30 kilobytes of RAM
 and ca. 250 kB Flash memory.
 
