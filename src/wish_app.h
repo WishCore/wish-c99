@@ -94,12 +94,6 @@ int wish_app_get_wsid(char *app_name, uint8_t wsid[WISH_ID_LEN]);
 
 wish_app_t * wish_app_find_by_wsid(uint8_t wsid[WISH_WSID_LEN]);
 
-/*
- * This function is called by wish_app_determine_handler() when it receives a reply from the local core (in that case there is no 'type' element in message)
- *
- */
-void send_wish_api(uint8_t *buffer, size_t buffer_len);
-
 /** Function for sending an App RPC frame. Will in turn call send_app_to_core
  * in the serivice IPC layer
  *

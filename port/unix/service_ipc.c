@@ -102,8 +102,3 @@ void send_core_to_app(wish_core_t* core, const uint8_t wsid[WISH_ID_LEN], const 
 #endif
 }
 
-
-void send_wish_api(uint8_t *buffer, size_t buffer_len) {
-        WISHDEBUG(LOG_CRITICAL, "WISHAPI UNIMPLEMENTED");
-
-}
