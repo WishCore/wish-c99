@@ -11,6 +11,7 @@ enum wish_event_type {
     remote core has been established. Normally this would result in
     sending a 'peers' request */
     WISH_EVENT_REQUEST_CONNECTION_CLOSING,
+    WISH_EVENT_REQUEST_CONNECTION_ABORT,
 };
 
 struct wish_event {
