@@ -166,10 +166,6 @@ struct wish_peer {
     char *protocol;    /* Protocol name */
 };
 
-
-
-size_t get_local_hostid(char** hostid);
-
 /* Start an instance of wish communication */
 wish_connection_t* wish_connection_init(wish_core_t* core, const uint8_t* luid, const uint8_t* ruid);
 
@@ -240,6 +236,9 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
  * yet ready for use, because it is e.g. just being created.
  */
 wish_connection_t* wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid);
+
+wish_connection_t* 
+wish_core_lookup_connected_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid);
 
 /* returns true if there is any connection form luid to ruid */
 bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t *ruid);

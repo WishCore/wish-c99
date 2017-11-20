@@ -40,6 +40,8 @@ typedef struct {
 struct wish_core;
 
 typedef uint32_t wish_time_t;
+#define WISH_TIME_T_MAX UINT32_MAX
+
 typedef struct wish_timer_db {
     void (*cb)(struct wish_core* core, void* ctx);
     void *cb_ctx;

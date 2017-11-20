@@ -97,6 +97,7 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
  *
  * Please note: The context returned here could a countext which is not
  * yet ready for use, because it is e.g. just being created.
+ * 
  */
 wish_connection_t* 
 wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid) {
@@ -136,6 +137,39 @@ wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, c
     return connection;
 }
 
+/** This function returns a pointer to the wish connection which matches the
+ * specified luid, ruid, rhid
+ *
+ * The returned connection is always a connected one, and in case of multiple connections, the returned context is the one which has received data the least time ago
+ */
+wish_connection_t* 
+wish_core_lookup_connected_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid) {
+    wish_connection_t *connection = NULL;
+    int i = 0;
+
+    wish_time_t latest_input = WISH_TIME_T_MAX;
+    for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) {
+            /* If the wish context is not in use, we can safely skip it */
+            //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
+            continue;
+        }
+
+        if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) 
+                    == 0) {
+                if (memcmp(core->connection_pool[i].rhid, rhid, 
+                        WISH_WHID_LEN) == 0) {
+                    if (core->connection_pool[i].context_state == WISH_CONTEXT_CONNECTED && core->connection_pool[i].latest_input_timestamp < latest_input) {
+                        connection = &(core->connection_pool[i]);
+                        latest_input = core->connection_pool[i].latest_input_timestamp;
+                    }
+                }
+            }
+        }
+    }
+    return connection;
+}
 
 bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t *ruid) {
     int i = 0;
