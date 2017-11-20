@@ -150,3 +150,30 @@ return_t wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t 
     
     return RET_SUCCESS;
 }
+
+void wish_close_parallel_connections(wish_core_t *core, void *_connection) {
+    wish_connection_t *connection = (wish_connection_t *) _connection;
+    
+    if (connection->context_state != WISH_CONTEXT_CONNECTED) {
+        return;
+    }
+    
+    for (int i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        wish_connection_t *c = &core->connection_pool[i];
+
+        if (c == connection) {
+            continue;
+        }
+
+        if (memcmp(c->luid, connection->luid, WISH_ID_LEN) == 0) {
+            if (memcmp(c->ruid, connection->ruid, WISH_ID_LEN) == 0) {
+                if (memcmp(c->rhid, connection->rhid, WISH_WHID_LEN) == 0) {
+                    if (c->context_state == WISH_CONTEXT_CONNECTED) {
+                        wish_close_connection(core, c);
+                    }
+               }
+           }
+       }
+    }
+}
+      
