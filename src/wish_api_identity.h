@@ -22,6 +22,8 @@ extern "C" {
 
     void wish_api_identity_create(rpc_server_req* req, const uint8_t* args);
 
+    void wish_api_identity_update(rpc_server_req* req, const uint8_t* args);
+
     void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args);
 
     void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args);

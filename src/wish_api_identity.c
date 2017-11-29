@@ -276,6 +276,14 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
         bson_append_finish_object(&bs);
         bson_append_finish_array(&bs);
     }
+    
+    bson b;
+    
+    if (identity.meta) {
+        bson_init_with_data(&b, identity.meta);
+        //bson_visit("identity.get meta:", bson_data(&b));
+        bson_append_bson(&bs, "meta", &b);
+    }
             
     bson_append_finish_object(&bs);
     bson_finish(&bs);
@@ -350,6 +358,105 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
     LL_FOREACH(core->relay_db, relay) {
         wish_relay_client_open(core, relay, id.uid);
     }
+    
+    wish_core_signals_emit_string(core, "identity");
+}
+
+/**
+ * Update identity meta data (identity.update)
+ *
+ * { alias: 'André Kaustell',
+ *   @context: 'http://schema.org'
+ *   @type: 'Person'
+ *   givenName: 'André',
+ *   familyName: 'Kaustell',
+ *   telephone: '+358407668660',
+ *   skype: 'andre-controlthings',
+ *   email: 'andre.kaustell@controlthings.fi' }
+ */
+void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        rpc_server_error_msg(req, 345, "Invalid uid.");
+        return;
+    }
+
+    uint8_t* luid = (uint8_t *)bson_iterator_bin_data(&it);
+    
+    wish_identity_t id;
+    
+    // check if we can make a signature with this identity
+    if (wish_identity_load(luid, &id) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+        rpc_server_error_msg(req, 345, "Could not load identity.");
+        return;
+    }
+
+    bson_iterator_from_buffer(&it, args);
+
+    const char* alias = NULL;
+    
+    //bson_visit("args for update", args);
+    
+    if ( bson_find_fieldpath_value("1.alias", &it) == BSON_STRING ) {
+        alias = bson_iterator_string(&it);
+        //WISHDEBUG(LOG_CRITICAL, "Found new alias to update: %s", alias);
+        strncpy(id.alias, alias, WISH_ALIAS_LEN);
+    }
+
+    // Start dealing with custom meta data fields
+    bson_iterator_from_buffer(&it, args);
+    
+    if ( bson_find_fieldpath_value("1", &it) != BSON_OBJECT ) {
+        rpc_server_error_msg(req, 63, "Expecting object.");
+        return;
+    }
+    
+    bson meta;
+    bson_init(&meta);
+    
+    int count = 0;
+    
+    bson_iterator sit;
+    bson_iterator_subiterator(&it, &sit);
+    
+    while ( BSON_EOO != bson_iterator_next(&sit) ) {
+        const char* key = bson_iterator_key(&sit);
+        if ( BSON_STRING != bson_iterator_type(&sit)) { continue; }
+        if ( strncmp(key, "alias", 6) == 0 ) { continue; }
+        
+        bson_append_string(&meta, key, bson_iterator_string(&sit));
+        count++;
+    }
+
+    bson_finish(&meta);
+    
+    if (count) { id.meta = bson_data(&meta); }
+    
+    int ret = wish_identity_update(core, &id);
+    
+    bson_destroy(&meta);
+    
+    int buf_len = 128;
+    uint8_t buf[buf_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_append_binary(&bs, "0", id.uid, WISH_UID_LEN);
+    bson_finish(&bs);
+
+    // pass to identity get handler with uid as parameter
+    wish_api_identity_get(req, (char*) bson_data(&bs));
+    
+    wish_core_update_identities(core);
+
+    //WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
+    wish_ldiscover_advertize(core, id.uid);
+    wish_report_identity_to_local_services(core, &id, true);
     
     wish_core_signals_emit_string(core, "identity");
 }

@@ -14,23 +14,18 @@
 
 #include "utlist.h"
 
-int wish_save_identity_entry(wish_identity_t *identity) {
-    int num_uids_in_db = wish_get_num_uid_entries();
-    wish_uid_list_elem_t uid_list[num_uids_in_db];
-    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
-
-    if(num_uids >= WISH_PORT_MAX_UIDS) {
-        // DB is full, return error
-        WISHDEBUG(LOG_CRITICAL, "Too many identities in database");
-        return -1;
-    }
-    
+/**
+ * Create a bson instance with data populated from identity
+ * 
+ * @param identity
+ * @return bson* or NULL
+ */
+static bson wish_identity_to_bson(wish_identity_t* identity) {
     const uint32_t identity_doc_max_len = sizeof (wish_identity_t) + 100;
-    uint8_t identity_doc[identity_doc_max_len];
-    /* Create the new BSON document in memory */
-    
+
     bson bs;
-    bson_init_buffer(&bs, identity_doc, identity_doc_max_len);
+    bson_init_size(&bs, identity_doc_max_len);
+    if (!bs.data) { return bs; }
     
     bson_append_string(&bs, "alias", identity->alias);
     bson_append_binary(&bs, "uid", identity->uid, WISH_ID_LEN);
@@ -38,6 +33,19 @@ int wish_save_identity_entry(wish_identity_t *identity) {
 
     if (identity->has_privkey) {
         bson_append_binary(&bs, "privkey", identity->privkey, WISH_PRIVKEY_LEN);
+    }
+    
+    if (identity->meta) {
+        bson meta;
+        bson_init_with_data(&meta, identity->meta);
+        
+        if (bson_size(&meta) > 1024) {
+            WISHDEBUG(LOG_CRITICAL, "Warning, identity meta data is bigger than 1KiB.");
+        }
+        
+        //bson_visit("saving meta:", bson_data(&meta));
+
+        bson_append_binary(&bs, "meta", bson_data(&meta), bson_size(&meta));
     }
 
     //WISHDEBUG(LOG_CRITICAL, "transports[0] to save: %s", identity->transports[0]);
@@ -47,13 +55,29 @@ int wish_save_identity_entry(wish_identity_t *identity) {
         bson_append_string(&bs, "0", &(identity->transports[0][0]));
         bson_append_finish_array(&bs);
     }
+    /* FIXME add the rest of the fields */
     
     bson_finish(&bs);
-    //bson_visit("Identity BSON to be saved:", bson_data(&bs));'
     
-    /* FIXME add the rest of the fields */
+    return bs;
+}
 
+int wish_save_identity_entry(wish_identity_t* identity) {
+    int num_uids_in_db = wish_get_num_uid_entries();
+    wish_uid_list_elem_t uid_list[num_uids_in_db];
+    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+
+    if (num_uids >= WISH_PORT_MAX_UIDS) {
+        // DB is full, return error
+        WISHDEBUG(LOG_CRITICAL, "Too many identities in database");
+        return -1;
+    }
+
+    bson bs = wish_identity_to_bson(identity);
+    if (bs.data == NULL) { bson_destroy(&bs); return -3; }
+    
     int ret = wish_save_identity_entry_bson(bson_data(&bs));
+    
     if (ret == 0) {
         return -2;
     } else {
@@ -249,13 +273,15 @@ int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len ) {
 }
 
 
-return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
+return_t wish_identity_load(const uint8_t* uid, wish_identity_t* identity) {
     int retval = RET_FAIL;
 
     if (uid == NULL) {
         return RET_FAIL;
     }
 
+    memset(identity, 0, sizeof(wish_identity_t));
+    
     wish_file_t fd = wish_fs_open(WISH_ID_DB_NAME);
     wish_offset_t prev_offset = 0;
 
@@ -354,6 +380,24 @@ return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
             if (bson_find_fieldpath_value("transports.0", &it) == BSON_STRING) {
                 strncpy(&(identity->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
             }
+
+            bson_iterator_init(&it, &bs);
+            
+            if (bson_find_fieldpath_value("meta", &it) == BSON_BINDATA) {
+                bson b;
+                bson_init_with_data(&b, bson_iterator_bin_data(&it));
+                //bson_visit("loaded meta:", bson_data(&b));
+                
+                char* meta = wish_platform_malloc(bson_size(&b));
+
+                if (meta != NULL) {
+                    memcpy(meta, bson_data(&b), bson_size(&b));
+                }
+                
+                identity->meta = meta;
+            }
+            
+            
             
             break;
         }
@@ -749,6 +793,115 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
         else if (memcmp(wish_context_pool[i].ruid, uid, WISH_ID_LEN) == 0) {
             //WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is ruid of a connection");
             wish_close_connection(core, &wish_context_pool[i]); 
+        }
+    }
+    
+    return retval;
+}
+
+int wish_identity_update(wish_core_t* core, wish_identity_t* identity) {
+    int retval = 0;
+
+    const char* oldpath = WISH_ID_DB_NAME;
+    const char* newpath = WISH_ID_DB_NAME ".tmp";
+    wish_file_t old_fd = wish_fs_open(oldpath);
+    wish_file_t new_fd = wish_fs_open(newpath);
+
+    /* Truncate the new file */
+    int32_t tmp = 0;
+    int wr_len = wish_fs_write(new_fd, &tmp, 0);
+    if (wr_len != 0) {
+        WISHDEBUG(LOG_CRITICAL, "Error truncating tmp file");
+    }
+
+    wish_offset_t prev_offset = 0;
+
+    do {
+        /* Determine length and uid of next element */
+        int peek_len = sizeof (wish_identity_t) + 100;
+        uint8_t peek_buf[peek_len];
+        /* Re-position the stream to the end of the previous BSON structure - 
+         * so that the next bytes to be read will be of the next element
+         * */
+        int io_retval = wish_fs_lseek(old_fd, prev_offset, WISH_FS_SEEK_SET);
+        if (io_retval == -1) {
+            WISHDEBUG(LOG_CRITICAL, "Error seeking");
+            break;
+
+        }
+        io_retval = wish_fs_read(old_fd, peek_buf, peek_len);
+        if (io_retval == 0) {
+            WISHDEBUG(LOG_DEBUG, "End of file detected (2)");
+            break;
+        }
+        else if (io_retval < 0) {
+            WISHDEBUG(LOG_CRITICAL, "read error");
+            break;
+        }
+
+        bson bs;
+        bson_init_with_data(&bs, peek_buf);
+        
+        int32_t elem_len = bson_size(&bs);
+        if (elem_len < 4 || elem_len > peek_len) {
+            WISHDEBUG(LOG_CRITICAL, "BSON Read error");
+            break;
+        }
+        
+        bson_iterator it;
+        
+        if (bson_find_from_buffer(&it, peek_buf, "uid") != BSON_BINDATA) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (g)");
+            break;
+        }
+        if (memcmp(bson_iterator_bin_data(&it), identity->uid, WISH_ID_LEN) == 0) {
+            //WISHDEBUG(LOG_CRITICAL, "Update: Found identity (2)!");
+            retval = 1;
+            
+            bson bs = wish_identity_to_bson(identity);
+            
+            if (bs.data == NULL) {
+                WISHDEBUG(LOG_CRITICAL, "Failed updating identity. Could not product bson serialized data.");
+                // failed to produce bson from identity, keep the old one.
+                wr_len = wish_fs_write(new_fd, peek_buf, elem_len);
+                if (wr_len != elem_len) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! A"); }
+            } else {
+                //bson_visit("on the right track...", bson_data(&bs));
+                wr_len = wish_fs_write(new_fd, bson_data(&bs), bson_size(&bs));
+                if (wr_len != elem_len) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! B"); }
+                bson_destroy(&bs);
+            }
+        } else {
+            /* Write the document to new file */
+            wr_len = wish_fs_write(new_fd, peek_buf, elem_len);
+            if (wr_len != elem_len) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! B"); }
+        }
+         /* Update prev offset so that we can later re-position the
+         * stream */
+        prev_offset+=elem_len;
+    } while (1);
+    
+    wish_fs_close(new_fd);
+    wish_fs_close(old_fd);
+
+    wish_fs_rename(newpath, oldpath);
+    
+    /* For all connections: if identity is either in luid or ruid, close the connection. */
+    wish_connection_t* connection = wish_core_get_connection_pool(core);
+    int i = 0;
+    for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        if (connection[i].context_state == WISH_CONTEXT_FREE) {
+            /* If the wish context is not in use, we can safely skip it */
+            //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
+            continue;
+        }
+        if (memcmp(connection[i].luid, identity->uid, WISH_ID_LEN) == 0) {
+            //WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is luid of a connection");
+            wish_close_connection(core, &connection[i]);
+        }
+        else if (memcmp(connection[i].ruid, identity->uid, WISH_ID_LEN) == 0) {
+            //WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is ruid of a connection");
+            wish_close_connection(core, &connection[i]); 
         }
     }
     
