@@ -869,13 +869,13 @@ int wish_identity_update(wish_core_t* core, wish_identity_t* identity) {
             } else {
                 //bson_visit("on the right track...", bson_data(&bs));
                 wr_len = wish_fs_write(new_fd, bson_data(&bs), bson_size(&bs));
-                if (wr_len != elem_len) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! B"); }
+                if (wr_len != bson_size(&bs)) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! B"); }
                 bson_destroy(&bs);
             }
         } else {
             /* Write the document to new file */
             wr_len = wish_fs_write(new_fd, peek_buf, elem_len);
-            if (wr_len != elem_len) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! B"); }
+            if (wr_len != elem_len) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! C"); }
         }
          /* Update prev offset so that we can later re-position the
          * stream */

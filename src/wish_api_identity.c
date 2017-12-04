@@ -298,6 +298,34 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
 }
 
 /**
+ * 
+ * 
+ * @return 
+ */
+static bool wish_identity_local_exists() {
+    
+    int num_uids_in_db = wish_get_num_uid_entries();
+    wish_uid_list_elem_t uid_list[num_uids_in_db];
+    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+
+    int i = 0;
+    for (i = 0; i < num_uids; i++) {
+        wish_identity_t identity;
+
+        if ( RET_SUCCESS != wish_identity_load(uid_list[i].uid, &identity) ) {
+            WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+            continue;
+        }
+
+        if (identity.has_privkey) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
  * identity.create
  *
  * App to core: { op: "identity.create", args: [ "Moster Greta" ], id: 5 }
@@ -315,6 +343,11 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
  */
 void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    if ( wish_identity_local_exists() ) {
+        rpc_server_error_msg(req, 304, "Identity exists. Multiple not yet supported.");
+        return;
+    }
     
     /* Get the new identity's alias, it is element 0 of array 'args' */
     bson_iterator it;
@@ -568,7 +601,9 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
 
     bson_find_from_buffer(&it, args, "2");
 
-    if(bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 5 && bson_iterator_bin_len(&it) <= 512 ) {
+    if (bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 5
+            && bson_iterator_bin_len(&it) <= 512 ) 
+    {
         claim.base = (char*) bson_iterator_bin_data(&it);
         claim.len = bson_iterator_bin_len(&it);
         WISHDEBUG(LOG_CRITICAL, "Sign with claim. %p %i", claim.base, claim.len);
@@ -576,7 +611,10 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
     
     bson_find_from_buffer(&it, args, "1");
     
-    if(bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 32 && bson_iterator_bin_len(&it) <= 64 ) {
+    if(bson_iterator_type(&it) == BSON_BINDATA 
+            && bson_iterator_bin_len(&it) >= 32 
+            && bson_iterator_bin_len(&it) <= 64 ) 
+    {
         // sign hash
         char hash[64];
         int hash_len = bson_iterator_bin_len(&it);
@@ -758,7 +796,8 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
             BSON_NUMSTR(index, i++);
             bson_append_start_object(&b, index);
             
-            WISHDEBUG(LOG_CRITICAL, "0.signatures.0 already present, should be verified. %i %s", bson_iterator_type(&it), bson_iterator_key(&it));
+            //WISHDEBUG(LOG_CRITICAL, "0.signatures.0 already present, should be verified. %i %s", 
+            //        bson_iterator_type(&it), bson_iterator_key(&it));
             bson obj;
             bson_iterator_subobject(&it, &obj);
             bson_iterator sit;
@@ -774,10 +813,16 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
             
             while ( bson_iterator_next(&sit) != BSON_EOO ) {
                 //WISHDEBUG(LOG_CRITICAL, "  sub object %i: %s", bson_iterator_type(&sit), bson_iterator_key(&sit));
-                if (strncmp("sign", bson_iterator_key(&sit), 5) == 0 && bson_iterator_type(&sit) == BSON_BINDATA && bson_iterator_bin_len(&sit) == WISH_SIGNATURE_LEN ) {
+                if (strncmp("sign", bson_iterator_key(&sit), 5) == 0 
+                        && bson_iterator_type(&sit) == BSON_BINDATA 
+                        && bson_iterator_bin_len(&sit) == WISH_SIGNATURE_LEN ) 
+                {
                     signature.base = (char*) bson_iterator_bin_data(&sit);
                     signature.len = bson_iterator_bin_len(&sit);
-                } else if (strncmp("uid", bson_iterator_key(&sit), 4) == 0 && bson_iterator_type(&sit) == BSON_BINDATA && bson_iterator_bin_len(&sit) == WISH_UID_LEN ) {
+                } else if (strncmp("uid", bson_iterator_key(&sit), 4) == 0
+                        && bson_iterator_type(&sit) == BSON_BINDATA &&
+                        bson_iterator_bin_len(&sit) == WISH_UID_LEN ) 
+                {
                     uid = bson_iterator_bin_data(&sit);
                     bson_append_element(&b, bson_iterator_key(&sit), &sit);
                 } else if (strncmp("claim", bson_iterator_key(&sit), 6) == 0 && bson_iterator_type(&sit) == BSON_BINDATA ) {
@@ -1184,7 +1229,8 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
         if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
             if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
-                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
+                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i",
+                //    core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
                 wish_connection = &core->connection_pool[i];
                 break;
             }
@@ -1230,7 +1276,9 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     
     //WISHDEBUG(LOG_CRITICAL, "Accepting friend request");
     
-    /* The friend request has been accepted, send our certificate as a RPC response to the remote core that originally sent us the core-to-core friend request. */
+    /* The friend request has been accepted, send our certificate as a RPC 
+     * response to the remote core that originally sent us the core-to-core 
+     * friend request. */
     size_t signed_cert_buffer_len = 1024;
 #ifdef COMPILING_FOR_ESP8266
     uint8_t *signed_cert_buffer = wish_platform_malloc(signed_cert_buffer_len);
@@ -1397,7 +1445,8 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
         if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
             if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
-                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
+                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i",
+                //    core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
                 wish_connection = &core->connection_pool[i];
                 break;
             }
@@ -1448,7 +1497,8 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
  * Let the local host identity to be h.
  * For every service "s" present in the local service registry, do;
  *    For every service "r" present in the local service registry, do:
- *      Construct "type: peer", "online: true", message with: <luid=i, ruid=i, rsid=r, rhid=h> and send it to s. If r == s, skip to avoid sending online message to service itself.
+ *      Construct "type: peer", "online: true", message with: <luid=i, ruid=i, rsid=r, rhid=h> 
+ *      and send it to s. If r == s, skip to avoid sending online message to service itself.
  *    done
  * done.      
  * 
