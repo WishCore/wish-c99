@@ -111,7 +111,7 @@ void wish_pubkey2uid(const uint8_t *pubkey, uint8_t *uid);
 /* Create a new "local" identity (i.e. complete with pubkey and privkey)
  * with the alias provided, saving the result in the pointer 'id'.
  * The uid field is also populated */
-void wish_create_local_identity(wish_identity_t *id, const char *alias);
+void wish_create_local_identity(wish_core_t *core, wish_identity_t *id, const char *alias);
 
 /* This is a helper function for loading pubkeys corresponding to uids.
  * Easier to use than wish_load_identity

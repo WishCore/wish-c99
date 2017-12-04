@@ -364,7 +364,7 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
 
     /* Create the identity */
     wish_identity_t id;
-    wish_create_local_identity(&id, alias_str);
+    wish_create_local_identity(core, &id, alias_str);
     int ret = wish_save_identity_entry(&id);
 
     
