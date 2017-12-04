@@ -576,6 +576,7 @@ static void wish_create_keypair(uint8_t *pubkey, uint8_t *privkey) {
 
 
 void wish_create_local_identity(wish_identity_t *id, const char *alias) {
+    memset(id, 0, sizeof (wish_identity_t));
     wish_create_keypair(&(id->pubkey[0]), &(id->privkey[0]));
     id->has_privkey = true;
     wish_pubkey2uid(&(id->pubkey[0]), &(id->uid[0]));
