@@ -21,7 +21,7 @@
  * @return bson* or NULL
  */
 static bson wish_identity_to_bson(wish_identity_t* identity) {
-    const uint32_t identity_doc_max_len = sizeof (wish_identity_t) + 100;
+    const uint32_t identity_doc_max_len = sizeof (wish_identity_t) + 100 + WISH_MAX_TRANSPORTS*WISH_MAX_TRANSPORT_LEN;
 
     bson bs;
     bson_init_size(&bs, identity_doc_max_len);
@@ -49,12 +49,15 @@ static bson wish_identity_to_bson(wish_identity_t* identity) {
     }
 
     //WISHDEBUG(LOG_CRITICAL, "transports[0] to save: %s", identity->transports[0]);
-    /** \fixme For now, just encode a single transport */
-    if (strnlen(&(identity->transports[0][0]), WISH_MAX_TRANSPORT_LEN) > 0) {
-        bson_append_start_array(&bs, "transports");
-        bson_append_string(&bs, "0", &(identity->transports[0][0]));
-        bson_append_finish_array(&bs);
+    bson_append_start_array(&bs, "transports");
+    for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+        if (strnlen(&(identity->transports[i][0]), WISH_MAX_TRANSPORT_LEN) > 0) {
+            char index_str[10] = { 0 };
+            BSON_NUMSTR(index_str, i);
+            bson_append_string(&bs, index_str, &(identity->transports[i][0]));
+        }
     }
+    bson_append_finish_array(&bs);
     /* FIXME add the rest of the fields */
     
     bson_finish(&bs);
@@ -374,11 +377,16 @@ return_t wish_identity_load(const uint8_t* uid, wish_identity_t* identity) {
             /* When we got this far, we are satisfied with import, the
              * rest is optional */
             retval = RET_SUCCESS;
-
-            bson_iterator_init(&it, &bs);
-            
-            if (bson_find_fieldpath_value("transports.0", &it) == BSON_STRING) {
-                strncpy(&(identity->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+  
+            for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+                const int max_len = 16;
+                char transports_path[max_len];
+                bson_iterator_init(&it, &bs);
+                wish_platform_snprintf(transports_path, max_len, "transports.%d", i);
+                if (bson_find_fieldpath_value(transports_path, &it) == BSON_STRING) {
+                    strncpy(&(identity->transports[i][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+                }
+                
             }
 
             bson_iterator_init(&it, &bs);
@@ -556,18 +564,8 @@ void wish_pubkey2uid(const uint8_t *pubkey, uint8_t *uid) {
 
 
 static void wish_create_keypair(uint8_t *pubkey, uint8_t *privkey) {
-    /* Test */
-#if 0
-    uint8_t seed[32] = {
-        0x33, 0xda, 0x14, 0xdb, 0xf3, 0x2e, 0x01, 0xff, 0xcc, 0x2e,
-        0x1e, 0x83, 0x64, 0x8b, 0x2e, 0xb1, 0x31, 0x20, 0x4c, 0x7e,
-        0xda, 0x94, 0x4d, 0xe8, 0x12, 0x10, 0xa0, 0x65, 0x6c, 0x29,
-        0xb1, 0x44,
-    };
-#else
     uint8_t seed[WISH_ED25519_SEED_LEN];
     wish_platform_fill_random(NULL, seed, WISH_ED25519_SEED_LEN);
-#endif
 
     ed25519_create_keypair(pubkey, privkey, seed);
 
@@ -593,6 +591,10 @@ void wish_create_local_identity(wish_core_t *core, wish_identity_t *id, const ch
         int i = 0;
         LL_FOREACH(core->relay_db, relay) {
             wish_relay_encode_as_url(&(id->transports[i][0]), &relay->ip, relay->port);
+            i++;
+            if (i >= WISH_MAX_TRANSPORTS) {
+                break;
+            }
         }
     }
 }
@@ -686,16 +688,15 @@ void wish_identity_add_meta_from_bson(wish_identity_t *id, const bson* meta) {
     
     bson_iterator it;
     
-    bson_iterator_init(&it, meta);
-    
-    /* FIXME copy all transports, now copying only the first one listed */
-
-    if ( bson_find_fieldpath_value("transports.0", &it) == BSON_STRING ) {
-        //WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
-        strncpy(&(id->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
-        
-    } else {
-        WISHDEBUG(LOG_CRITICAL, "transprots.0 not found");
+    for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+        size_t max_len = 16;
+        char transports_path[max_len];
+        wish_platform_snprintf(transports_path, max_len, "transports.%d", i);
+        bson_iterator_init(&it, meta);
+        if ( bson_find_fieldpath_value(transports_path, &it) == BSON_STRING ) {
+            //WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
+            strncpy(&(id->transports[i][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+        }
     }
 }
 

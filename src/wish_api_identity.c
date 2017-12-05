@@ -267,15 +267,21 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     bson_append_binary(&bs, "pubkey", identity.pubkey, WISH_PUBKEY_LEN);
 
     // TODO: Support multiple transports
-    if ( strnlen(&identity.transports[0][0], 64) % 64 != 0 ) {
-        bson_append_start_array(&bs, "hosts");
-        bson_append_start_object(&bs, "0");
-        bson_append_start_array(&bs, "transports");
-        bson_append_string(&bs, "0", &identity.transports[0][0]);
-        bson_append_finish_array(&bs);
-        bson_append_finish_object(&bs);
-        bson_append_finish_array(&bs);
+    bson_append_start_array(&bs, "hosts");
+    bson_append_start_object(&bs, "0");
+    bson_append_start_array(&bs, "transports");
+    
+    for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+        if ( strnlen(&identity.transports[i][0], WISH_MAX_TRANSPORT_LEN)  > 0 ) {   
+            char index_str[10] = { 0 };
+            BSON_NUMSTR(index_str, i);
+            
+            bson_append_string(&bs, index_str, &identity.transports[i][0]);
+        }
     }
+    bson_append_finish_array(&bs);
+    bson_append_finish_object(&bs);
+    bson_append_finish_array(&bs);
     
     bson b;
     
@@ -951,7 +957,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         bson_iterator meta;
         bson_iterator_from_buffer(&meta, bson_iterator_bin_data(&it));
 
-
+        /* FIXME: support friend request connection to all the transports, not just the 0th one. */
         bson_find_fieldpath_value("transports.0", &meta);
 
         if (bson_iterator_type(&meta) != BSON_STRING) {
