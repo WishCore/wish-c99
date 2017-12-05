@@ -244,6 +244,11 @@ int wish_relay_get_preferred_server_url(char *url_str, int url_str_max_len) {
     return 0;
 }
 
+int wish_relay_encode_as_url(char *url_str, wish_ip_addr_t *ip, int port) {
+    wish_platform_sprintf(url_str, "wish://%d.%d.%d.%d:%d", ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], port);
+    return 0;
+}
+
 /**
  * Get relay contexts. 
  *

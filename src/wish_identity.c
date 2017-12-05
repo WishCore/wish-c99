@@ -575,16 +575,26 @@ static void wish_create_keypair(uint8_t *pubkey, uint8_t *privkey) {
 }
 
 
-void wish_create_local_identity(wish_identity_t *id, const char *alias) {
+void wish_create_local_identity(wish_core_t *core, wish_identity_t *id, const char *alias) {
     memset(id, 0, sizeof (wish_identity_t));
     wish_create_keypair(&(id->pubkey[0]), &(id->privkey[0]));
     id->has_privkey = true;
     wish_pubkey2uid(&(id->pubkey[0]), &(id->uid[0]));
     strncpy(&(id->alias[0]), alias, WISH_ALIAS_LEN);
 
-    /* Encode our preferred relay server as first transport */
-    wish_relay_get_preferred_server_url(&(id->transports[0][0]), WISH_MAX_TRANSPORT_LEN);
- 
+    wish_relay_client_t* relay;
+    int num_relays = 0;
+    LL_COUNT(core->relay_db, relay, num_relays);
+    if (num_relays == 0) {
+        /* There were no relays, use our preferred relay server as first transport */
+        wish_relay_get_preferred_server_url(&(id->transports[0][0]), WISH_MAX_TRANSPORT_LEN);
+    }
+    else {
+        int i = 0;
+        LL_FOREACH(core->relay_db, relay) {
+            wish_relay_encode_as_url(&(id->transports[i][0]), &relay->ip, relay->port);
+        }
+    }
 }
 
 /* Return 1 if privkey is known, else 0 */
