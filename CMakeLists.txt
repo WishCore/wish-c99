@@ -2,7 +2,7 @@ project(wish)
 cmake_minimum_required(VERSION 2.8.8)
 
 #set(CMAKE_C_FLAGS "-Wall -std=c99 -Wno-pointer-sign")
-#set(CMAKE_C_FLAGS "-Wall -Wno-pointer-sign -Wno-unused-variable")
+set(CMAKE_C_FLAGS "-Wall -Wno-pointer-sign -Wno-unused-variable")
 #set(CMAKE_C_FLAGS_RELEASE "-Os -O3")
 #set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
 
@@ -25,6 +25,7 @@ set(TEST_EXECUTABLE "test_bson")
 #MESSAGE( STATUS "output: " ${EXECUTABLE} )
 
 add_definitions( "-DWISH_CORE_VERSION_STRING=\"${WISH_CORE_VERSION_STRING}\"") 
+add_definitions( "-DWLD_META_PRODUCT=\"${WLD_META_PRODUCT}\"") 
 
 include_directories(src port/unix deps/bson deps/ed25519/src deps/mbedtls-2.1.2/include deps/uthash/include deps/wish-rpc-c99/src)
 

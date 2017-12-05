@@ -36,6 +36,8 @@ typedef struct wish_ldiscover_t {
     wish_ip_addr_t transport_ip;
     uint16_t transport_port;
     const char* meta;
+    /** Class broadcasted by core. Can expose hint of device type or application of the core. */
+    const char* class;
 } wish_ldiscover_t;
 
 void wish_ldiscover_init(wish_core_t* core);

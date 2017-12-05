@@ -138,9 +138,16 @@ size_t buffer_len) {
         claim = bson_iterator_bool(&it);
     }
     
+    bson_iterator_from_buffer(&it, msg);
+    
+    const char* meta_product = NULL;
+    
+    if (bson_find_fieldpath_value("meta.product", &it) == BSON_STRING) {
+        meta_product = bson_iterator_string(&it);
+    }
+    
     /** The port number of the remote wish core will be saved here */
     uint16_t tcp_port = 0;
-
 
     bson_iterator_from_buffer(&it, msg);
 
@@ -208,6 +215,7 @@ size_t buffer_len) {
         memcpy(&core->ldiscovery_db[free].rhid, rhid, WISH_ID_LEN);
         memcpy(&core->ldiscovery_db[free].pubkey, pubkey_ptr, WISH_PUBKEY_LEN);
         strncpy((char*) &core->ldiscovery_db[free].alias, alias, WISH_ALIAS_LEN);
+        core->ldiscovery_db[free].class = (meta_product != NULL ? strdup(meta_product) : NULL);
         core->ldiscovery_db[free].claim = claim;
         /* FIXME ip address length here is hardcoded and assumed to be
          * IPv4 */
@@ -367,6 +375,11 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     bson_init_buffer(&bs, msg+2, msg_len-2);
     
     bson_append_string(&bs, "alias", my_identity.alias);
+#ifdef WLD_META_PRODUCT
+    bson_append_start_object(&bs, "meta");
+    bson_append_string(&bs, "product", WLD_META_PRODUCT);
+    bson_append_finish_object(&bs);
+#endif
     bson_append_binary(&bs, "wuid", my_uid, WISH_ID_LEN);
 
     uint8_t host_id[WISH_WHID_LEN];
