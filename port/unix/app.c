@@ -635,7 +635,7 @@ int main(int argc, char** argv) {
         struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 100000;
-        
+
         for (i = 0; i < max_fd; i++) {
             if (FD_ISSET(i, &rfds)) {
                 FD_SET(i, &exceptfds);
@@ -878,7 +878,8 @@ int main(int argc, char** argv) {
         }
         else {
             /* Select error return */
-            printf("Select error: %i: %s\n", select_ret, strerror(select_ret));
+            perror("Select error: ");
+            
             exit(0);
         }
         
