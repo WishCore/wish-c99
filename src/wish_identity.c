@@ -787,6 +787,7 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
     wish_fs_close(new_fd);
     wish_fs_close(old_fd);
 
+    wish_fs_remove(oldpath);
     wish_fs_rename(newpath, oldpath);
     
     /* For all connections: if identity is either in luid or ruid, close the connection. */
@@ -818,7 +819,9 @@ int wish_identity_update(wish_core_t* core, wish_identity_t* identity) {
     const char* newpath = WISH_ID_DB_NAME ".tmp";
     wish_file_t old_fd = wish_fs_open(oldpath);
     wish_file_t new_fd = wish_fs_open(newpath);
-
+      
+    //WISHDEBUG(LOG_CRITICAL, "wish_identity_update: old_fd %d new_fd %d", old_fd, new_fd);
+ 
     /* Truncate the new file */
     int32_t tmp = 0;
     int wr_len = wish_fs_write(new_fd, &tmp, 0);
@@ -896,25 +899,10 @@ int wish_identity_update(wish_core_t* core, wish_identity_t* identity) {
     wish_fs_close(new_fd);
     wish_fs_close(old_fd);
 
-    wish_fs_rename(newpath, oldpath);
-    
-    /* For all connections: if identity is either in luid or ruid, close the connection. */
-    wish_connection_t* connection = wish_core_get_connection_pool(core);
-    int i = 0;
-    for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
-        if (connection[i].context_state == WISH_CONTEXT_FREE) {
-            /* If the wish context is not in use, we can safely skip it */
-            //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
-            continue;
-        }
-        if (memcmp(connection[i].luid, identity->uid, WISH_ID_LEN) == 0) {
-            //WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is luid of a connection");
-            wish_close_connection(core, &connection[i]);
-        }
-        else if (memcmp(connection[i].ruid, identity->uid, WISH_ID_LEN) == 0) {
-            //WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is ruid of a connection");
-            wish_close_connection(core, &connection[i]); 
-        }
+    wish_fs_remove(oldpath);
+    int rename_ret = wish_fs_rename(newpath, oldpath);
+    if ( rename_ret != 0) {
+        WISHDEBUG(LOG_CRITICAL, "Rename fails %d", rename_ret);
     }
     
     return retval;
