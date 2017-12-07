@@ -226,7 +226,8 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
  * to the id number given as argument */
 wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_connection_id_t connection_id);
 
-/** Check that a connection is valid for sending data */
+/** Check that a connection pointer actually represents a wish
+ * connection in the pool */
 wish_connection_t* wish_connection_exists(wish_core_t *core, wish_connection_t *connection);
 
 /**
