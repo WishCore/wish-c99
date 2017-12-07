@@ -682,12 +682,16 @@ handler core_friend_req_h =                            { .op = "friendRequest", 
 static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
     wish_connection_t* connection = (wish_connection_t*) req->ctx;
     
+    wish_core_t* core = req->server->context;
+    
+    connection = wish_connection_exists(core, req->ctx);
+    
     if (connection == NULL) {
         WISHDEBUG(LOG_CRITICAL, "wish_core_connection_send: The connection is null, bailing.");
         return;
     }
     
-    wish_core_t* core = connection->core;
+    
     
     const uint8_t* payload = bson_data(bs);
     int payload_len = bson_size(bs);

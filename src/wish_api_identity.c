@@ -555,6 +555,11 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
             }
         }
         
+        if (wish_connection_exists(core, req->ctx) == NULL) {
+            WISHDEBUG(LOG_CRITICAL, "Will not send, connection gone");
+            return;
+        }
+        
         rpc_server_send(req, bson_data(&bs), bson_size(&bs));
         
         wish_core_signals_emit_string(core, "identity");
