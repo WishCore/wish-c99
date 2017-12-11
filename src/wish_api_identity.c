@@ -413,7 +413,7 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
  *   skype: 'andre-controlthings',
  *   email: 'andre.kaustell@controlthings.fi' }
  */
-void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
+void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) { 
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     bson_iterator it;
@@ -475,9 +475,9 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&meta);
     
     if (count) { id.meta = bson_data(&meta); }
-    
+
     int ret = wish_identity_update(core, &id);
-    
+
     bson_destroy(&meta);
     
     int buf_len = 128;
@@ -490,7 +490,7 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
 
     // pass to identity get handler with uid as parameter
     wish_api_identity_get(req, (char*) bson_data(&bs));
-    
+
     wish_core_update_identities(core);
 
     //WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");

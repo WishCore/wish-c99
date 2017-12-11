@@ -671,6 +671,7 @@ handler core_signals_h =                               { .op = "signals",       
 handler core_send_h =                                  { .op = "send",                                .handler = send_op_handler };
 handler core_directory_h =                             { .op = "directory",                           .handler = core_directory };
 handler core_identity_list_h =                         { .op = "identity.list",                       .handler = wish_api_identity_list };
+handler core_identity_update_h =                       { .op = "identity.update",                     .handler = wish_api_identity_update };
 handler core_identity_remove_h =                       { .op = "identity.remove",                     .handler = wish_api_identity_remove };
 handler core_identity_export_h =                       { .op = "identity.export",                     .handler = wish_api_identity_export };
 handler core_identity_sign_h =                         { .op = "identity.sign",                       .handler = wish_api_identity_sign };
@@ -735,6 +736,7 @@ void wish_core_init_rpc(wish_core_t* core) {
     rpc_server_register(core->core_api, &core_send_h);
     rpc_server_register(core->core_api, &core_directory_h);
     rpc_server_register(core->core_api, &core_identity_list_h);
+    rpc_server_register(core->core_api, &core_identity_update_h);
     rpc_server_register(core->core_api, &core_identity_remove_h);
     rpc_server_register(core->core_api, &core_identity_export_h);
     rpc_server_register(core->core_api, &core_identity_sign_h);
