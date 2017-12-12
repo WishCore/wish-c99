@@ -350,17 +350,17 @@ static bool wish_identity_local_exists() {
 void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    if ( wish_identity_local_exists() ) {
-        rpc_server_error_msg(req, 304, "Identity exists. Multiple not yet supported.");
-        return;
-    }
-    
     /* Get the new identity's alias, it is element 0 of array 'args' */
     bson_iterator it;
     bson_iterator_from_buffer(&it, args);
     
     if ( bson_find_fieldpath_value("0", &it) != BSON_STRING ) {
         rpc_server_error_msg(req, 309, "Argument 1 must be string");
+        return;
+    }
+
+    if ( wish_identity_local_exists() ) {
+        rpc_server_error_msg(req, 304, "Identity exists. Multiple not yet supported.");
         return;
     }
     
