@@ -465,10 +465,10 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     
     while ( BSON_EOO != bson_iterator_next(&sit) ) {
         const char* key = bson_iterator_key(&sit);
-        if ( BSON_STRING != bson_iterator_type(&sit)) { continue; }
+        //if ( BSON_STRING != bson_iterator_type(&sit)) { continue; }
         if ( strncmp(key, "alias", 6) == 0 ) { continue; }
         
-        bson_append_string(&meta, key, bson_iterator_string(&sit));
+        bson_append_element(&meta, key, &sit);
         count++;
     }
 
