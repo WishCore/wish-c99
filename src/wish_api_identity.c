@@ -350,17 +350,17 @@ static bool wish_identity_local_exists() {
 void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
     wish_core_t* core = (wish_core_t*) req->server->context;
     
-    if ( wish_identity_local_exists() ) {
-        rpc_server_error_msg(req, 304, "Identity exists. Multiple not yet supported.");
-        return;
-    }
-    
     /* Get the new identity's alias, it is element 0 of array 'args' */
     bson_iterator it;
     bson_iterator_from_buffer(&it, args);
     
     if ( bson_find_fieldpath_value("0", &it) != BSON_STRING ) {
         rpc_server_error_msg(req, 309, "Argument 1 must be string");
+        return;
+    }
+
+    if ( wish_identity_local_exists() ) {
+        rpc_server_error_msg(req, 304, "Identity exists. Multiple not yet supported.");
         return;
     }
     
@@ -413,7 +413,7 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
  *   skype: 'andre-controlthings',
  *   email: 'andre.kaustell@controlthings.fi' }
  */
-void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
+void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) { 
     wish_core_t* core = (wish_core_t*) req->server->context;
     
     bson_iterator it;
@@ -465,19 +465,19 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     
     while ( BSON_EOO != bson_iterator_next(&sit) ) {
         const char* key = bson_iterator_key(&sit);
-        if ( BSON_STRING != bson_iterator_type(&sit)) { continue; }
+        //if ( BSON_STRING != bson_iterator_type(&sit)) { continue; }
         if ( strncmp(key, "alias", 6) == 0 ) { continue; }
         
-        bson_append_string(&meta, key, bson_iterator_string(&sit));
+        bson_append_element(&meta, key, &sit);
         count++;
     }
 
     bson_finish(&meta);
     
     if (count) { id.meta = bson_data(&meta); }
-    
+
     int ret = wish_identity_update(core, &id);
-    
+
     bson_destroy(&meta);
     
     int buf_len = 128;
@@ -490,7 +490,7 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
 
     // pass to identity get handler with uid as parameter
     wish_api_identity_get(req, (char*) bson_data(&bs));
-    
+
     wish_core_update_identities(core);
 
     //WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
@@ -552,6 +552,13 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
         LL_FOREACH(core->relay_db, relay) {
             if (memcmp(relay->uid, uid, WISH_UID_LEN) == 0) {
                 wish_relay_client_close(core, relay);
+            }
+        }
+        
+        if (wish_service_exists(core, req->context) == NULL) {
+            if (wish_connection_exists(core, req->ctx) == NULL) {
+                WISHDEBUG(LOG_CRITICAL, "Will not send, connection gone");
+                return;
             }
         }
         

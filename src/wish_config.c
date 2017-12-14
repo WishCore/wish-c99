@@ -26,11 +26,13 @@ int wish_core_config_load(wish_core_t* core) {
     if (read_ret != 4) {
         WISHDEBUG(LOG_CRITICAL, "Empty file, or read error in configuration load." WISH_CORE_CONFIG_DB_NAME);
         wish_core_config_save(core);
+        wish_fs_close(fd);
         return -2;
     }
 
     if(size>4*1024) {
         WISHDEBUG(LOG_CRITICAL, "Configuration load, file too large (4KiB limit). Found: %i bytes.", size);
+        wish_fs_close(fd);
         return -3;
     }
     

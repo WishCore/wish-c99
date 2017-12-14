@@ -92,6 +92,16 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
     return connection;
 }
 
+wish_connection_t* wish_connection_exists(wish_core_t *core, wish_connection_t *connection) {
+    for (int i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        if (&core->connection_pool[i] == connection) {
+            
+            return connection;
+        }
+    }
+    return NULL;
+}
+
 /** This function returns a pointer to the wish context which matches the
  * specified luid, ruid, rhid identities 
  *

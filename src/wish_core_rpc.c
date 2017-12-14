@@ -670,7 +670,9 @@ handler core_peers_h =                                 { .op = "peers",         
 handler core_signals_h =                               { .op = "signals",                             .handler = wish_core_signals };
 handler core_send_h =                                  { .op = "send",                                .handler = send_op_handler };
 handler core_directory_h =                             { .op = "directory",                           .handler = core_directory };
+handler core_identity_get_h =                          { .op = "identity.get",                        .handler = wish_api_identity_get };
 handler core_identity_list_h =                         { .op = "identity.list",                       .handler = wish_api_identity_list };
+handler core_identity_update_h =                       { .op = "identity.update",                     .handler = wish_api_identity_update };
 handler core_identity_remove_h =                       { .op = "identity.remove",                     .handler = wish_api_identity_remove };
 handler core_identity_export_h =                       { .op = "identity.export",                     .handler = wish_api_identity_export };
 handler core_identity_sign_h =                         { .op = "identity.sign",                       .handler = wish_api_identity_sign };
@@ -682,12 +684,16 @@ handler core_friend_req_h =                            { .op = "friendRequest", 
 static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
     wish_connection_t* connection = (wish_connection_t*) req->ctx;
     
+    wish_core_t* core = req->server->context;
+    
+    connection = wish_connection_exists(core, req->ctx);
+    
     if (connection == NULL) {
         WISHDEBUG(LOG_CRITICAL, "wish_core_connection_send: The connection is null, bailing.");
         return;
     }
     
-    wish_core_t* core = connection->core;
+    
     
     const uint8_t* payload = bson_data(bs);
     int payload_len = bson_size(bs);
@@ -730,7 +736,9 @@ void wish_core_init_rpc(wish_core_t* core) {
     rpc_server_register(core->core_api, &core_signals_h);
     rpc_server_register(core->core_api, &core_send_h);
     rpc_server_register(core->core_api, &core_directory_h);
+    rpc_server_register(core->core_api, &core_identity_get_h);
     rpc_server_register(core->core_api, &core_identity_list_h);
+    rpc_server_register(core->core_api, &core_identity_update_h);
     rpc_server_register(core->core_api, &core_identity_remove_h);
     rpc_server_register(core->core_api, &core_identity_export_h);
     rpc_server_register(core->core_api, &core_identity_sign_h);

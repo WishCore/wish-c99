@@ -100,13 +100,11 @@ static void rpc_callback(rpc_client_req* req, void* context, const uint8_t* payl
     bson_finish(&bs);
     
     if (bson_find_from_buffer(&it, payload, "err") == BSON_INT) {
-        WISHDEBUG(LOG_CRITICAL, "CoreRPC response is an error, trying to pass it up as one!");
         rpc_server_error(sreq, bson_data(&bs), bson_size(&bs));
         return;
     }
 
     if (bson_find_from_buffer(&it, payload, "sig") == BSON_INT) {
-        WISHDEBUG(LOG_CRITICAL, "CoreRPC response is a sig.");
         rpc_server_emit(sreq, bson_data(&bs), bson_size(&bs));
         return;
     }
