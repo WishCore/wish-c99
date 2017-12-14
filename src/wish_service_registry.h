@@ -1,6 +1,5 @@
 #pragma once
 
-#include "wish_app.h"
 #include "wish_core.h"
 
 void wish_service_register_add(wish_core_t* core, const uint8_t* src_wsid, const char* name, const uint8_t* protocols, const uint8_t* permissions);

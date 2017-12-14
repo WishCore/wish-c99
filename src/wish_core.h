@@ -8,6 +8,12 @@ extern "C" {
 
 #define WISH_MAX_SERVICES 10 /* contrast with NUM_WISH_APPS due to be removed in wish_app.h */
 
+#ifndef WISH_ID_LEN
+#define WISH_ID_LEN     32
+#endif
+#define WISH_WHID_LEN   32
+#define WISH_WSID_LEN   32
+
 typedef struct {
     char* base;
     int len;
@@ -19,12 +25,15 @@ typedef struct {
     
 #include "wish_port_config.h"
 #include "wish_rpc.h"
-#include "wish_app.h"
+#include "wish_protocol.h"
 #include "bson.h"
 
 typedef struct {
     uint8_t name[WISH_PROTOCOL_NAME_MAX_LEN];
 } wish_protocol_t;
+
+#define WISH_APP_NAME_MAX_LEN 32
+#define WISH_APP_MAX_PROTOCOLS 2
     
 typedef struct wish_service_entry {
     uint8_t wsid[WISH_WSID_LEN];

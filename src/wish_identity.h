@@ -31,14 +31,6 @@
 #define WISH_PRIVKEY_LEN 64     /* Length of ED25519 privkey */
 #define WISH_SIGNATURE_LEN 64   /* Length of ED25519 signature */
 #define WISH_ID_LEN 32  /* Actually, length of a SH256 checksum */
-#ifndef WISH_WSID_LEN
-// This check is due to refactoring dependencies: disconnecting wish_app from the core
-#define WISH_WSID_LEN WISH_ID_LEN  /* Actually, length of a SH256 checksum */
-#endif
-#ifndef WISH_WHID_LEN
-// This check is due to refactoring dependencies: disconnecting wish_app from the core
-#define WISH_WHID_LEN WISH_ID_LEN   /* Host ID */
-#endif
 
 /**
  * Wish in-memory Identity structure
