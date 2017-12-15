@@ -10,7 +10,7 @@ extern "C" {
 
 #include "wish_core.h"
     
-    /* Acl API */
+    /* Identity API */
     
     void wish_api_identity_export(rpc_server_req* req, const uint8_t* args);
 
