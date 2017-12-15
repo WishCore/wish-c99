@@ -139,13 +139,19 @@ return_t wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t 
     if ( RET_SUCCESS != wish_identity_load(luid, &lu) 
             || RET_SUCCESS != wish_identity_load(ruid, &ru) )
     {
+        wish_identity_destroy(&lu);
+        wish_identity_destroy(&ru);
         return RET_FAIL;
     }
     
-    wish_connection_t *new_ctx = wish_connection_init(core, luid, ruid);
-    if (new_ctx != NULL) {
+    wish_identity_destroy(&lu);
+    wish_identity_destroy(&ru);
+    
+    wish_connection_t* connection = wish_connection_init(core, luid, ruid);
+    
+    if (connection != NULL) {
         //WISHDEBUG(LOG_CRITICAL, "Connection attempt: %s > %s (%u.%u.%u.%u:%hu)", lu.alias, ru.alias, ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], port);
-        wish_open_connection(core, new_ctx, ip, port, false);
+        wish_open_connection(core, connection, ip, port, false);
     }
     
     return RET_SUCCESS;

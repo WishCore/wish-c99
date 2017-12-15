@@ -256,13 +256,19 @@ bool wish_core_check_wsid(wish_core_t* core, wish_connection_t* ctx, uint8_t* ds
     
     if ( wish_identity_load(src_id, &tmp_id) != RET_SUCCESS ) {
         WISHDEBUG(LOG_CRITICAL, "We don't know to guy trying to connect to us.");
+        wish_identity_destroy(&tmp_id);
         return false;
     }
+
+    wish_identity_destroy(&tmp_id);
     
     if ( wish_identity_load(dst_id, &tmp_id) != RET_SUCCESS ) {
         WISHDEBUG(LOG_CRITICAL, "We know who is trying to connect to us, but not the one he wants to connect to. (Did we delete an identity?)");
+        wish_identity_destroy(&tmp_id);
         return false;
     }
+
+    wish_identity_destroy(&tmp_id);
 
     /* Technically, we need to have the privkey for "dst_id", else we
      * cannot be communicating */
@@ -554,16 +560,6 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
         {
             wish_connection_t *conn = connection;
             
-            wish_identity_t lu;
-            wish_identity_t ru;
-
-            if ( RET_SUCCESS == wish_identity_load(conn->luid, &lu) 
-                    && RET_SUCCESS == wish_identity_load(conn->ruid, &ru) )
-            {
-                //WISHDEBUG(LOG_CRITICAL, "Connection TCP_DISCONNECTED: %s > %s (%u.%u.%u.%u:%hu)",
-                //        lu.alias, ru.alias, conn->remote_ip_addr[0], conn->remote_ip_addr[1], conn->remote_ip_addr[2], conn->remote_ip_addr[3], conn->remote_port);
-            }
-
             int i = 0;
             bool other_connection_found = false;
 

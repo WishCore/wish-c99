@@ -124,6 +124,7 @@ handler identity_export_h =                           { .op = "identity.export",
 handler identity_import_h =                           { .op = "identity.import",                   .handler = wish_api_identity_import, .args="(identity: Document): Identity" };
 handler identity_create_h =                           { .op = "identity.create",                   .handler = wish_api_identity_create, .args="(alias: string): Identity" };
 handler identity_update_h =                           { .op = "identity.update",                   .handler = wish_api_identity_update, .args="({ alias?: string, [field: string]: string }): Identity" };
+handler identity_permissions_h =                      { .op = "identity.permissions",              .handler = wish_api_identity_permissions, .args="({ [field: string]: string }): Identity" };
 handler identity_get_h =                              { .op = "identity.get",                      .handler = wish_api_identity_get, .args="(uid: Uid): Identity" };
 handler identity_remove_h =                           { .op = "identity.remove",                   .handler = wish_api_identity_remove, .args="(uid: Uid): bool" };
 
@@ -192,6 +193,7 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     rpc_server_register(core->app_api, &identity_list_h);
     rpc_server_register(core->app_api, &identity_create_h);
     rpc_server_register(core->app_api, &identity_update_h);
+    rpc_server_register(core->app_api, &identity_permissions_h);
     rpc_server_register(core->app_api, &identity_export_h);
     rpc_server_register(core->app_api, &identity_import_h);
     rpc_server_register(core->app_api, &identity_get_h);

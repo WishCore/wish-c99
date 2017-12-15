@@ -51,6 +51,7 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     
     if ( RET_SUCCESS != wish_identity_load(uid, &id) ) {
         rpc_server_error_msg(req, 343, "Failed to load identity.");
+        wish_identity_destroy(&id);
         return;
     }
 
@@ -62,8 +63,11 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     
     if ( RET_SUCCESS != wish_identity_export(core, &id, NULL, &buf) ) {
         rpc_server_error_msg(req, 92, "Internal export failed.");
+        wish_identity_destroy(&id);
         return;
     }
+    
+    wish_identity_destroy(&id);
     
     bson bs;
     bson_init_with_data(&bs, buf.base);
@@ -192,11 +196,15 @@ void wish_api_identity_list(rpc_server_req* req, const uint8_t* args) {
         if ( RET_SUCCESS != wish_identity_load(uid_list[i].uid, &identity) ) {
             WISHDEBUG(LOG_CRITICAL, "Could not load identity");
             rpc_server_error_msg(req, 997, "Could not load identity");
+            wish_identity_destroy(&identity);
+            return;
         }
 
         bson_append_binary(&bs, "uid", identity.uid, WISH_UID_LEN);
         bson_append_string(&bs, "alias", identity.alias);
         bson_append_bool(&bs, "privkey", identity.has_privkey);
+
+        wish_identity_destroy(&identity);
         
         bson_append_finish_object(&bs);
     }
@@ -258,6 +266,7 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     if ( RET_SUCCESS != wish_identity_load(arg_uid, &identity) ) {
         WISHDEBUG(LOG_CRITICAL, "Could not load identity");
         rpc_server_error_msg(req, 997, "Could not load identity");
+        wish_identity_destroy(&identity);
         return;
     }
 
@@ -287,10 +296,16 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     
     if (identity.meta) {
         bson_init_with_data(&b, identity.meta);
-        //bson_visit("identity.get meta:", bson_data(&b));
         bson_append_bson(&bs, "meta", &b);
     }
-            
+    
+    if (identity.permissions) {
+        bson_init_with_data(&b, identity.permissions);
+        bson_append_bson(&bs, "permissions", &b);
+    }
+    
+    wish_identity_destroy(&identity);
+    
     bson_append_finish_object(&bs);
     bson_finish(&bs);
 
@@ -300,6 +315,7 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     } else {
         rpc_server_send(req, bs.data, bson_size(&bs));
     }
+    
     bson_destroy(&bs);
 }
 
@@ -320,12 +336,16 @@ static bool wish_identity_local_exists() {
 
         if ( RET_SUCCESS != wish_identity_load(uid_list[i].uid, &identity) ) {
             WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+            wish_identity_destroy(&identity);
             continue;
         }
 
         if (identity.has_privkey) {
+            wish_identity_destroy(&identity);
             return true;
         }
+        
+        wish_identity_destroy(&identity);
     }
     
     return false;
@@ -432,6 +452,7 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     if (wish_identity_load(luid, &id) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not load identity");
         rpc_server_error_msg(req, 345, "Could not load identity.");
+        wish_identity_destroy(&id);
         return;
     }
 
@@ -452,6 +473,7 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     
     if ( bson_find_fieldpath_value("1", &it) != BSON_OBJECT ) {
         rpc_server_error_msg(req, 63, "Expecting object.");
+        wish_identity_destroy(&id);
         return;
     }
     
@@ -496,8 +518,9 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     //WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
     wish_ldiscover_advertize(core, id.uid);
     wish_report_identity_to_local_services(core, &id, true);
-    
+
     wish_core_signals_emit_string(core, "identity");
+    wish_identity_destroy(&id);
 }
 
 /**
@@ -531,6 +554,9 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
         if (wish_identity_load(uid, &id_to_remove) == RET_SUCCESS) {
             wish_report_identity_to_local_services(core, &id_to_remove, false);
         }
+        
+        wish_identity_destroy(&id_to_remove);
+        
         
         int res = wish_identity_remove(core, uid);
 
@@ -571,6 +597,84 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
     }
 }
 
+void wish_api_identity_permissions(rpc_server_req* req, const uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        rpc_server_error_msg(req, 345, "Invalid uid.");
+        return;
+    }
+
+    uint8_t* luid = (uint8_t *)bson_iterator_bin_data(&it);
+    
+    wish_identity_t id;
+    
+    // check if we can make a signature with this identity
+    if (wish_identity_load(luid, &id) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+        rpc_server_error_msg(req, 345, "Could not load identity.");
+        wish_identity_destroy(&id);
+        return;
+    }
+
+    bson_iterator_from_buffer(&it, args);
+
+    // Start dealing with permissions data fields
+    bson_iterator_from_buffer(&it, args);
+    
+    if ( bson_find_fieldpath_value("1", &it) != BSON_OBJECT ) {
+        rpc_server_error_msg(req, 63, "Expecting object.");
+        wish_identity_destroy(&id);
+        return;
+    }
+    
+    bson permissions;
+    bson_init(&permissions);
+    
+    int count = 0;
+    
+    bson_iterator sit;
+    bson_iterator_subiterator(&it, &sit);
+    
+    while ( BSON_EOO != bson_iterator_next(&sit) ) {
+        const char* key = bson_iterator_key(&sit);
+        
+        bson_append_element(&permissions, key, &sit);
+        count++;
+    }
+
+    bson_finish(&permissions);
+    
+    if (count) { id.permissions = bson_data(&permissions); }
+
+    int ret = wish_identity_update(core, &id);
+
+    bson_destroy(&permissions);
+    
+    int buf_len = 128;
+    uint8_t buf[buf_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_append_binary(&bs, "0", id.uid, WISH_UID_LEN);
+    bson_finish(&bs);
+
+    // pass to identity get handler with uid as parameter
+    wish_api_identity_get(req, (char*) bson_data(&bs));
+
+    wish_core_update_identities(core);
+
+    //WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
+    wish_ldiscover_advertize(core, id.uid);
+    wish_report_identity_to_local_services(core, &id, true);
+    
+    wish_core_signals_emit_string(core, "identity");
+    wish_identity_destroy(&id);
+}
+
 /**
  * identity.sign
  *
@@ -605,7 +709,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
     if (wish_identity_load(luid, &uid) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not load identity");
         rpc_server_error_msg(req, 345, "Could not load identity.");
-        return;
+        goto cleanup_and_return;
     }
     
     bin claim;
@@ -644,7 +748,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
 
         if(bs.err != 0) {
             rpc_server_error_msg(req, 344, "Failed writing reponse.");
-            return;
+            goto cleanup_and_return;
         }
 
         rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -659,10 +763,8 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         bson_iterator_from_buffer(&it, args);
         
         if ( bson_find_fieldpath_value("1.data", &it) != BSON_BINDATA ) {
-            WISHDEBUG(LOG_CRITICAL, "1.data not bin data");
-            
             rpc_server_error_msg(req, 345, "Second arg object does not have { data: <Buffer> }.");
-            return;
+            goto cleanup_and_return;
         }
 
         // copy the data blob to response
@@ -699,7 +801,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         // add signature by uid
         if ( RET_SUCCESS != wish_identity_sign(core, &uid, &data, &claim, &signature) ) {
             rpc_server_error_msg(req, 345, "Failed producing signature");
-            return;
+            goto cleanup_and_return;
         }
         
         BSON_NUMSTR(index, i++);
@@ -721,15 +823,17 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
 
         if(b.err != 0) {
             rpc_server_error_msg(req, 344, "Failed writing reponse.");
-            return;
+            goto cleanup_and_return;
         }
         
         rpc_server_send(req, bson_data(&b), bson_size(&b));
-        return;
     } else {
         rpc_server_error_msg(req, 345, "Second arg not valid hash or object.");
-        return;
     }
+    
+cleanup_and_return:
+    wish_identity_destroy(&uid);
+    return;            
 }
 
 /**
@@ -859,6 +963,8 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
                 } else {
                     bson_append_null(&b, "sign");
                 }
+                
+                wish_identity_destroy(&id);
             } else {
                 //WISHDEBUG(LOG_CRITICAL, "signature base is %p len: %i", signature.base, signature.len);
                 bson_append_null(&b, "sign");

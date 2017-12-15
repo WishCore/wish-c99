@@ -44,6 +44,9 @@ typedef struct {
     char alias[WISH_ALIAS_LEN];
     char transports[WISH_MAX_TRANSPORTS][WISH_MAX_TRANSPORT_LEN];
     char contacts[WISH_MAX_CONTACTS][WISH_MAX_CONTACT_LEN];
+    /** BSON object containing permissions (will be superseded by ACL) */
+    const char* permissions;
+    /** BSON object containing meta like phone, email etc */
     const char* meta;
 } wish_identity_t;
 
@@ -62,17 +65,26 @@ int wish_get_num_uid_entries(void);
  * Returns the number of uids in the list, or 0 if there are no
  * identities in the database, and a negative number for an error */
 int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len); 
-/* This function loads the contact specified by 'uid', storing it to
- * the pointer 'contact' */
+
+/** 
+ * Initializes the structure and loads the contact specified by 'uid', storing it to
+ * the pointer 'contact'
+ * 
+ * Identity must be destroyed by wish_identity_destroy() independently of return value
+ */
 return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity);
+
+/** 
+ * Frees malloc'ed data from identity structure, but not the structure itself
+ */
+void wish_identity_destroy(wish_identity_t* identity);
 
 // returns < 0 on error, == 0 is false, > 0 is true
 int wish_identity_exists(uint8_t *uid);
 
 /* This function load the identity specified by 'uid', and saves the
  * data in BSON format to identity_bson_doc */
-int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc,
-    size_t identity_bson_doc_max_len);
+int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc, size_t identity_bson_doc_max_len);
 
 /* Save identity to database */
 int wish_save_identity_entry(wish_identity_t *identity);
