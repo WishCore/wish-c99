@@ -23,7 +23,6 @@
 #include "wish_event.h"
 #include "wish_platform.h"
 #include "wish_debug.h"
-//#include "wish_service_registry.h"
 
 #include "bson.h"
 #include "bson_visit.h"
@@ -31,10 +30,8 @@
 #include "wish_local_discovery.h"
 #include "wish_connection_mgr.h"
 #include "wish_core_rpc.h"
-#include "wish_app.h"
 #include "wish_identity.h"
 #include "wish_time.h"
-//#include "app_service_ipc.h"
 #include "core_service_ipc.h"
 
 
