@@ -1187,11 +1187,31 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 return;
             }
             
-            // Check transports
-            bson_iterator_from_buffer(&it, plaintxt);
-            
-            if (bson_find_fieldpath_value("transports.0", &it) == BSON_STRING) {
-                // FIXME: Not stored, but transport reported on connection
+            /* Update transports if we have a normal connection */
+            if (connection->friend_req_connection == false) {
+                bool found_transports = false;
+                wish_identity_t id = { 0 };
+                wish_identity_load(connection->ruid, &id);
+                /* Clear existing transports, and replace them with transports provided by remote party */
+                memset(id.transports, 0, WISH_MAX_TRANSPORTS*WISH_MAX_TRANSPORT_LEN);
+                for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+                    const size_t path_max_len = 16;
+                    char path[path_max_len];
+                    wish_platform_snprintf(path, path_max_len, "transports.%d", i);
+                    bson_iterator_from_buffer(&it, plaintxt);
+                    if (bson_find_fieldpath_value(path, &it) == BSON_STRING) {
+                        strncpy(&id.transports[i][0], bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+                        found_transports = true;
+                    }
+                }
+                
+                if (!found_transports) {
+                    WISHDEBUG(LOG_CRITICAL, "No transports were reported by remote!");
+                }
+                else {
+                    /* Save the remote identity updated with transports */
+                    wish_identity_update(core, &id);
+                }
             }
             
             /* Finished processing the handshake */
