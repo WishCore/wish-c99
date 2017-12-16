@@ -117,7 +117,8 @@ void wish_pubkey2uid(const uint8_t *pubkey, uint8_t *uid);
  * The uid field is also populated */
 void wish_create_local_identity(wish_core_t *core, wish_identity_t *id, const char *alias);
 
-/* This is a helper function for loading pubkeys corresponding to uids.
+/**
+ * This is a helper function for loading pubkeys corresponding to uids.
  * Easier to use than wish_load_identity
  *
  * Returns 0 when pubkey is found
@@ -133,10 +134,9 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer);
 /**
  * Populate a struct wish_identity_t based on information in a 'cert'
  * which is obtained for example from a 'friend request'
- * @param new_id a pointer to the identity struct which will be
- * populated
- * @param a pointer to BSON document from which the data will be read
- * from
+ * 
+ * @param new_id a pointer to the identity struct which will be populated
+ * @param a pointer to BSON document from which the data will be read from
  * @return 0 for success
  */
 int wish_identity_from_bson(wish_identity_t *id, const bson* bs);
@@ -186,3 +186,8 @@ return_t wish_identity_verify(wish_core_t* core, wish_identity_t* uid, const bin
 return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char* signed_meta, bin *buffer);
 
 return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* meta, bin *buffer);
+
+bson_iterator wish_identity_meta(wish_identity_t* identity, const char* permission);
+
+bson_iterator wish_identity_permission(wish_identity_t* identity, const char* permission);
+

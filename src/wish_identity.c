@@ -1267,3 +1267,18 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* me
     
     return RET_SUCCESS;
 }
+
+bson_iterator wish_identity_meta(wish_identity_t* identity, const char* fieldpath) {
+    bson_iterator it;
+    
+    if (identity->meta == NULL) {
+        return bson_iterator_eoo();
+    }
+    
+    bson_iterator_from_buffer(&it, identity->meta);
+    
+    bson_find_fieldpath_value(fieldpath, &it);
+    
+    return it;
+}
+
