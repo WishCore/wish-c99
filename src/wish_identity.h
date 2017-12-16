@@ -187,7 +187,35 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char
 
 return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* meta, bin *buffer);
 
+/**
+ * Returns bson_iterator from identity meta data from given fieldpath
+ * 
+ * Example 
+ * 
+ *     bson_iterator it = wish_identity_meta(&identity, "payment.BCH")
+ * 
+ *     bson_iterator_type(&it) == BSON_STRING
+ *     const char* address = bson_iterator_string(&it);
+ * 
+ * @param identity
+ * @param permission
+ * @return bson_iterator
+ */
 bson_iterator wish_identity_meta(wish_identity_t* identity, const char* permission);
 
-bson_iterator wish_identity_permission(wish_identity_t* identity, const char* permission);
+/**
+ * Returns bson_iterator from identity permissions data from given fieldpath
+ * 
+ * Example 
+ * 
+ *     bson_iterator it = wish_identity_permissions(&identity, "payment.BCH")
+ * 
+ *     bson_iterator_type(&it) == BSON_STRING
+ *     const char* address = bson_iterator_string(&it);
+ * 
+ * @param identity
+ * @param permission
+ * @return bson_iterator
+ */
+bson_iterator wish_identity_permissions(wish_identity_t* identity, const char* permission);
 
