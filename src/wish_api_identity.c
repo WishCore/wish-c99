@@ -496,10 +496,13 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
 
     bson_finish(&meta);
     
-    if (count) { id.meta = bson_data(&meta); }
+    if (count) { id.meta = bson_data(&meta); } else { id.meta = NULL; }
 
     int ret = wish_identity_update(core, &id);
 
+    // set meta to NULL or the identity_destroy will try to free it
+    id.meta = NULL;
+    
     bson_destroy(&meta);
     
     int buf_len = 128;
@@ -648,10 +651,13 @@ void wish_api_identity_permissions(rpc_server_req* req, const uint8_t* args) {
 
     bson_finish(&permissions);
     
-    if (count) { id.permissions = bson_data(&permissions); }
+    if (count) { id.permissions = bson_data(&permissions); } else { id.permissions = NULL; }
 
     int ret = wish_identity_update(core, &id);
 
+    // set permissions to NULL or the identity_destroy will try to free it
+    id.permissions = 0;
+    
     bson_destroy(&permissions);
     
     int buf_len = 128;

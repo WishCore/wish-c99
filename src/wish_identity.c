@@ -405,15 +405,19 @@ return_t wish_identity_load(const uint8_t* uid, wish_identity_t* identity) {
             if (bson_find_fieldpath_value("meta", &it) == BSON_BINDATA) {
                 bson b;
                 bson_init_with_data(&b, bson_iterator_bin_data(&it));
-                //bson_visit("loaded meta:", bson_data(&b));
                 
-                char* meta = wish_platform_malloc(bson_size(&b));
+                if (bson_iterator_bin_len(&it) != bson_size(&b)) {
+                    // corrupt data, don't load
+                    WISHDEBUG(LOG_CRITICAL, "Identity meta data is corrupt, not loading.");
+                } else {
+                    char* meta = wish_platform_malloc(bson_size(&b));
 
-                if (meta != NULL) {
-                    memcpy(meta, bson_data(&b), bson_size(&b));
+                    if (meta != NULL) {
+                        memcpy(meta, bson_data(&b), bson_size(&b));
+                    }
+
+                    identity->meta = meta;
                 }
-                
-                identity->meta = meta;
             }
 
             bson_iterator_init(&it, &bs);
@@ -422,17 +426,19 @@ return_t wish_identity_load(const uint8_t* uid, wish_identity_t* identity) {
                 bson b;
                 bson_init_with_data(&b, bson_iterator_bin_data(&it));
                 
-                char* permissions = wish_platform_malloc(bson_size(&b));
+                if (bson_iterator_bin_len(&it) != bson_size(&b)) {
+                    // corrupt data, don't load
+                    WISHDEBUG(LOG_CRITICAL, "Identity permission data is corrupt, not loading.");
+                } else {
+                    char* permissions = wish_platform_malloc(bson_size(&b));
 
-                if (permissions != NULL) {
-                    memcpy(permissions, bson_data(&b), bson_size(&b));
+                    if (permissions != NULL) {
+                        memcpy(permissions, bson_data(&b), bson_size(&b));
+                    }
+
+                    identity->permissions = permissions;
                 }
-                
-                identity->permissions = permissions;
             }
-            
-            
-            
             break;
         }
     } while (1); 
@@ -441,8 +447,8 @@ return_t wish_identity_load(const uint8_t* uid, wish_identity_t* identity) {
 }
 
 void wish_identity_destroy(wish_identity_t* identity) {
-    if (identity->meta) { wish_platform_free(identity->meta); }
-    if (identity->permissions ) { wish_platform_free(identity->permissions); }
+    if (identity->meta) { wish_platform_free(identity->meta); identity->meta = NULL; }
+    if (identity->permissions ) { wish_platform_free(identity->permissions); identity->permissions = NULL; }
 }
 
 // returns < 0 on error, == 0 is false, > 0 is true
@@ -689,6 +695,8 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer) {
  * @return 0 for success
  */
 int wish_identity_from_bson(wish_identity_t *id, const bson* bs) {
+    memset(id, 0, sizeof(wish_identity_t));
+    
     //bson_visit("Populating identity from BSON:", bson_data(bs));
     if (id == NULL) {
         WISHDEBUG(LOG_CRITICAL, "new_id is null");
