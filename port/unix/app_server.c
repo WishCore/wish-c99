@@ -23,7 +23,6 @@
 #include "wish_event.h"
 #include "wish_platform.h"
 #include "wish_debug.h"
-//#include "wish_service_registry.h"
 
 #include "bson.h"
 #include "bson_visit.h"
@@ -31,10 +30,8 @@
 #include "wish_local_discovery.h"
 #include "wish_connection_mgr.h"
 #include "wish_core_rpc.h"
-#include "wish_app.h"
 #include "wish_identity.h"
 #include "wish_time.h"
-//#include "app_service_ipc.h"
 #include "core_service_ipc.h"
 
 
@@ -85,7 +82,7 @@ void setup_app_server(wish_core_t* core, uint16_t app_port) {
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof (server_addr));
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);   //Replace with INADDR_ANY if you wish to allow remote apps, but beware!
     server_addr.sin_port = htons(app_port);
     if (bind(app_serverfd, (struct sockaddr *) &server_addr, 
             sizeof(server_addr)) < 0) {

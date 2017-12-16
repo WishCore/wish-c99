@@ -9,8 +9,6 @@
 #include <string.h>
 
 #include "wish_core.h"
-#include "wish_app.h"
-//#include "app_service_ipc.h"
 #include "core_service_ipc.h"
 #include "bson_visit.h"
 #include "wish_debug.h"

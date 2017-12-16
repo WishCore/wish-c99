@@ -24,7 +24,6 @@
 #include "wish_local_discovery.h"
 #include "wish_connection_mgr.h"
 #include "wish_core_rpc.h"
-#include "wish_app.h"
 #include "wish_identity.h"
 #include "wish_time.h"
 #include "bson_visit.h"
@@ -168,8 +167,8 @@ void wish_close_connection(wish_core_t* core, wish_connection_t* connection) {
 
 char usage_str[] = "Wish Core " WISH_CORE_VERSION_STRING
 "\n\n  Usage: %s [options]\n\
-    -b broadcast own uid over local discovery\n\
-    -l listen to local discovery broadcasts\n\
+    -b don't broadcast own uid over local discovery\n\
+    -l don't listen to local discovery broadcasts\n\
 \n\
     -s start accepting incoming connections (\"server\" mode)\n\
     -p <port> listen for incoming connections at this TCP port\n\
@@ -232,16 +231,16 @@ static void process_cmdline_opts(int argc, char** argv) {
     while ((opt = getopt(argc, argv, "hbilc:C:R:sp:ra:")) != -1) {
         switch (opt) {
         case 'b':
-            //printf("Would start as advertizer\n");
-            advertize_own_uid = true;
+            printf("Will not do wld broadcast!\n");
+            advertize_own_uid = false;
             break;
         case 'i':
             //printf("Skip connection acl (Core is Claimable)\n");
             skip_connection_acl = true;
             break;
         case 'l':
-            //printf("Would start as ad listener\n");
-            listen_to_adverts = true;
+            printf("Will not listen to wld broadcasts!\n");
+            listen_to_adverts = false;
             break;
         case 'c':
             //printf("Would start as client to ip %s\n", optarg);
@@ -635,7 +634,7 @@ int main(int argc, char** argv) {
         struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 100000;
-        
+
         for (i = 0; i < max_fd; i++) {
             if (FD_ISSET(i, &rfds)) {
                 FD_SET(i, &exceptfds);
@@ -878,7 +877,8 @@ int main(int argc, char** argv) {
         }
         else {
             /* Select error return */
-            printf("Select error: %i: %s\n", select_ret, strerror(select_ret));
+            perror("Select error: ");
+            
             exit(0);
         }
         

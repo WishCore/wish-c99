@@ -14,23 +14,18 @@
 
 #include "utlist.h"
 
-int wish_save_identity_entry(wish_identity_t *identity) {
-    int num_uids_in_db = wish_get_num_uid_entries();
-    wish_uid_list_elem_t uid_list[num_uids_in_db];
-    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+/**
+ * Create a bson instance with data populated from identity
+ * 
+ * @param identity
+ * @return bson* or NULL
+ */
+static bson wish_identity_to_bson(wish_identity_t* identity) {
+    const uint32_t identity_doc_max_len = sizeof (wish_identity_t) + 100 + WISH_MAX_TRANSPORTS*WISH_MAX_TRANSPORT_LEN;
 
-    if(num_uids >= WISH_PORT_MAX_UIDS) {
-        // DB is full, return error
-        WISHDEBUG(LOG_CRITICAL, "Too many identities in database");
-        return -1;
-    }
-    
-    const uint32_t identity_doc_max_len = sizeof (wish_identity_t) + 100;
-    uint8_t identity_doc[identity_doc_max_len];
-    /* Create the new BSON document in memory */
-    
     bson bs;
-    bson_init_buffer(&bs, identity_doc, identity_doc_max_len);
+    bson_init_size(&bs, identity_doc_max_len);
+    if (!bs.data) { return bs; }
     
     bson_append_string(&bs, "alias", identity->alias);
     bson_append_binary(&bs, "uid", identity->uid, WISH_ID_LEN);
@@ -39,21 +34,62 @@ int wish_save_identity_entry(wish_identity_t *identity) {
     if (identity->has_privkey) {
         bson_append_binary(&bs, "privkey", identity->privkey, WISH_PRIVKEY_LEN);
     }
-
-    //WISHDEBUG(LOG_CRITICAL, "transports[0] to save: %s", identity->transports[0]);
-    /** \fixme For now, just encode a single transport */
-    if (strnlen(&(identity->transports[0][0]), WISH_MAX_TRANSPORT_LEN) > 0) {
-        bson_append_start_array(&bs, "transports");
-        bson_append_string(&bs, "0", &(identity->transports[0][0]));
-        bson_append_finish_array(&bs);
+    
+    if (identity->meta) {
+        bson meta;
+        bson_init_with_data(&meta, identity->meta);
+        
+        if (bson_size(&meta) > 1024) {
+            WISHDEBUG(LOG_CRITICAL, "Warning, identity meta data is bigger than 1KiB.");
+        }
+        
+        bson_append_binary(&bs, "meta", bson_data(&meta), bson_size(&meta));
     }
     
-    bson_finish(&bs);
-    //bson_visit("Identity BSON to be saved:", bson_data(&bs));'
-    
-    /* FIXME add the rest of the fields */
+    if (identity->permissions) {
+        bson permissions;
+        bson_init_with_data(&permissions, identity->permissions);
+        
+        if (bson_size(&permissions) > 1024) {
+            WISHDEBUG(LOG_CRITICAL, "Warning, identity permissions data is bigger than 1KiB.");
+        }
+        
+        bson_append_binary(&bs, "permissions", bson_data(&permissions), bson_size(&permissions));
+    }
 
+    //WISHDEBUG(LOG_CRITICAL, "transports[0] to save: %s", identity->transports[0]);
+    bson_append_start_array(&bs, "transports");
+    for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+        if (strnlen(&(identity->transports[i][0]), WISH_MAX_TRANSPORT_LEN) > 0) {
+            char index_str[10] = { 0 };
+            BSON_NUMSTR(index_str, i);
+            bson_append_string(&bs, index_str, &(identity->transports[i][0]));
+        }
+    }
+    bson_append_finish_array(&bs);
+    /* FIXME add the rest of the fields */
+    
+    bson_finish(&bs);
+    
+    return bs;
+}
+
+int wish_save_identity_entry(wish_identity_t* identity) {
+    int num_uids_in_db = wish_get_num_uid_entries();
+    wish_uid_list_elem_t uid_list[num_uids_in_db];
+    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+
+    if (num_uids >= WISH_PORT_MAX_UIDS) {
+        // DB is full, return error
+        WISHDEBUG(LOG_CRITICAL, "Too many identities in database");
+        return -1;
+    }
+
+    bson bs = wish_identity_to_bson(identity);
+    if (bs.data == NULL) { bson_destroy(&bs); return -3; }
+    
     int ret = wish_save_identity_entry_bson(bson_data(&bs));
+    
     if (ret == 0) {
         return -2;
     } else {
@@ -249,13 +285,17 @@ int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len ) {
 }
 
 
-return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
+return_t wish_identity_load(const uint8_t* uid, wish_identity_t* identity) {
+    // init the structure to all zeroes, i.e. pointers to NULL
+    memset(identity, 0, sizeof(wish_identity_t));
+    
     int retval = RET_FAIL;
 
     if (uid == NULL) {
         return RET_FAIL;
     }
 
+    
     wish_file_t fd = wish_fs_open(WISH_ID_DB_NAME);
     wish_offset_t prev_offset = 0;
 
@@ -348,12 +388,50 @@ return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
             /* When we got this far, we are satisfied with import, the
              * rest is optional */
             retval = RET_SUCCESS;
+  
+            for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+                const int max_len = 16;
+                char transports_path[max_len];
+                bson_iterator_init(&it, &bs);
+                wish_platform_snprintf(transports_path, max_len, "transports.%d", i);
+                if (bson_find_fieldpath_value(transports_path, &it) == BSON_STRING) {
+                    strncpy(&(identity->transports[i][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+                }
+                
+            }
 
             bson_iterator_init(&it, &bs);
             
-            if (bson_find_fieldpath_value("transports.0", &it) == BSON_STRING) {
-                strncpy(&(identity->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+            if (bson_find_fieldpath_value("meta", &it) == BSON_BINDATA) {
+                bson b;
+                bson_init_with_data(&b, bson_iterator_bin_data(&it));
+                //bson_visit("loaded meta:", bson_data(&b));
+                
+                char* meta = wish_platform_malloc(bson_size(&b));
+
+                if (meta != NULL) {
+                    memcpy(meta, bson_data(&b), bson_size(&b));
+                }
+                
+                identity->meta = meta;
             }
+
+            bson_iterator_init(&it, &bs);
+            
+            if (bson_find_fieldpath_value("permissions", &it) == BSON_BINDATA) {
+                bson b;
+                bson_init_with_data(&b, bson_iterator_bin_data(&it));
+                
+                char* permissions = wish_platform_malloc(bson_size(&b));
+
+                if (permissions != NULL) {
+                    memcpy(permissions, bson_data(&b), bson_size(&b));
+                }
+                
+                identity->permissions = permissions;
+            }
+            
+            
             
             break;
         }
@@ -362,6 +440,10 @@ return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity) {
     return retval;
 }
 
+void wish_identity_destroy(wish_identity_t* identity) {
+    if (identity->meta) { wish_platform_free(identity->meta); }
+    if (identity->permissions ) { wish_platform_free(identity->permissions); }
+}
 
 // returns < 0 on error, == 0 is false, > 0 is true
 int wish_identity_exists(uint8_t *uid) {
@@ -512,18 +594,8 @@ void wish_pubkey2uid(const uint8_t *pubkey, uint8_t *uid) {
 
 
 static void wish_create_keypair(uint8_t *pubkey, uint8_t *privkey) {
-    /* Test */
-#if 0
-    uint8_t seed[32] = {
-        0x33, 0xda, 0x14, 0xdb, 0xf3, 0x2e, 0x01, 0xff, 0xcc, 0x2e,
-        0x1e, 0x83, 0x64, 0x8b, 0x2e, 0xb1, 0x31, 0x20, 0x4c, 0x7e,
-        0xda, 0x94, 0x4d, 0xe8, 0x12, 0x10, 0xa0, 0x65, 0x6c, 0x29,
-        0xb1, 0x44,
-    };
-#else
     uint8_t seed[WISH_ED25519_SEED_LEN];
     wish_platform_fill_random(NULL, seed, WISH_ED25519_SEED_LEN);
-#endif
 
     ed25519_create_keypair(pubkey, privkey, seed);
 
@@ -531,15 +603,30 @@ static void wish_create_keypair(uint8_t *pubkey, uint8_t *privkey) {
 }
 
 
-void wish_create_local_identity(wish_identity_t *id, const char *alias) {
+void wish_create_local_identity(wish_core_t *core, wish_identity_t *id, const char *alias) {
+    memset(id, 0, sizeof (wish_identity_t));
     wish_create_keypair(&(id->pubkey[0]), &(id->privkey[0]));
     id->has_privkey = true;
     wish_pubkey2uid(&(id->pubkey[0]), &(id->uid[0]));
     strncpy(&(id->alias[0]), alias, WISH_ALIAS_LEN);
 
-    /* Encode our preferred relay server as first transport */
-    wish_relay_get_preferred_server_url(&(id->transports[0][0]), WISH_MAX_TRANSPORT_LEN);
- 
+    wish_relay_client_t* relay;
+    int num_relays = 0;
+    LL_COUNT(core->relay_db, relay, num_relays);
+    if (num_relays == 0) {
+        /* There were no relays, use our preferred relay server as first transport */
+        wish_relay_get_preferred_server_url(&(id->transports[0][0]), WISH_MAX_TRANSPORT_LEN);
+    }
+    else {
+        int i = 0;
+        LL_FOREACH(core->relay_db, relay) {
+            wish_relay_encode_as_url(&(id->transports[i][0]), &relay->ip, relay->port);
+            i++;
+            if (i >= WISH_MAX_TRANSPORTS) {
+                break;
+            }
+        }
+    }
 }
 
 /* Return 1 if privkey is known, else 0 */
@@ -558,14 +645,16 @@ int wish_load_pubkey(uint8_t *uid, uint8_t *dst_buffer) {
 
     if (retval != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "wish_load_pubkey: Identity not found");
+        wish_identity_destroy(&id);
         return -1;
     }
 
     
     memcpy(dst_buffer, id.pubkey, WISH_PUBKEY_LEN);
 
+    wish_identity_destroy(&id);
+        
     return 0;
-
 }
 
 
@@ -575,15 +664,18 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer) {
 
     if (retval != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "wish_load_privkey: Identity not found");
+        wish_identity_destroy(&id);
         return -1;
     }
 
     if (id.has_privkey == false) {
         WISHDEBUG(LOG_DEBUG, "Identity found, but no privkey");
+        wish_identity_destroy(&id);
         return -1;
     }
 
     memcpy(dst_buffer, id.privkey, WISH_PRIVKEY_LEN);
+    wish_identity_destroy(&id);
     return 0;
 }
 
@@ -631,16 +723,15 @@ void wish_identity_add_meta_from_bson(wish_identity_t *id, const bson* meta) {
     
     bson_iterator it;
     
-    bson_iterator_init(&it, meta);
-    
-    /* FIXME copy all transports, now copying only the first one listed */
-
-    if ( bson_find_fieldpath_value("transports.0", &it) == BSON_STRING ) {
-        //WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
-        strncpy(&(id->transports[0][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
-        
-    } else {
-        WISHDEBUG(LOG_CRITICAL, "transprots.0 not found");
+    for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+        size_t max_len = 16;
+        char transports_path[max_len];
+        wish_platform_snprintf(transports_path, max_len, "transports.%d", i);
+        bson_iterator_init(&it, meta);
+        if ( bson_find_fieldpath_value(transports_path, &it) == BSON_STRING ) {
+            //WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
+            strncpy(&(id->transports[i][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+        }
     }
 }
 
@@ -731,6 +822,7 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
     wish_fs_close(new_fd);
     wish_fs_close(old_fd);
 
+    wish_fs_remove(oldpath);
     wish_fs_rename(newpath, oldpath);
     
     /* For all connections: if identity is either in luid or ruid, close the connection. */
@@ -750,6 +842,102 @@ int wish_identity_remove(wish_core_t* core, uint8_t uid[WISH_ID_LEN]) {
             //WISHDEBUG(LOG_CRITICAL, "identity.remove: closing context because uid is ruid of a connection");
             wish_close_connection(core, &wish_context_pool[i]); 
         }
+    }
+    
+    return retval;
+}
+
+int wish_identity_update(wish_core_t* core, wish_identity_t* identity) {
+    int retval = 0;
+
+    const char* oldpath = WISH_ID_DB_NAME;
+    const char* newpath = WISH_ID_DB_NAME ".tmp";
+    wish_file_t old_fd = wish_fs_open(oldpath);
+    wish_file_t new_fd = wish_fs_open(newpath);
+      
+    //WISHDEBUG(LOG_CRITICAL, "wish_identity_update: old_fd %d new_fd %d", old_fd, new_fd);
+ 
+    /* Truncate the new file */
+    int32_t tmp = 0;
+    int wr_len = wish_fs_write(new_fd, &tmp, 0);
+    if (wr_len != 0) {
+        WISHDEBUG(LOG_CRITICAL, "Error truncating tmp file");
+    }
+
+    wish_offset_t prev_offset = 0;
+
+    do {
+        /* Determine length and uid of next element */
+        int peek_len = sizeof (wish_identity_t) + 100;
+        uint8_t peek_buf[peek_len];
+        /* Re-position the stream to the end of the previous BSON structure - 
+         * so that the next bytes to be read will be of the next element
+         * */
+        int io_retval = wish_fs_lseek(old_fd, prev_offset, WISH_FS_SEEK_SET);
+        if (io_retval == -1) {
+            WISHDEBUG(LOG_CRITICAL, "Error seeking");
+            break;
+
+        }
+        io_retval = wish_fs_read(old_fd, peek_buf, peek_len);
+        if (io_retval == 0) {
+            WISHDEBUG(LOG_DEBUG, "End of file detected (2)");
+            break;
+        }
+        else if (io_retval < 0) {
+            WISHDEBUG(LOG_CRITICAL, "read error");
+            break;
+        }
+
+        bson bs;
+        bson_init_with_data(&bs, peek_buf);
+        
+        int32_t elem_len = bson_size(&bs);
+        if (elem_len < 4 || elem_len > peek_len) {
+            WISHDEBUG(LOG_CRITICAL, "BSON Read error");
+            break;
+        }
+        
+        bson_iterator it;
+        
+        if (bson_find_from_buffer(&it, peek_buf, "uid") != BSON_BINDATA) {
+            WISHDEBUG(LOG_CRITICAL, "Could not get uid (g)");
+            break;
+        }
+        if (memcmp(bson_iterator_bin_data(&it), identity->uid, WISH_ID_LEN) == 0) {
+            //WISHDEBUG(LOG_CRITICAL, "Update: Found identity (2)!");
+            retval = 1;
+            
+            bson bs = wish_identity_to_bson(identity);
+            
+            if (bs.data == NULL) {
+                WISHDEBUG(LOG_CRITICAL, "Failed updating identity. Could not product bson serialized data.");
+                // failed to produce bson from identity, keep the old one.
+                wr_len = wish_fs_write(new_fd, peek_buf, elem_len);
+                if (wr_len != elem_len) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! A"); }
+            } else {
+                //bson_visit("on the right track...", bson_data(&bs));
+                wr_len = wish_fs_write(new_fd, bson_data(&bs), bson_size(&bs));
+                if (wr_len != bson_size(&bs)) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! B"); }
+                bson_destroy(&bs);
+            }
+        } else {
+            /* Write the document to new file */
+            wr_len = wish_fs_write(new_fd, peek_buf, elem_len);
+            if (wr_len != elem_len) { WISHDEBUG(LOG_CRITICAL, "Unexpected write len! C"); }
+        }
+         /* Update prev offset so that we can later re-position the
+         * stream */
+        prev_offset+=elem_len;
+    } while (1);
+    
+    wish_fs_close(new_fd);
+    wish_fs_close(old_fd);
+
+    wish_fs_remove(oldpath);
+    int rename_ret = wish_fs_rename(newpath, oldpath);
+    if ( rename_ret != 0) {
+        WISHDEBUG(LOG_CRITICAL, "Rename fails %d", rename_ret);
     }
     
     return retval;
@@ -997,6 +1185,7 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* me
     
     if (wish_identity_load(luid, &id) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not load the identity");
+        wish_identity_destroy(&id);
         return RET_FAIL;
     }
 
@@ -1006,6 +1195,7 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* me
 
         if ( bson_size(&validate) > 1024 ) {
             WISHDEBUG(LOG_CRITICAL, "Could load meta data, it was bigger than 1024 bytes: %i", bson_size(&validate));
+            wish_identity_destroy(&id);
             return RET_FAIL;
         }
     }
@@ -1015,6 +1205,7 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* me
     bin cert = { .base = cert_buffer, .len = cert_buffer_len };
     if (wish_identity_export(core, &id, meta, &cert) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not export the identity");
+        wish_identity_destroy(&id);
         return RET_FAIL;
     }
     
@@ -1024,6 +1215,7 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* me
     
     if (wish_identity_sign(core, &id, &cert, NULL, &signature) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not sign the identity");
+        wish_identity_destroy(&id);
         return RET_FAIL;
     }
     
@@ -1059,8 +1251,11 @@ return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* me
     
     if (bs.err) {
         WISHDEBUG(LOG_CRITICAL, "Could not properly write the signed cert");
+        wish_identity_destroy(&id);
         return RET_FAIL;
     }
+
+    wish_identity_destroy(&id);
     
     return RET_SUCCESS;
 }

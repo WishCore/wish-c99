@@ -31,24 +31,23 @@
 #define WISH_PRIVKEY_LEN 64     /* Length of ED25519 privkey */
 #define WISH_SIGNATURE_LEN 64   /* Length of ED25519 signature */
 #define WISH_ID_LEN 32  /* Actually, length of a SH256 checksum */
-#ifndef WISH_WSID_LEN
-// This check is due to refactoring dependencies: disconnecting wish_app from the core
-#define WISH_WSID_LEN WISH_ID_LEN  /* Actually, length of a SH256 checksum */
-#endif
-#ifndef WISH_WHID_LEN
-// This check is due to refactoring dependencies: disconnecting wish_app from the core
-#define WISH_WHID_LEN WISH_ID_LEN   /* Host ID */
-#endif
 
+/**
+ * Wish in-memory Identity structure
+ */
 typedef struct {
     uint8_t uid[WISH_ID_LEN];
     uint8_t pubkey[WISH_PUBKEY_LEN];
-    /* True, if the privkey buffer has a valid privkey */
+    /** True, if the privkey buffer has a valid privkey */
     bool has_privkey;
     uint8_t privkey[WISH_PRIVKEY_LEN];
     char alias[WISH_ALIAS_LEN];
     char transports[WISH_MAX_TRANSPORTS][WISH_MAX_TRANSPORT_LEN];
     char contacts[WISH_MAX_CONTACTS][WISH_MAX_CONTACT_LEN];
+    /** BSON object containing permissions (will be superseded by ACL) */
+    const char* permissions;
+    /** BSON object containing meta like phone, email etc */
+    const char* meta;
 } wish_identity_t;
 
 #define WISH_ID_DB_NAME "wish_id_db.bson"
@@ -66,17 +65,26 @@ int wish_get_num_uid_entries(void);
  * Returns the number of uids in the list, or 0 if there are no
  * identities in the database, and a negative number for an error */
 int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len); 
-/* This function loads the contact specified by 'uid', storing it to
- * the pointer 'contact' */
+
+/** 
+ * Initializes the structure and loads the contact specified by 'uid', storing it to
+ * the pointer 'contact'
+ * 
+ * Identity must be destroyed by wish_identity_destroy() independently of return value
+ */
 return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity);
+
+/** 
+ * Frees malloc'ed data from identity structure, but not the structure itself
+ */
+void wish_identity_destroy(wish_identity_t* identity);
 
 // returns < 0 on error, == 0 is false, > 0 is true
 int wish_identity_exists(uint8_t *uid);
 
 /* This function load the identity specified by 'uid', and saves the
  * data in BSON format to identity_bson_doc */
-int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc,
-    size_t identity_bson_doc_max_len);
+int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc, size_t identity_bson_doc_max_len);
 
 /* Save identity to database */
 int wish_save_identity_entry(wish_identity_t *identity);
@@ -107,7 +115,7 @@ void wish_pubkey2uid(const uint8_t *pubkey, uint8_t *uid);
 /* Create a new "local" identity (i.e. complete with pubkey and privkey)
  * with the alias provided, saving the result in the pointer 'id'.
  * The uid field is also populated */
-void wish_create_local_identity(wish_identity_t *id, const char *alias);
+void wish_create_local_identity(wish_core_t *core, wish_identity_t *id, const char *alias);
 
 /* This is a helper function for loading pubkeys corresponding to uids.
  * Easier to use than wish_load_identity
@@ -141,6 +149,14 @@ int wish_identity_from_bson(wish_identity_t *id, const bson* bs);
  * @param meta The BSON bin buffer containing the metadata
  */
 void wish_identity_add_meta_from_bson(wish_identity_t *id, const bson* meta);
+
+/**
+ * Update an identity from the database 
+ *
+ * @param uid the uid of the identity to be updated
+ * @return returns 1 if the identity was updated, or 0 for none
+ */
+int wish_identity_update(wish_core_t* core, wish_identity_t* identity);
 
 /**
  * Remove an identity from the database 

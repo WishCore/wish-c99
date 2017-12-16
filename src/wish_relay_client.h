@@ -88,6 +88,8 @@ void wish_relay_client_feed(wish_core_t* core, wish_relay_client_t *rctx,
 
 int wish_relay_get_preferred_server_url(char *url_str, int url_str_len);
 
+int wish_relay_encode_as_url(char *url_str, wish_ip_addr_t *ip, int port);
+
 /**
  * Get relay contexts. 
  *

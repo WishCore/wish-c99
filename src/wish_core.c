@@ -16,10 +16,11 @@ int wish_core_update_identities(wish_core_t* core) {
     
     int i = 0;
     for (i = 0; i < core->num_ids; i++) {
-        wish_identity_t recovered_id;
-        memset(&recovered_id, 0, sizeof (wish_identity_t));
-        return_t load_retval = wish_identity_load(core->uid_list[i].uid, &recovered_id);
-        //printf("Loaded identity (ret %i), alias: %s\n", load_retval, recovered_id.alias);
+        wish_identity_t id;
+        memset(&id, 0, sizeof (wish_identity_t));
+        return_t load_retval = wish_identity_load(core->uid_list[i].uid, &id);
+        wish_identity_destroy(&id);
     }
+    
     return 0;
 }

@@ -52,3 +52,5 @@ void wish_set_host_port(wish_core_t* core, uint16_t port);
 
 
 return_t wish_connections_connect_tcp(wish_core_t* core, uint8_t *luid, uint8_t *ruid, wish_ip_addr_t *ip, uint16_t port);
+
+void wish_close_parallel_connections(wish_core_t* core, void *connection);

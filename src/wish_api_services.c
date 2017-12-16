@@ -146,7 +146,7 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     /* Destination is determined to be a remote service on a remote core. */
-    wish_connection_t* connection = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
+    wish_connection_t* connection = wish_core_lookup_connected_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
 
     // We will just send data and not expect response, not registering a request
     //  wish_rpc_client_request(core->core_rpc_client, &bs, NULL);

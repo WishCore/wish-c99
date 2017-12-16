@@ -92,11 +92,22 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
     return connection;
 }
 
+wish_connection_t* wish_connection_exists(wish_core_t *core, wish_connection_t *connection) {
+    for (int i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        if (&core->connection_pool[i] == connection) {
+            
+            return connection;
+        }
+    }
+    return NULL;
+}
+
 /** This function returns a pointer to the wish context which matches the
  * specified luid, ruid, rhid identities 
  *
  * Please note: The context returned here could a countext which is not
  * yet ready for use, because it is e.g. just being created.
+ * 
  */
 wish_connection_t* 
 wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid) {
@@ -136,6 +147,39 @@ wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, c
     return connection;
 }
 
+/** This function returns a pointer to the wish connection which matches the
+ * specified luid, ruid, rhid
+ *
+ * The returned connection is always a connected one, and in case of multiple connections, the returned context is the one which has received data the least time ago
+ */
+wish_connection_t* 
+wish_core_lookup_connected_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid) {
+    wish_connection_t *connection = NULL;
+    int i = 0;
+
+    wish_time_t latest_input = WISH_TIME_T_MAX;
+    for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) {
+            /* If the wish context is not in use, we can safely skip it */
+            //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
+            continue;
+        }
+
+        if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) 
+                    == 0) {
+                if (memcmp(core->connection_pool[i].rhid, rhid, 
+                        WISH_WHID_LEN) == 0) {
+                    if (core->connection_pool[i].context_state == WISH_CONTEXT_CONNECTED && core->connection_pool[i].latest_input_timestamp < latest_input) {
+                        connection = &(core->connection_pool[i]);
+                        latest_input = core->connection_pool[i].latest_input_timestamp;
+                    }
+                }
+            }
+        }
+    }
+    return connection;
+}
 
 bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t *ruid) {
     int i = 0;
@@ -212,13 +256,19 @@ bool wish_core_check_wsid(wish_core_t* core, wish_connection_t* ctx, uint8_t* ds
     
     if ( wish_identity_load(src_id, &tmp_id) != RET_SUCCESS ) {
         WISHDEBUG(LOG_CRITICAL, "We don't know to guy trying to connect to us.");
+        wish_identity_destroy(&tmp_id);
         return false;
     }
+
+    wish_identity_destroy(&tmp_id);
     
     if ( wish_identity_load(dst_id, &tmp_id) != RET_SUCCESS ) {
         WISHDEBUG(LOG_CRITICAL, "We know who is trying to connect to us, but not the one he wants to connect to. (Did we delete an identity?)");
+        wish_identity_destroy(&tmp_id);
         return false;
     }
+
+    wish_identity_destroy(&tmp_id);
 
     /* Technically, we need to have the privkey for "dst_id", else we
      * cannot be communicating */
@@ -510,16 +560,6 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
         {
             wish_connection_t *conn = connection;
             
-            wish_identity_t lu;
-            wish_identity_t ru;
-
-            if ( RET_SUCCESS == wish_identity_load(conn->luid, &lu) 
-                    && RET_SUCCESS == wish_identity_load(conn->ruid, &ru) )
-            {
-                //WISHDEBUG(LOG_CRITICAL, "Connection TCP_DISCONNECTED: %s > %s (%u.%u.%u.%u:%hu)",
-                //        lu.alias, ru.alias, conn->remote_ip_addr[0], conn->remote_ip_addr[1], conn->remote_ip_addr[2], conn->remote_ip_addr[3], conn->remote_port);
-            }
-
             int i = 0;
             bool other_connection_found = false;
 

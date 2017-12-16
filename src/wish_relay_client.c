@@ -78,8 +78,19 @@ static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
     wish_relay_client_check_connections(core);
 }
 
+static int wish_core_get_num_relays(wish_core_t *core) {
+    wish_relay_client_t* elt;
+    int num_relays = 0;
+    LL_COUNT(core->relay_db, elt, num_relays);
+    return num_relays;
+}
+
 void wish_core_relay_client_init(wish_core_t* core) {
-    wish_relay_client_add(core, RELAY_SERVER_HOST);
+    if (wish_core_get_num_relays(core) == 0) {
+        /* If there are no relay servers configured, add our 'preferred' relay server */
+        wish_relay_client_add(core, RELAY_SERVER_HOST);
+    }
+    
     wish_core_time_set_interval(core, wish_core_relay_periodic, NULL, 1);
     
     wish_relay_client_check_connections(core);
@@ -230,6 +241,11 @@ void wish_relay_client_feed(wish_core_t* core, wish_relay_client_t *relay, uint8
 
 int wish_relay_get_preferred_server_url(char *url_str, int url_str_max_len) {
     wish_platform_sprintf(url_str, "wish://" RELAY_SERVER_HOST);
+    return 0;
+}
+
+int wish_relay_encode_as_url(char *url_str, wish_ip_addr_t *ip, int port) {
+    wish_platform_sprintf(url_str, "wish://%d.%d.%d.%d:%d", ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], port);
     return 0;
 }
 

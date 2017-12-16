@@ -100,13 +100,11 @@ static void rpc_callback(rpc_client_req* req, void* context, const uint8_t* payl
     bson_finish(&bs);
     
     if (bson_find_from_buffer(&it, payload, "err") == BSON_INT) {
-        WISHDEBUG(LOG_CRITICAL, "CoreRPC response is an error, trying to pass it up as one!");
         rpc_server_error(sreq, bson_data(&bs), bson_size(&bs));
         return;
     }
 
     if (bson_find_from_buffer(&it, payload, "sig") == BSON_INT) {
-        WISHDEBUG(LOG_CRITICAL, "CoreRPC response is a sig.");
         rpc_server_emit(sreq, bson_data(&bs), bson_size(&bs));
         return;
     }
@@ -192,7 +190,7 @@ void wish_api_connections_request(rpc_server_req* req, const uint8_t* args) {
     bson_append_int(&ba, "id", 0);
     bson_finish(&ba);
     
-    wish_connection_t* connection = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
+    wish_connection_t* connection = wish_core_lookup_connected_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
     
     if (connection == NULL) {
         rpc_server_error_msg(req, 39, "Connection not found.");
@@ -350,7 +348,7 @@ void wish_api_connections_apps(rpc_server_req* req, const uint8_t* args) {
     /* Get the uid of identity to export, the uid is argument "0" in args */
     const uint8_t* rhid = bson_iterator_bin_data(&it);
     
-    wish_connection_t* connection = wish_core_lookup_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
+    wish_connection_t* connection = wish_core_lookup_connected_ctx_by_luid_ruid_rhid(core, luid, ruid, rhid);
     
     if (connection == NULL) {
         rpc_server_error_msg(req, 39, "Connection not found.");

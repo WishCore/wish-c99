@@ -166,10 +166,6 @@ struct wish_peer {
     char *protocol;    /* Protocol name */
 };
 
-
-
-size_t get_local_hostid(char** hostid);
-
 /* Start an instance of wish communication */
 wish_connection_t* wish_connection_init(wish_core_t* core, const uint8_t* luid, const uint8_t* ruid);
 
@@ -230,6 +226,10 @@ wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4],
  * to the id number given as argument */
 wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish_connection_id_t connection_id);
 
+/** Check that a connection pointer actually represents a wish
+ * connection in the pool */
+wish_connection_t* wish_connection_exists(wish_core_t *core, wish_connection_t *connection);
+
 /**
  * Returns wish connection matching given luid, ruid, rhid or NULL
  * 
@@ -240,6 +240,9 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
  * yet ready for use, because it is e.g. just being created.
  */
 wish_connection_t* wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid);
+
+wish_connection_t* 
+wish_core_lookup_connected_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid);
 
 /* returns true if there is any connection form luid to ruid */
 bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t *ruid);

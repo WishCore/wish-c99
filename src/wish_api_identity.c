@@ -51,6 +51,7 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     
     if ( RET_SUCCESS != wish_identity_load(uid, &id) ) {
         rpc_server_error_msg(req, 343, "Failed to load identity.");
+        wish_identity_destroy(&id);
         return;
     }
 
@@ -62,8 +63,11 @@ void wish_api_identity_export(rpc_server_req* req, const uint8_t* args) {
     
     if ( RET_SUCCESS != wish_identity_export(core, &id, NULL, &buf) ) {
         rpc_server_error_msg(req, 92, "Internal export failed.");
+        wish_identity_destroy(&id);
         return;
     }
+    
+    wish_identity_destroy(&id);
     
     bson bs;
     bson_init_with_data(&bs, buf.base);
@@ -192,11 +196,15 @@ void wish_api_identity_list(rpc_server_req* req, const uint8_t* args) {
         if ( RET_SUCCESS != wish_identity_load(uid_list[i].uid, &identity) ) {
             WISHDEBUG(LOG_CRITICAL, "Could not load identity");
             rpc_server_error_msg(req, 997, "Could not load identity");
+            wish_identity_destroy(&identity);
+            return;
         }
 
         bson_append_binary(&bs, "uid", identity.uid, WISH_UID_LEN);
         bson_append_string(&bs, "alias", identity.alias);
         bson_append_bool(&bs, "privkey", identity.has_privkey);
+
+        wish_identity_destroy(&identity);
         
         bson_append_finish_object(&bs);
     }
@@ -258,6 +266,7 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     if ( RET_SUCCESS != wish_identity_load(arg_uid, &identity) ) {
         WISHDEBUG(LOG_CRITICAL, "Could not load identity");
         rpc_server_error_msg(req, 997, "Could not load identity");
+        wish_identity_destroy(&identity);
         return;
     }
 
@@ -267,16 +276,36 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     bson_append_binary(&bs, "pubkey", identity.pubkey, WISH_PUBKEY_LEN);
 
     // TODO: Support multiple transports
-    if ( strnlen(&identity.transports[0][0], 64) % 64 != 0 ) {
-        bson_append_start_array(&bs, "hosts");
-        bson_append_start_object(&bs, "0");
-        bson_append_start_array(&bs, "transports");
-        bson_append_string(&bs, "0", &identity.transports[0][0]);
-        bson_append_finish_array(&bs);
-        bson_append_finish_object(&bs);
-        bson_append_finish_array(&bs);
-    }
+    bson_append_start_array(&bs, "hosts");
+    bson_append_start_object(&bs, "0");
+    bson_append_start_array(&bs, "transports");
+    
+    for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+        if ( strnlen(&identity.transports[i][0], WISH_MAX_TRANSPORT_LEN)  > 0 ) {   
+            char index_str[10] = { 0 };
+            BSON_NUMSTR(index_str, i);
             
+            bson_append_string(&bs, index_str, &identity.transports[i][0]);
+        }
+    }
+    bson_append_finish_array(&bs);
+    bson_append_finish_object(&bs);
+    bson_append_finish_array(&bs);
+    
+    bson b;
+    
+    if (identity.meta) {
+        bson_init_with_data(&b, identity.meta);
+        bson_append_bson(&bs, "meta", &b);
+    }
+    
+    if (identity.permissions) {
+        bson_init_with_data(&b, identity.permissions);
+        bson_append_bson(&bs, "permissions", &b);
+    }
+    
+    wish_identity_destroy(&identity);
+    
     bson_append_finish_object(&bs);
     bson_finish(&bs);
 
@@ -286,7 +315,40 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     } else {
         rpc_server_send(req, bs.data, bson_size(&bs));
     }
+    
     bson_destroy(&bs);
+}
+
+/**
+ * 
+ * 
+ * @return 
+ */
+static bool wish_identity_local_exists() {
+    
+    int num_uids_in_db = wish_get_num_uid_entries();
+    wish_uid_list_elem_t uid_list[num_uids_in_db];
+    int num_uids = wish_load_uid_list(uid_list, num_uids_in_db);
+
+    int i = 0;
+    for (i = 0; i < num_uids; i++) {
+        wish_identity_t identity;
+
+        if ( RET_SUCCESS != wish_identity_load(uid_list[i].uid, &identity) ) {
+            WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+            wish_identity_destroy(&identity);
+            continue;
+        }
+
+        if (identity.has_privkey) {
+            wish_identity_destroy(&identity);
+            return true;
+        }
+        
+        wish_identity_destroy(&identity);
+    }
+    
+    return false;
 }
 
 /**
@@ -316,6 +378,11 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
         rpc_server_error_msg(req, 309, "Argument 1 must be string");
         return;
     }
+
+    if ( wish_identity_local_exists() ) {
+        rpc_server_error_msg(req, 304, "Identity exists. Multiple not yet supported.");
+        return;
+    }
     
     const char *alias_str = bson_iterator_string(&it);
 
@@ -323,7 +390,7 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
 
     /* Create the identity */
     wish_identity_t id;
-    wish_create_local_identity(&id, alias_str);
+    wish_create_local_identity(core, &id, alias_str);
     int ret = wish_save_identity_entry(&id);
 
     
@@ -352,6 +419,108 @@ void wish_api_identity_create(rpc_server_req* req, const uint8_t* args) {
     }
     
     wish_core_signals_emit_string(core, "identity");
+}
+
+/**
+ * Update identity meta data (identity.update)
+ *
+ * { alias: 'André Kaustell',
+ *   @context: 'http://schema.org'
+ *   @type: 'Person'
+ *   givenName: 'André',
+ *   familyName: 'Kaustell',
+ *   telephone: '+358407668660',
+ *   skype: 'andre-controlthings',
+ *   email: 'andre.kaustell@controlthings.fi' }
+ */
+void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) { 
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        rpc_server_error_msg(req, 345, "Invalid uid.");
+        return;
+    }
+
+    uint8_t* luid = (uint8_t *)bson_iterator_bin_data(&it);
+    
+    wish_identity_t id;
+    
+    // check if we can make a signature with this identity
+    if (wish_identity_load(luid, &id) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+        rpc_server_error_msg(req, 345, "Could not load identity.");
+        wish_identity_destroy(&id);
+        return;
+    }
+
+    bson_iterator_from_buffer(&it, args);
+
+    const char* alias = NULL;
+    
+    //bson_visit("args for update", args);
+    
+    if ( bson_find_fieldpath_value("1.alias", &it) == BSON_STRING ) {
+        alias = bson_iterator_string(&it);
+        //WISHDEBUG(LOG_CRITICAL, "Found new alias to update: %s", alias);
+        strncpy(id.alias, alias, WISH_ALIAS_LEN);
+    }
+
+    // Start dealing with custom meta data fields
+    bson_iterator_from_buffer(&it, args);
+    
+    if ( bson_find_fieldpath_value("1", &it) != BSON_OBJECT ) {
+        rpc_server_error_msg(req, 63, "Expecting object.");
+        wish_identity_destroy(&id);
+        return;
+    }
+    
+    bson meta;
+    bson_init(&meta);
+    
+    int count = 0;
+    
+    bson_iterator sit;
+    bson_iterator_subiterator(&it, &sit);
+    
+    while ( BSON_EOO != bson_iterator_next(&sit) ) {
+        const char* key = bson_iterator_key(&sit);
+        //if ( BSON_STRING != bson_iterator_type(&sit)) { continue; }
+        if ( strncmp(key, "alias", 6) == 0 ) { continue; }
+        
+        bson_append_element(&meta, key, &sit);
+        count++;
+    }
+
+    bson_finish(&meta);
+    
+    if (count) { id.meta = bson_data(&meta); }
+
+    int ret = wish_identity_update(core, &id);
+
+    bson_destroy(&meta);
+    
+    int buf_len = 128;
+    uint8_t buf[buf_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_append_binary(&bs, "0", id.uid, WISH_UID_LEN);
+    bson_finish(&bs);
+
+    // pass to identity get handler with uid as parameter
+    wish_api_identity_get(req, (char*) bson_data(&bs));
+
+    wish_core_update_identities(core);
+
+    //WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
+    wish_ldiscover_advertize(core, id.uid);
+    wish_report_identity_to_local_services(core, &id, true);
+
+    wish_core_signals_emit_string(core, "identity");
+    wish_identity_destroy(&id);
 }
 
 /**
@@ -386,6 +555,9 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
             wish_report_identity_to_local_services(core, &id_to_remove, false);
         }
         
+        wish_identity_destroy(&id_to_remove);
+        
+        
         int res = wish_identity_remove(core, uid);
 
         bson bs;
@@ -409,6 +581,13 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
             }
         }
         
+        if (wish_service_exists(core, req->context) == NULL) {
+            if (wish_connection_exists(core, req->ctx) == NULL) {
+                WISHDEBUG(LOG_CRITICAL, "Will not send, connection gone");
+                return;
+            }
+        }
+        
         rpc_server_send(req, bson_data(&bs), bson_size(&bs));
         
         wish_core_signals_emit_string(core, "identity");
@@ -416,6 +595,84 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
         rpc_server_error_msg(req, 343, "Invalid argument. Expecting 32 byte bin data.");
         return;
     }
+}
+
+void wish_api_identity_permissions(rpc_server_req* req, const uint8_t* args) {
+    wish_core_t* core = (wish_core_t*) req->server->context;
+    
+    bson_iterator it;
+    bson_find_from_buffer(&it, args, "0");
+    
+    if(bson_iterator_type(&it) != BSON_BINDATA || bson_iterator_bin_len(&it) != WISH_ID_LEN) {
+        rpc_server_error_msg(req, 345, "Invalid uid.");
+        return;
+    }
+
+    uint8_t* luid = (uint8_t *)bson_iterator_bin_data(&it);
+    
+    wish_identity_t id;
+    
+    // check if we can make a signature with this identity
+    if (wish_identity_load(luid, &id) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "Could not load identity");
+        rpc_server_error_msg(req, 345, "Could not load identity.");
+        wish_identity_destroy(&id);
+        return;
+    }
+
+    bson_iterator_from_buffer(&it, args);
+
+    // Start dealing with permissions data fields
+    bson_iterator_from_buffer(&it, args);
+    
+    if ( bson_find_fieldpath_value("1", &it) != BSON_OBJECT ) {
+        rpc_server_error_msg(req, 63, "Expecting object.");
+        wish_identity_destroy(&id);
+        return;
+    }
+    
+    bson permissions;
+    bson_init(&permissions);
+    
+    int count = 0;
+    
+    bson_iterator sit;
+    bson_iterator_subiterator(&it, &sit);
+    
+    while ( BSON_EOO != bson_iterator_next(&sit) ) {
+        const char* key = bson_iterator_key(&sit);
+        
+        bson_append_element(&permissions, key, &sit);
+        count++;
+    }
+
+    bson_finish(&permissions);
+    
+    if (count) { id.permissions = bson_data(&permissions); }
+
+    int ret = wish_identity_update(core, &id);
+
+    bson_destroy(&permissions);
+    
+    int buf_len = 128;
+    uint8_t buf[buf_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_append_binary(&bs, "0", id.uid, WISH_UID_LEN);
+    bson_finish(&bs);
+
+    // pass to identity get handler with uid as parameter
+    wish_api_identity_get(req, (char*) bson_data(&bs));
+
+    wish_core_update_identities(core);
+
+    //WISHDEBUG(LOG_CRITICAL, "Starting to advertize the new identity");
+    wish_ldiscover_advertize(core, id.uid);
+    wish_report_identity_to_local_services(core, &id, true);
+    
+    wish_core_signals_emit_string(core, "identity");
+    wish_identity_destroy(&id);
 }
 
 /**
@@ -452,7 +709,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
     if (wish_identity_load(luid, &uid) != RET_SUCCESS) {
         WISHDEBUG(LOG_CRITICAL, "Could not load identity");
         rpc_server_error_msg(req, 345, "Could not load identity.");
-        return;
+        goto cleanup_and_return;
     }
     
     bin claim;
@@ -461,7 +718,9 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
 
     bson_find_from_buffer(&it, args, "2");
 
-    if(bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 5 && bson_iterator_bin_len(&it) <= 512 ) {
+    if (bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 5
+            && bson_iterator_bin_len(&it) <= 512 ) 
+    {
         claim.base = (char*) bson_iterator_bin_data(&it);
         claim.len = bson_iterator_bin_len(&it);
         WISHDEBUG(LOG_CRITICAL, "Sign with claim. %p %i", claim.base, claim.len);
@@ -469,7 +728,10 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
     
     bson_find_from_buffer(&it, args, "1");
     
-    if(bson_iterator_type(&it) == BSON_BINDATA && bson_iterator_bin_len(&it) >= 32 && bson_iterator_bin_len(&it) <= 64 ) {
+    if(bson_iterator_type(&it) == BSON_BINDATA 
+            && bson_iterator_bin_len(&it) >= 32 
+            && bson_iterator_bin_len(&it) <= 64 ) 
+    {
         // sign hash
         char hash[64];
         int hash_len = bson_iterator_bin_len(&it);
@@ -486,7 +748,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
 
         if(bs.err != 0) {
             rpc_server_error_msg(req, 344, "Failed writing reponse.");
-            return;
+            goto cleanup_and_return;
         }
 
         rpc_server_send(req, bson_data(&bs), bson_size(&bs));
@@ -501,10 +763,8 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         bson_iterator_from_buffer(&it, args);
         
         if ( bson_find_fieldpath_value("1.data", &it) != BSON_BINDATA ) {
-            WISHDEBUG(LOG_CRITICAL, "1.data not bin data");
-            
             rpc_server_error_msg(req, 345, "Second arg object does not have { data: <Buffer> }.");
-            return;
+            goto cleanup_and_return;
         }
 
         // copy the data blob to response
@@ -541,7 +801,7 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
         // add signature by uid
         if ( RET_SUCCESS != wish_identity_sign(core, &uid, &data, &claim, &signature) ) {
             rpc_server_error_msg(req, 345, "Failed producing signature");
-            return;
+            goto cleanup_and_return;
         }
         
         BSON_NUMSTR(index, i++);
@@ -563,15 +823,17 @@ void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args) {
 
         if(b.err != 0) {
             rpc_server_error_msg(req, 344, "Failed writing reponse.");
-            return;
+            goto cleanup_and_return;
         }
         
         rpc_server_send(req, bson_data(&b), bson_size(&b));
-        return;
     } else {
         rpc_server_error_msg(req, 345, "Second arg not valid hash or object.");
-        return;
     }
+    
+cleanup_and_return:
+    wish_identity_destroy(&uid);
+    return;            
 }
 
 /**
@@ -651,7 +913,8 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
             BSON_NUMSTR(index, i++);
             bson_append_start_object(&b, index);
             
-            WISHDEBUG(LOG_CRITICAL, "0.signatures.0 already present, should be verified. %i %s", bson_iterator_type(&it), bson_iterator_key(&it));
+            //WISHDEBUG(LOG_CRITICAL, "0.signatures.0 already present, should be verified. %i %s", 
+            //        bson_iterator_type(&it), bson_iterator_key(&it));
             bson obj;
             bson_iterator_subobject(&it, &obj);
             bson_iterator sit;
@@ -667,10 +930,16 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
             
             while ( bson_iterator_next(&sit) != BSON_EOO ) {
                 //WISHDEBUG(LOG_CRITICAL, "  sub object %i: %s", bson_iterator_type(&sit), bson_iterator_key(&sit));
-                if (strncmp("sign", bson_iterator_key(&sit), 5) == 0 && bson_iterator_type(&sit) == BSON_BINDATA && bson_iterator_bin_len(&sit) == WISH_SIGNATURE_LEN ) {
+                if (strncmp("sign", bson_iterator_key(&sit), 5) == 0 
+                        && bson_iterator_type(&sit) == BSON_BINDATA 
+                        && bson_iterator_bin_len(&sit) == WISH_SIGNATURE_LEN ) 
+                {
                     signature.base = (char*) bson_iterator_bin_data(&sit);
                     signature.len = bson_iterator_bin_len(&sit);
-                } else if (strncmp("uid", bson_iterator_key(&sit), 4) == 0 && bson_iterator_type(&sit) == BSON_BINDATA && bson_iterator_bin_len(&sit) == WISH_UID_LEN ) {
+                } else if (strncmp("uid", bson_iterator_key(&sit), 4) == 0
+                        && bson_iterator_type(&sit) == BSON_BINDATA &&
+                        bson_iterator_bin_len(&sit) == WISH_UID_LEN ) 
+                {
                     uid = bson_iterator_bin_data(&sit);
                     bson_append_element(&b, bson_iterator_key(&sit), &sit);
                 } else if (strncmp("claim", bson_iterator_key(&sit), 6) == 0 && bson_iterator_type(&sit) == BSON_BINDATA ) {
@@ -694,6 +963,8 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
                 } else {
                     bson_append_null(&b, "sign");
                 }
+                
+                wish_identity_destroy(&id);
             } else {
                 //WISHDEBUG(LOG_CRITICAL, "signature base is %p len: %i", signature.base, signature.len);
                 bson_append_null(&b, "sign");
@@ -799,7 +1070,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         bson_iterator meta;
         bson_iterator_from_buffer(&meta, bson_iterator_bin_data(&it));
 
-
+        /* FIXME: support friend request connection to all the transports, not just the 0th one. */
         bson_find_fieldpath_value("transports.0", &meta);
 
         if (bson_iterator_type(&meta) != BSON_STRING) {
@@ -1077,7 +1348,8 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
         if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
             if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
-                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
+                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i",
+                //    core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
                 wish_connection = &core->connection_pool[i];
                 break;
             }
@@ -1123,7 +1395,9 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
     
     //WISHDEBUG(LOG_CRITICAL, "Accepting friend request");
     
-    /* The friend request has been accepted, send our certificate as a RPC response to the remote core that originally sent us the core-to-core friend request. */
+    /* The friend request has been accepted, send our certificate as a RPC 
+     * response to the remote core that originally sent us the core-to-core 
+     * friend request. */
     size_t signed_cert_buffer_len = 1024;
 #ifdef COMPILING_FOR_ESP8266
     uint8_t *signed_cert_buffer = wish_platform_malloc(signed_cert_buffer_len);
@@ -1290,7 +1564,8 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
         if (memcmp(core->connection_pool[i].luid, luid, WISH_ID_LEN) == 0) {
             if (memcmp(core->connection_pool[i].ruid, ruid, WISH_ID_LEN) == 0) {
                 found = true;
-                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i", core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
+                //WISHDEBUG(LOG_CRITICAL, "Found the connection used for friend request, cnx state %i proto state: %i",
+                //    core->connection_pool[i].context_state, core->connection_pool[i].curr_protocol_state);
                 wish_connection = &core->connection_pool[i];
                 break;
             }
@@ -1341,7 +1616,8 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
  * Let the local host identity to be h.
  * For every service "s" present in the local service registry, do;
  *    For every service "r" present in the local service registry, do:
- *      Construct "type: peer", "online: true", message with: <luid=i, ruid=i, rsid=r, rhid=h> and send it to s. If r == s, skip to avoid sending online message to service itself.
+ *      Construct "type: peer", "online: true", message with: <luid=i, ruid=i, rsid=r, rhid=h> 
+ *      and send it to s. If r == s, skip to avoid sending online message to service itself.
  *    done
  * done.      
  * 
