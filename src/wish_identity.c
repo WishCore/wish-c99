@@ -718,9 +718,18 @@ int wish_identity_from_bson(wish_identity_t *id, const bson* bs) {
     memcpy(id->alias, alias, strnlen(alias, WISH_ALIAS_LEN));
     id->has_privkey = false;
     memset(id->privkey, 0, WISH_PRIVKEY_LEN);
-
-    /* Note: Transports are not part of the certificate, but are in the metadata instead. */
-
+   
+    for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+        size_t max_len = 16;
+        char transports_path[max_len];
+        wish_platform_snprintf(transports_path, max_len, "transports.%d", i);
+        bson_iterator_init(&it, bs);
+        if ( bson_find_fieldpath_value(transports_path, &it) == BSON_STRING ) {
+            //WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
+            strncpy(&(id->transports[i][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+        }
+    }
+    
     /* FIXME update contacts */
 
     return 0;
@@ -728,19 +737,8 @@ int wish_identity_from_bson(wish_identity_t *id, const bson* bs) {
 
 void wish_identity_add_meta_from_bson(wish_identity_t *id, const bson* meta) {
     //bson_visit("Adding metadata to identity from BSON:", bson_data(meta));
-    
-    bson_iterator it;
-    
-    for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
-        size_t max_len = 16;
-        char transports_path[max_len];
-        wish_platform_snprintf(transports_path, max_len, "transports.%d", i);
-        bson_iterator_init(&it, meta);
-        if ( bson_find_fieldpath_value(transports_path, &it) == BSON_STRING ) {
-            //WISHDEBUG(LOG_CRITICAL, "Copying from transprots.0: %s", bson_iterator_string(&it));
-            strncpy(&(id->transports[i][0]), bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
-        }
-    }
+
+    /* No metadata currently. */
 }
 
 /**
@@ -1093,12 +1091,13 @@ var document = {
   alias: String,
   uid: Buffer(32),
   pubkey: Buffer(32),
+  transports: ['123.234.123.234:40000']
 };
 
 var certificate = {
   // type: 'inline' | 'url',
   data: BSON(document),
-  meta: BSON({ transports: ['123.234.123.234:40000'] }),
+  meta: BSON( ),
 };
 */
 
@@ -1111,6 +1110,25 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char
     bson_append_binary(&bs, "uid", id->uid, WISH_UID_LEN);
     bson_append_binary(&bs, "pubkey", id->pubkey, WISH_PUBKEY_LEN);
     
+    /* Add core's current relay servers as transports of the identity */
+    wish_relay_client_t* relay;
+    int i = 0;
+    
+    if (core->relay_db != NULL) {
+        bson_append_start_array(&bs, "transports");
+
+        LL_FOREACH(core->relay_db, relay) {
+            char index[21];
+            BSON_NUMSTR(index, i++);
+            char host[29];
+            wish_platform_snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
+
+            bson_append_string(&bs, index, host);
+        }
+
+        bson_append_finish_array(&bs);
+    }
+   
     // If we have some signed meta requested (used in friend requests with extra data)
     if (signed_meta) {
         bson bm;
@@ -1137,25 +1155,7 @@ return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char
     bson meta;
     
     bson_init_buffer(&meta, meta_buf, meta_buf_len);
-    
-    wish_relay_client_t* relay;
-    int i = 0;
-    
-    if (core->relay_db != NULL) {
-        bson_append_start_array(&meta, "transports");
 
-        LL_FOREACH(core->relay_db, relay) {
-            char index[21];
-            BSON_NUMSTR(index, i++);
-            char host[29];
-            wish_platform_snprintf(host, 29, "wish://%d.%d.%d.%d:%d", relay->ip.addr[0], relay->ip.addr[1], relay->ip.addr[2], relay->ip.addr[3], relay->port);
-
-            bson_append_string(&meta, index, host);
-        }
-
-        bson_append_finish_array(&meta);
-    }
-    
     bson_finish(&meta);
 
     if (meta.err) {

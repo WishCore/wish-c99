@@ -410,6 +410,13 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     
     const char *cert = bson_iterator_bin_data(&it);
     
+    bson_iterator cert_it;
+    bson_iterator_from_buffer(&cert_it, cert);
+    
+    if (bson_find_fieldpath_value("transports.0", &cert_it) != BSON_STRING) {
+        WISHDEBUG(LOG_CRITICAL, "Friend request: no transports in data field!");
+    }
+    
     const char* signed_meta_bson = NULL;
     char* signed_meta_copy = NULL;
     
@@ -450,16 +457,9 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     
     char* meta = (char*) bson_iterator_bin_data(&it);
     
-    bson_iterator meta_it;
-    bson_iterator_from_buffer(&meta_it, meta);
-    
-    if (bson_find_fieldpath_value("transports.0", &meta_it) != BSON_STRING) {
-        WISHDEBUG(LOG_CRITICAL, "Friend request: no transports in meta field!");
-    }
-    
     /* Reset iterator */
     bson_iterator_from_buffer(&it, args);
-    /* Find the element pointed by 0.data */
+    /* Find the element pointed by 0.signatures */
     if ( bson_find_fieldpath_value("0.signatures", &it) != BSON_ARRAY ) {
         WISHDEBUG(LOG_CRITICAL, "0.signatures not array");
 
