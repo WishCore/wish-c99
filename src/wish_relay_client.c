@@ -12,6 +12,8 @@
 
 #include "utlist.h"
 
+#include "wish_core.h"
+
 void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay) {
     WISHDEBUG(LOG_CRITICAL, "Relay control connection established");
     relay->curr_state = WISH_RELAY_CLIENT_OPEN;
