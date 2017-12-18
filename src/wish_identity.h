@@ -44,6 +44,9 @@ typedef struct {
     char alias[WISH_ALIAS_LEN];
     char transports[WISH_MAX_TRANSPORTS][WISH_MAX_TRANSPORT_LEN];
     char contacts[WISH_MAX_CONTACTS][WISH_MAX_CONTACT_LEN];
+    /** BSON object containing permissions (will be superseded by ACL) */
+    const char* permissions;
+    /** BSON object containing meta like phone, email etc */
     const char* meta;
 } wish_identity_t;
 
@@ -62,17 +65,26 @@ int wish_get_num_uid_entries(void);
  * Returns the number of uids in the list, or 0 if there are no
  * identities in the database, and a negative number for an error */
 int wish_load_uid_list(wish_uid_list_elem_t *list, int list_len); 
-/* This function loads the contact specified by 'uid', storing it to
- * the pointer 'contact' */
+
+/** 
+ * Initializes the structure and loads the contact specified by 'uid', storing it to
+ * the pointer 'contact'
+ * 
+ * Identity must be destroyed by wish_identity_destroy() independently of return value
+ */
 return_t wish_identity_load(const uint8_t *uid, wish_identity_t *identity);
+
+/** 
+ * Frees malloc'ed data from identity structure, but not the structure itself
+ */
+void wish_identity_destroy(wish_identity_t* identity);
 
 // returns < 0 on error, == 0 is false, > 0 is true
 int wish_identity_exists(uint8_t *uid);
 
 /* This function load the identity specified by 'uid', and saves the
  * data in BSON format to identity_bson_doc */
-int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc,
-    size_t identity_bson_doc_max_len);
+int wish_load_identity_bson(uint8_t *uid, uint8_t *identity_bson_doc, size_t identity_bson_doc_max_len);
 
 /* Save identity to database */
 int wish_save_identity_entry(wish_identity_t *identity);
@@ -105,7 +117,8 @@ void wish_pubkey2uid(const uint8_t *pubkey, uint8_t *uid);
  * The uid field is also populated */
 void wish_create_local_identity(wish_core_t *core, wish_identity_t *id, const char *alias);
 
-/* This is a helper function for loading pubkeys corresponding to uids.
+/**
+ * This is a helper function for loading pubkeys corresponding to uids.
  * Easier to use than wish_load_identity
  *
  * Returns 0 when pubkey is found
@@ -121,10 +134,9 @@ int wish_load_privkey(uint8_t *uid, uint8_t *dst_buffer);
 /**
  * Populate a struct wish_identity_t based on information in a 'cert'
  * which is obtained for example from a 'friend request'
- * @param new_id a pointer to the identity struct which will be
- * populated
- * @param a pointer to BSON document from which the data will be read
- * from
+ * 
+ * @param new_id a pointer to the identity struct which will be populated
+ * @param a pointer to BSON document from which the data will be read from
  * @return 0 for success
  */
 int wish_identity_from_bson(wish_identity_t *id, const bson* bs);
@@ -174,3 +186,36 @@ return_t wish_identity_verify(wish_core_t* core, wish_identity_t* uid, const bin
 return_t wish_identity_export(wish_core_t *core, wish_identity_t *id, const char* signed_meta, bin *buffer);
 
 return_t wish_build_signed_cert(wish_core_t *core, uint8_t *luid, const char* meta, bin *buffer);
+
+/**
+ * Returns bson_iterator from identity meta data from given fieldpath
+ * 
+ * Example 
+ * 
+ *     bson_iterator it = wish_identity_meta(&identity, "payment.BCH")
+ * 
+ *     bson_iterator_type(&it) == BSON_STRING
+ *     const char* address = bson_iterator_string(&it);
+ * 
+ * @param identity
+ * @param permission
+ * @return bson_iterator
+ */
+bson_iterator wish_identity_meta(wish_identity_t* identity, const char* permission);
+
+/**
+ * Returns bson_iterator from identity permissions data from given fieldpath
+ * 
+ * Example 
+ * 
+ *     bson_iterator it = wish_identity_permissions(&identity, "payment.BCH")
+ * 
+ *     bson_iterator_type(&it) == BSON_STRING
+ *     const char* address = bson_iterator_string(&it);
+ * 
+ * @param identity
+ * @param permission
+ * @return bson_iterator
+ */
+bson_iterator wish_identity_permissions(wish_identity_t* identity, const char* permission);
+

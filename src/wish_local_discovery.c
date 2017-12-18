@@ -232,10 +232,11 @@ size_t buffer_len) {
     /* Save the pubkey to contact database, along with metadata.
      * But first, check if we already know this uid */
     wish_identity_t discovered_id;
-    if (wish_identity_load(ruid, &discovered_id) == RET_SUCCESS) {
-        //WISHDEBUG(LOG_CRITICAL, "Auto-discovered uid is already in our contacts %s", discovered_id.alias);
-    } else {
-        //WISHDEBUG(LOG_CRITICAL, "Ignoring auto discovery bcast for unknown uid");
+    return_t ret = wish_identity_load(ruid, &discovered_id);
+    wish_identity_destroy(&discovered_id);
+    
+    if (ret != RET_SUCCESS) {
+        // Not trying to connect to unknown uid
         return;
     }
 
@@ -352,18 +353,21 @@ static int append_transports_array(wish_core_t* core, bson* bs) {
 }
 
 /* Send out one "advertizement" message for wish identity my_uid */
-void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
+void wish_ldiscover_advertize(wish_core_t* core, uint8_t* uid) {
     /* Advert message length:
      * uid len + hostid len + pubkey len + room for metadata */
 
-    wish_identity_t my_identity;
-    return_t ret = wish_identity_load(my_uid, &my_identity);
+    wish_identity_t id;
+    return_t ret = wish_identity_load(uid, &id);
     
     // Local discovery will not advertise if we cant load identity
-    if (ret != RET_SUCCESS) { return; }
+    if (ret != RET_SUCCESS) { 
+        wish_identity_destroy(&id);
+        return; 
+    }
 
     // Local discovery will not advertise if we don't have a private key
-    if (!my_identity.has_privkey) { return; }
+    if (!id.has_privkey) { return; }
 
     const size_t msg_len = 2 + 2*(20 + WISH_ID_LEN) + 20 + WISH_PUBKEY_LEN + 10 + WISH_MAX_TRANSPORT_LEN + WISH_ALIAS_LEN;
     uint8_t msg[msg_len];
@@ -374,13 +378,13 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     bson bs;
     bson_init_buffer(&bs, msg+2, msg_len-2);
     
-    bson_append_string(&bs, "alias", my_identity.alias);
+    bson_append_string(&bs, "alias", id.alias);
 #ifdef WLD_META_PRODUCT
     bson_append_start_object(&bs, "meta");
     bson_append_string(&bs, "product", WLD_META_PRODUCT);
     bson_append_finish_object(&bs);
 #endif
-    bson_append_binary(&bs, "wuid", my_uid, WISH_ID_LEN);
+    bson_append_binary(&bs, "wuid", uid, WISH_ID_LEN);
 
     uint8_t host_id[WISH_WHID_LEN];
     wish_core_get_host_id(core, host_id);
@@ -388,7 +392,7 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
 
     uint8_t pubkey[WISH_PUBKEY_LEN] = { 0 };
 
-    if (wish_load_pubkey(my_uid, pubkey)) {
+    if (wish_load_pubkey(uid, pubkey)) {
         bson_visit("failed to load pubkey for uid", bson_data(&bs));
         return;
     }
@@ -405,6 +409,7 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t *my_uid) {
     //bson_visit("Advertisement message going out from core:", bson_data(&bs));
     
     wish_send_advertizement(core, msg, 2 + bson_size(&bs));
+    wish_identity_destroy(&id);
 }
 
 void wish_ldiscover_add(wish_core_t* core, wish_ldiscover_t* entry) {

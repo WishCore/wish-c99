@@ -527,6 +527,15 @@ bson_type bson_find_fieldpath_value3(FFPCTX* ffctx) {
     return bt;
 }
 
+static const char* bson_iterator_invalid = "\0";
+
+bson_iterator bson_iterator_eoo() {
+    bson_iterator it;
+    it.cur = bson_iterator_invalid;
+    it.first = 0;
+    return it;
+}
+
 bson_bool_t bson_iterator_more(const bson_iterator *i) {
     return *(i->cur);
 }

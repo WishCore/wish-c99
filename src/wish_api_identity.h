@@ -10,7 +10,7 @@ extern "C" {
 
 #include "wish_core.h"
     
-    /* Acl API */
+    /* Identity API */
     
     void wish_api_identity_export(rpc_server_req* req, const uint8_t* args);
 
@@ -25,7 +25,9 @@ extern "C" {
     void wish_api_identity_update(rpc_server_req* req, const uint8_t* args);
 
     void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args);
-
+    
+    void wish_api_identity_permissions(rpc_server_req* req, const uint8_t* args);
+    
     void wish_api_identity_sign(rpc_server_req* req, const uint8_t* args);
 
     void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args);
