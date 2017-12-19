@@ -1186,9 +1186,10 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             /* Update transports if we have a normal connection */
             if (connection->friend_req_connection == false) {
                 bool found_transports = false;
-                wish_identity_t id = { 0 };
+                wish_identity_t id;
                 wish_identity_load(connection->ruid, &id);
                 /* Clear existing transports, and replace them with transports provided by remote party */
+                /* FIXME append to transport list - instead of overwriting - the old transports should be deprecated later when we discover that they are no longer valid */
                 memset(id.transports, 0, WISH_MAX_TRANSPORTS*WISH_MAX_TRANSPORT_LEN);
                 for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
                     const size_t path_max_len = 16;
@@ -1208,6 +1209,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                     /* Save the remote identity updated with transports */
                     wish_identity_update(core, &id);
                 }
+                wish_identity_destroy(&id);
             }
             
             /* Finished processing the handshake */
