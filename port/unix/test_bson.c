@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-/*
 int main(int argc, char** argv) {
     wish_platform_set_malloc(malloc);
     wish_platform_set_realloc(realloc);
@@ -61,9 +60,32 @@ int main(int argc, char** argv) {
     bson_append_finish_object(&bi);
     bson_finish(&bi);
 
+    bson_visit("Initial state:", bson_data(&bi));
+    
     bson_insert_string(&bi, "acl.roles.user", "uid3");
     bson_insert_string(&bi, "acl.roles.user", "uid6");
+    
+    bson b;
+    bson_init(&b);
+    bson_append_start_object(&b, "data");
+    bson_append_start_object(&b, "connectPolicy");
+    bson_append_string(&b, "abdefbda", "always");
+    bson_append_string(&b, "deadbeef", "sometimes");
+    bson_append_finish_object(&b);
+    bson_append_finish_object(&b);
+    bson_finish(&b);
+    
+    bson_iterator i;
+    bson_iterator_init(&i, &b);
+    bson_find_fieldpath_value("data.connectPolicy", &i); // "connectPolicy");
+    
+    printf("iterator: %i", bson_iterator_type(&i));
 
+    bson_insert_element(&bi, "acl.permissions.root", i);
+    bson_insert_element(&bi, "acl.roles.user", i);
+    
+    bson_destroy(&b);
+    
     bson_visit("After insert:", bson_data(&bi));
     
     bson_remove_string(&bi, "acl.roles.user", "uid3");
@@ -94,4 +116,3 @@ int main(int argc, char** argv) {
     
     return 0;
 }
-*/

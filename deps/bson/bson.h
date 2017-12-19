@@ -1390,6 +1390,8 @@ const char* bson_type_string(bson_type type);
 
 void bson_insert_string(bson* bs, const char* path, const char* string);
 
+void bson_insert_element(bson* bs, const char* path, const bson_iterator it);
+
 void bson_remove_string(bson* bs, const char* path, const char* string);
 
 void bson_remove_path(bson* bs, const char* path);

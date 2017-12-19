@@ -3107,6 +3107,7 @@ typedef struct {
     bson *bsout;
     const char* path;
     const char* data;
+    const bson_iterator src;
     bson_type type;
     bson_type parentType;
     const char* lastkey;
@@ -3134,16 +3135,18 @@ static bson_visitor_cmd_t _bson_append_into_visitor(
     memcpy(tkey, key, keylen);
     tkey[keylen] = 0;
     
-    //WISHDEBUG(LOG_CRITICAL, "path: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+    printf("path: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
     
     if (after && strcmp(tpath, ctx->path) == 0) {
-        //WISHDEBUG(LOG_CRITICAL, "appending here: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+        printf("appending here: %s (%s) %s %s %s", tpath, tkey, bson_type_string(bt), bson_iterator_key(&ctx->src), after ? "after" : "before");
         if (bt == BSON_ARRAY) {
             char index[22];
             BSON_NUMSTR(index, ctx->lastindex+1);
-            bson_append_string(ctx->bsout, index, ctx->data);
+            bson_append_element(ctx->bsout, index, &ctx->src);
+        } else if (bt == BSON_OBJECT) {
+            bson_append_element(ctx->bsout, bson_iterator_key(&ctx->src), &ctx->src);
         } else {
-            bson_append_string(ctx->bsout, "test", ctx->data);
+            // Cannot insert unless parent is object or array, we failed.
         }
     }
     
@@ -3243,6 +3246,7 @@ static bson_visitor_cmd_t _bson_remove_visitor(
     return BSON_VCMD_OK;
 }
 
+/*
 static void bson_append_into_inner(const bson* from, bson* to, const char* path, const char* string) {
     bson_iterator i;
     bson_iterator_init(&i, from);
@@ -3255,6 +3259,25 @@ static void bson_append_into_inner(const bson* from, bson* to, const char* path,
         .lastkey = NULL,
         .lastindex = 0,
         .nstack = 0
+    };
+    
+    bson_visit_fields(&i, 0, _bson_append_into_visitor, &ctx);
+}
+*/
+
+static void bson_append_into_inner(const bson* from, bson* to, const char* path, const bson_iterator it) {
+    bson_iterator i;
+    bson_iterator_init(&i, from);
+    
+    _BSONMERGE3CTX ctx = {
+        .bsout = to,
+        .path = path,
+        .data = NULL,
+        .type = bson_iterator_type(&it),
+        .lastkey = NULL,
+        .lastindex = 0,
+        .nstack = 0,
+        .src = it
     };
     
     bson_visit_fields(&i, 0, _bson_append_into_visitor, &ctx);
@@ -3318,11 +3341,41 @@ static int bson_copy_with_state(bson* out, const bson* in) {
 void bson_insert_string(bson* bs, const char* path, const char* string) {
     //bson_visit("bson_append_into:", bson_data(bs));
 
+    /*
     bson tmp;
     bson_init_size(&tmp, 512);
     
     // Do the inserting
     bson_append_into_inner(bs, &tmp, path, string);
+    
+    bson_finish(&tmp);
+
+    bson_copy_with_state(bs, &tmp);
+
+    //bson_visit("bson_append_into tmp copy when done:", bson_data(&tmp));
+    
+    bson_destroy(&tmp);
+    */
+}
+
+/**
+ * Inserts element at iterator to path in bson. 
+ * 
+ * If path is an object bson_iterator_key of iterator is used as key. If path is
+ * an array, a correct index is used as key.
+ * 
+ * @param bs
+ * @param path
+ * @param it
+ */
+void bson_insert_element(bson* bs, const char* path, const bson_iterator it) {
+    //bson_visit("bson_append_into:", bson_data(bs));
+    
+    bson tmp;
+    bson_init_size(&tmp, 512);
+    
+    // Do the inserting
+    bson_append_into_inner(bs, &tmp, path, it);
     
     bson_finish(&tmp);
 
