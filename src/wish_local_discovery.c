@@ -192,6 +192,11 @@ size_t buffer_len) {
                 
                 bool changed = false;
                 
+                if (strncmp(core->ldiscovery_db[i].alias, alias, WISH_ALIAS_LEN) != 0) {
+                    strncpy((char*) &core->ldiscovery_db[i].alias, alias, WISH_ALIAS_LEN);
+                    changed = true;
+                }
+                
                 if (core->ldiscovery_db[i].claim != claim) {
                     // claim state changed
                     changed = true;
