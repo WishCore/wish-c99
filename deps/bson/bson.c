@@ -3135,10 +3135,10 @@ static bson_visitor_cmd_t _bson_append_into_visitor(
     memcpy(tkey, key, keylen);
     tkey[keylen] = 0;
     
-    printf("path: %s (%s) %s %s", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+    //printf("path: %s (%s) %s %s\n", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
     
     if (after && strcmp(tpath, ctx->path) == 0) {
-        printf("appending here: %s (%s) %s %s %s", tpath, tkey, bson_type_string(bt), bson_iterator_key(&ctx->src), after ? "after" : "before");
+        //printf("appending here: %s (%s) %s %s %s\n", tpath, tkey, bson_type_string(bt), bson_iterator_key(&ctx->src), after ? "after" : "before");
         if (bt == BSON_ARRAY) {
             char index[22];
             BSON_NUMSTR(index, ctx->lastindex+1);
@@ -3180,6 +3180,70 @@ static bson_visitor_cmd_t _bson_append_into_visitor(
 #else
         ctx->lastindex = strtoimax(ctx->lastkey, &endptr,10);
 #endif
+        return BSON_VCMD_SKIP_AFTER;
+    }
+
+    return BSON_VCMD_OK;
+}
+
+static bson_visitor_cmd_t _bson_replace_into_visitor(
+        const char *ipath, int ipathlen, 
+        const char *key, int keylen,
+        const bson_iterator *it, 
+        bool after, void *op) 
+{
+    _BSONMERGE3CTX *ctx = op;
+
+    bson_type bt = BSON_ITERATOR_TYPE(it);
+    
+    char tpath[128];
+    memcpy(tpath, ipath, ipathlen);
+    tpath[ipathlen] = 0;
+    
+    char tkey[128];
+    memcpy(tkey, key, keylen);
+    tkey[keylen] = 0;
+
+    if (!ctx->data) {
+        //printf("replace iterator: %s (%s) %s %s\n", tpath, tkey, bson_type_string(bt), after ? "after" : "before");
+    }
+    
+    if (!ctx->data && !after && strcmp(tpath, ctx->path) == 0) {
+        //printf("replacing this path: %s (%s) %s %s\n", tpath, tkey, bson_type_string(bson_iterator_type(&ctx->src)), after ? "after" : "before");
+
+        bson_append_element(ctx->bsout, tkey, &ctx->src);
+        
+        return BSON_VCMD_SKIP_NESTED | BSON_VCMD_SKIP_AFTER;
+    }
+
+    
+    if (bt == BSON_OBJECT || bt == BSON_ARRAY) {
+        if (!after) {
+            ctx->nstack++;
+            if (bt == BSON_OBJECT) {
+                bson_append_start_object2(ctx->bsout, key, keylen);
+            } else if (bt == BSON_ARRAY) {
+                bson_append_start_array2(ctx->bsout, key, keylen);
+            }
+            return BSON_VCMD_OK;
+        } else {
+            if (ctx->nstack > 0) {
+                ctx->nstack--;
+                if (bt == BSON_OBJECT) {
+                    bson_append_finish_object(ctx->bsout);
+                } else if (bt == BSON_ARRAY) {
+                    bson_append_finish_array(ctx->bsout);
+                }
+            }
+            return BSON_VCMD_OK;
+        }
+    } else {
+        if (ctx->data && bt == BSON_STRING && strcmp(bson_iterator_string(it), ctx->data) == 0) {
+            // Found match: Do not copy this one
+            //printf("this should be replaced\n");
+        } else {
+            bson_append_field_from_iterator(it, ctx->bsout);
+        }
         return BSON_VCMD_SKIP_AFTER;
     }
 
@@ -3283,6 +3347,24 @@ static void bson_append_into_inner(const bson* from, bson* to, const char* path,
     bson_visit_fields(&i, 0, _bson_append_into_visitor, &ctx);
 }
 
+static void bson_replace_into_inner(const bson* from, bson* to, const char* path, const bson_iterator it) {
+    bson_iterator i;
+    bson_iterator_init(&i, from);
+    
+    _BSONMERGE3CTX ctx = {
+        .bsout = to,
+        .path = path,
+        .data = NULL,
+        .type = bson_iterator_type(&it),
+        .lastkey = NULL,
+        .lastindex = 0,
+        .nstack = 0,
+        .src = it
+    };
+    
+    bson_visit_fields(&i, 0, _bson_replace_into_visitor, &ctx);
+}
+
 static void bson_remove_inner(const bson* from, bson* to, const char* path, const char* string) {
     bson_iterator i;
     bson_iterator_init(&i, from);
@@ -3315,9 +3397,11 @@ static int bson_copy_with_state(bson* out, const bson* in) {
     }
 
     if (bson_size(in) > out->dataSize) {
-        //WISHDEBUG(LOG_CRITICAL, "bson_insert_string could not copy data to original bson. Buffer too small.");
-        out->err = BSON_SIZE_OVERFLOW;
-        return BSON_ERROR;
+        if (BSON_OK != bson_ensure_space(out, bson_size(in))) {
+            //WISHDEBUG(LOG_CRITICAL, "bson_insert_string could not copy data to original bson. Buffer too small.");
+            out->err = BSON_SIZE_OVERFLOW;
+            return BSON_ERROR;
+        }
     }
 
     // copy bson data
@@ -3382,6 +3466,64 @@ void bson_insert_element(bson* bs, const char* path, const bson_iterator it) {
     bson_copy_with_state(bs, &tmp);
 
     //bson_visit("bson_append_into tmp copy when done:", bson_data(&tmp));
+    
+    bson_destroy(&tmp);
+}
+
+/**
+ * Inserts element at iterator to path in bson. 
+ * 
+ * If path is an object bson_iterator_key of iterator is used as key. If path is
+ * an array, a correct index is used as key.
+ * 
+ * @param bs
+ * @param path
+ * @param it
+ */
+void bson_insert_root_element(bson* bs, const char* path, const bson_iterator it) {
+    //bson_visit("bson_append_into:", bson_data(bs));
+    
+    bson tmp;
+    bson_init_size(&tmp, 512);
+    
+    // Do copy the rest
+    bson_append_into_inner(bs, &tmp, "", it);
+
+    bson_append_element(&tmp, path, &it);
+    
+    bson_finish(&tmp);
+
+    bson_copy_with_state(bs, &tmp);
+
+    //bson_visit("bson_append_into tmp copy when done:", bson_data(&tmp));
+    
+    bson_destroy(&tmp);
+}
+
+/**
+ * Replace element at path in bson with element from iterator. 
+ * 
+ * If path is an object bson_iterator_key of iterator is used as key. If path is
+ * an array, a correct index is used as key.
+ * 
+ * @param bs
+ * @param path
+ * @param it
+ */
+void bson_replace_element(bson* bs, const char* path, const bson_iterator it) {
+    //bson_visit("bson_append_into:", bson_data(bs));
+    
+    bson tmp;
+    bson_init_size(&tmp, 512);
+    
+    // Do the inserting
+    bson_replace_into_inner(bs, &tmp, path, it);
+    
+    bson_finish(&tmp);
+
+    bson_copy_with_state(bs, &tmp);
+
+    //bson_visit("bson_replace_into tmp copy when done:", bson_data(&tmp));
     
     bson_destroy(&tmp);
 }

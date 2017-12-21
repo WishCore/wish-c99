@@ -484,19 +484,76 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     
     bson_iterator sit;
     bson_iterator_subiterator(&it, &sit);
+
+    bson orig;
+    if (id.meta) {
+        bson_init_with_data(&orig, id.meta);
+    } else {
+        bson_empty(&orig);
+    }
+    
+    bson tmp;
+    bson_copy(&tmp, &orig);
     
     while ( BSON_EOO != bson_iterator_next(&sit) ) {
         const char* key = bson_iterator_key(&sit);
-        //if ( BSON_STRING != bson_iterator_type(&sit)) { continue; }
         if ( strncmp(key, "alias", 6) == 0 ) { continue; }
         
-        bson_append_element(&meta, key, &sit);
+        if (id.meta) {
+            bson_iterator i;
+            if (BSON_EOO != bson_find_from_buffer(&i, id.meta, key) ) {
+                if (BSON_NULL == bson_iterator_type(&sit)) {
+                    // This should be deleted...
+                    bson_remove_path(&tmp, key);
+                } else {
+                    // This should be updated...
+                    bson_replace_element(&tmp, key, sit);
+                }
+            }
+        } else {
+            // This should be added...
+            bson_append_element(&meta, key, &sit);
+        }
+        
         count++;
+    }
+
+    // Check for new keys
+    if (id.meta) {
+        bson_iterator_subiterator(&it, &sit);
+        
+        while ( BSON_EOO != bson_iterator_next(&sit) ) {
+            const char* key = bson_iterator_key(&sit);
+
+            bson_iterator i;
+            bson_iterator_init(&i, &orig);
+
+            bool found = false;
+            
+            while ( BSON_EOO != bson_iterator_next(&i) ) {
+                if ( strcmp(bson_iterator_key(&i), key) == 0 ) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // this key was not there from before, add it
+                bson_insert_root_element(&tmp, key, sit);
+            }
+        }
     }
 
     bson_finish(&meta);
     
-    if (count) { id.meta = bson_data(&meta); } else { id.meta = NULL; }
+    if (count) {
+        if (id.meta) {
+            id.meta = bson_data(&tmp);
+        } else {
+            id.meta = bson_data(&meta);
+        }
+    } else {
+        id.meta = NULL;
+    }
 
     int ret = wish_identity_update(core, &id);
 
