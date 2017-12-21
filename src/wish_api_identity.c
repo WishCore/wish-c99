@@ -477,12 +477,12 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     
-    bson orig;
+    bson meta;
     if (id.meta) {
-        bson_init_with_data(&orig, id.meta);
+        bson_init_with_data(&meta, id.meta);
     } else {
-        bson_init(&orig);
-        bson_finish(&orig);
+        bson_init(&meta);
+        bson_finish(&meta);
     }
 
     // create the update query object from iterator pointing at update parameter object
@@ -492,9 +492,9 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&update);
     
     // run update on orig
-    bson_update(&orig, &update);
+    bson_update(&meta, &update);
 
-    id.meta = bson_data(&orig);
+    id.meta = bson_data(&meta);
 
     int ret = wish_identity_update(core, &id);
 
@@ -631,30 +631,29 @@ void wish_api_identity_permissions(rpc_server_req* req, const uint8_t* args) {
     }
     
     bson permissions;
-    bson_init(&permissions);
-    
-    int count = 0;
-    
-    bson_iterator sit;
-    bson_iterator_subiterator(&it, &sit);
-    
-    while ( BSON_EOO != bson_iterator_next(&sit) ) {
-        const char* key = bson_iterator_key(&sit);
-        
-        bson_append_element(&permissions, key, &sit);
-        count++;
+    if (id.permissions) {
+        bson_init_with_data(&permissions, id.permissions);
+    } else {
+        bson_init(&permissions);
+        bson_finish(&permissions);
     }
 
-    bson_finish(&permissions);
+    // create the update query object from iterator pointing at update parameter object
+    bson update;
+    bson_init(&update);
+    bson_append_iterator(&update, &it);
+    bson_finish(&update);
     
-    if (count) { id.permissions = bson_data(&permissions); } else { id.permissions = NULL; }
+    // run update on orig
+    bson_update(&permissions, &update);
+
+    id.permissions = bson_data(&permissions);
 
     int ret = wish_identity_update(core, &id);
 
     // set permissions to NULL or the identity_destroy will try to free it
-    id.permissions = 0;
+    id.permissions = NULL;
     
-    bson_destroy(&permissions);
     
     int buf_len = 128;
     uint8_t buf[buf_len];
