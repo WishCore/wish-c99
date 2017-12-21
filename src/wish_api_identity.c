@@ -477,90 +477,29 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
         return;
     }
     
-    bson meta;
-    bson_init(&meta);
-    
-    int count = 0;
-    
-    bson_iterator sit;
-    bson_iterator_subiterator(&it, &sit);
-
     bson orig;
     if (id.meta) {
         bson_init_with_data(&orig, id.meta);
     } else {
-        bson_empty(&orig);
+        bson_init(&orig);
+        bson_finish(&orig);
     }
+
+    // create the update query object from iterator pointing at update parameter object
+    bson update;
+    bson_init(&update);
+    bson_append_iterator(&update, &it);
+    bson_finish(&update);
     
-    bson tmp;
-    bson_copy(&tmp, &orig);
-    
-    while ( BSON_EOO != bson_iterator_next(&sit) ) {
-        const char* key = bson_iterator_key(&sit);
-        if ( strncmp(key, "alias", 6) == 0 ) { continue; }
-        
-        if (id.meta) {
-            bson_iterator i;
-            if (BSON_EOO != bson_find_from_buffer(&i, id.meta, key) ) {
-                if (BSON_NULL == bson_iterator_type(&sit)) {
-                    // This should be deleted...
-                    bson_remove_path(&tmp, key);
-                } else {
-                    // This should be updated...
-                    bson_replace_element(&tmp, key, sit);
-                }
-            }
-        } else {
-            // This should be added...
-            bson_append_element(&meta, key, &sit);
-        }
-        
-        count++;
-    }
+    // run update on orig
+    bson_update(&orig, &update);
 
-    // Check for new keys
-    if (id.meta) {
-        bson_iterator_subiterator(&it, &sit);
-        
-        while ( BSON_EOO != bson_iterator_next(&sit) ) {
-            const char* key = bson_iterator_key(&sit);
-
-            bson_iterator i;
-            bson_iterator_init(&i, &orig);
-
-            bool found = false;
-            
-            while ( BSON_EOO != bson_iterator_next(&i) ) {
-                if ( strcmp(bson_iterator_key(&i), key) == 0 ) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                // this key was not there from before, add it
-                bson_insert_root_element(&tmp, key, sit);
-            }
-        }
-    }
-
-    bson_finish(&meta);
-    
-    if (count) {
-        if (id.meta) {
-            id.meta = bson_data(&tmp);
-        } else {
-            id.meta = bson_data(&meta);
-        }
-    } else {
-        id.meta = NULL;
-    }
+    id.meta = bson_data(&orig);
 
     int ret = wish_identity_update(core, &id);
 
     // set meta to NULL or the identity_destroy will try to free it
     id.meta = NULL;
-    
-    bson_destroy(&meta);
     
     int buf_len = 128;
     uint8_t buf[buf_len];

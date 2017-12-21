@@ -139,6 +139,7 @@ bson *bson_empty(bson *obj) {
     obj->errstr = NULL;
     obj->stackPos = 0;
     obj->flags = 0;
+    obj->dataSize = 0;
     return obj;
 }
 
@@ -924,6 +925,61 @@ int bson_ensure_space(bson *b, const int bytesNeeded) {
 
     new_size = 1.5 * (b->dataSize + bytesNeeded);
 
+    if (new_size < b->dataSize) {
+        if ((b->dataSize + bytesNeeded) < INT_MAX)
+            new_size = INT_MAX;
+        else {
+            b->err = BSON_SIZE_OVERFLOW;
+            return BSON_ERROR;
+        }
+    }
+
+    if (b->flags & BSON_FLAG_STACK_ALLOCATED) { //translate stack memory into heap
+        char *odata = b->data;
+        b->data = bson_malloc_func(new_size);
+        if (!b->data) {
+            bson_fatal_msg(!!b->data, "malloc() failed");
+            return BSON_ERROR;
+        }
+        if (odata) {
+            memcpy(b->data, odata, MIN(new_size, b->dataSize));
+        }
+        b->flags &= ~BSON_FLAG_STACK_ALLOCATED; //reset this flag
+    } else if (b->flags & BSON_FLAG_EXTERNAL_BUFFER) { // given eternal buffer is too small, fail
+        b->err = BSON_SIZE_OVERFLOW;
+        return BSON_ERROR;
+    } else {
+        b->data = bson_realloc(b->data, new_size);
+    }
+    if (!b->data) {
+        bson_fatal_msg(!!b->data, "realloc() failed");
+        return BSON_ERROR;
+    }
+
+    b->dataSize = new_size;
+    b->cur += b->data - orig;
+
+    return BSON_OK;
+}
+
+/**
+ * Grow a bson object.
+ *
+ * @param b the bson to grow.
+ * @param bytesNeeded the total bytes of buffer required
+ *
+ * @return BSON_OK or BSON_ERROR with the bson error object set.
+ *   Exits if allocation fails.
+ */
+static int bson_ensure_buffer_size(bson *b, const int bytesNeeded) {
+    char *orig = b->data;
+    int new_size;
+
+    if (bytesNeeded <= b->dataSize)
+        return BSON_OK;
+
+    new_size = 1.5 * bytesNeeded;
+    
     if (new_size < b->dataSize) {
         if ((b->dataSize + bytesNeeded) < INT_MAX)
             new_size = INT_MAX;
@@ -3396,13 +3452,19 @@ static int bson_copy_with_state(bson* out, const bson* in) {
         return BSON_ERROR;
     }
 
-    if (bson_size(in) > out->dataSize) {
-        if (BSON_OK != bson_ensure_space(out, bson_size(in))) {
-            //WISHDEBUG(LOG_CRITICAL, "bson_insert_string could not copy data to original bson. Buffer too small.");
+    int size = out->dataSize;
+    
+    if ( out->dataSize < bson_size(in) ) {
+        int bytesNeeded = bson_size(in);
+        //printf("additional bytes needed: %i\n", bytesNeeded);
+        if (BSON_OK != bson_ensure_buffer_size(out, bytesNeeded)) {
+            //printf("bson_ensure_space failed.\n");
             out->err = BSON_SIZE_OVERFLOW;
             return BSON_ERROR;
         }
     }
+    
+    //if (size < out->dataSize) { printf("resized (or same) bson copy from %i to %i\n", size, out->dataSize); }
 
     // copy bson data
     memcpy(out->data, in->data, bson_size(in));
@@ -3495,8 +3557,7 @@ void bson_insert_root_element(bson* bs, const char* path, const bson_iterator it
 
     bson_copy_with_state(bs, &tmp);
 
-    //bson_visit("bson_append_into tmp copy when done:", bson_data(&tmp));
-    
+    // FIXME this magically breaks, but should be freed
     bson_destroy(&tmp);
 }
 
@@ -3559,5 +3620,82 @@ void bson_remove_path(bson* bs, const char* path) {
 
     bson_copy_with_state(bs, &tmp);
 
+    bson_destroy(&tmp);
+}
+
+void bson_append_iterator(bson* bs, bson_iterator* from) {
+    assert(from);
+    bson_iterator it;
+    bson_iterator_subiterator(from, &it);
+    bson_type bt;
+    while ((bt = bson_iterator_next(&it)) != BSON_EOO) {
+        bson_append_field_from_iterator(&it, bs);
+    }
+}
+
+
+void bson_update(bson* orig, bson* update) {
+    
+    bson tmp;
+    bson_copy(&tmp, orig);
+
+    //printf("bson_update: orig size: %i, tmp size: %i\n", orig->dataSize, tmp.dataSize);
+
+    bson_iterator sit;
+    bson_iterator_init(&sit, update);
+    
+    int count = 0;
+    
+    while ( BSON_EOO != bson_iterator_next(&sit) ) {
+        const char* key = bson_iterator_key(&sit);
+        if ( strncmp(key, "alias", 6) == 0 ) { continue; }
+        
+        bson_iterator i;
+        if (BSON_EOO != bson_find(&i, update, key) ) {
+            //printf("Checking %s %d\n", key, bson_iterator_type(&sit));
+            if (BSON_NULL == bson_iterator_type(&sit)) {
+                // This should be deleted...
+                bson_remove_path(&tmp, key);
+                //printf("bson_remove_path: orig size: %i, tmp size: %i\n", orig->dataSize, tmp.dataSize);
+            } else {
+                // This should be updated...
+                bson_replace_element(&tmp, key, sit);
+                //printf("bson_replace_element: orig size: %i, tmp size: %i\n", orig->dataSize, tmp.dataSize);
+            }
+        }
+        
+        count++;
+    }
+
+    // Check for new keys
+    bson_iterator_init(&sit, update);
+
+    while ( BSON_EOO != bson_iterator_next(&sit) ) {
+        const char* key = bson_iterator_key(&sit);
+
+        bson_iterator i;
+        bson_iterator_init(&i, orig);
+
+        bool found = false;
+
+        while ( BSON_EOO != bson_iterator_next(&i) ) {
+            if ( strcmp(bson_iterator_key(&i), key) == 0 ) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            // this key was not there from before, add it
+            if (BSON_NULL != bson_iterator_type(&sit)) {
+                bson_insert_root_element(&tmp, key, sit);
+                //printf("bson_insert_root_element: orig size: %i, tmp size: %i\n", orig->dataSize, tmp.dataSize);
+            }
+        }
+    }
+    
+    bson_copy_with_state(orig, &tmp);
+    
+    //printf("bson_update destroying tmp: %p %i, %s\n", tmp.data, tmp.err, tmp.errstr);
+    
     bson_destroy(&tmp);
 }

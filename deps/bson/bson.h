@@ -1400,6 +1400,16 @@ void bson_remove_string(bson* bs, const char* path, const char* string);
 
 void bson_remove_path(bson* bs, const char* path);
 
+/**
+ * Append all elements from iterator
+ * 
+ * @param bs
+ * @param from
+ */
+void bson_append_iterator(bson* bs, bson_iterator* from);
+
+void bson_update(bson* orig, bson* update);
+
 bson_iterator bson_iterator_eoo();
 
 //EJDB_EXTERN_C_END

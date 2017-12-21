@@ -66,12 +66,14 @@ void bson_visit_inner(const uint8_t* data, uint8_t depth) {
                 WISHDEBUG(LOG_CRITICAL, "%s" AC_WHITE_STRING ": [", indent, key);
                 bson_visit_inner(bson_iterator_value(&i), depth + 1);
                 break;
+            case BSON_NULL:
+                WISHDEBUG(LOG_CRITICAL, "%s" AC_WHITE_STRING ": " ANSI_COLOR_RED "null" ANSI_COLOR_RESET, indent, key);
+                break;
             case BSON_TIMESTAMP:
             case BSON_SYMBOL:
             case BSON_OID:
             case BSON_DATE:
             case BSON_UNDEFINED:
-            case BSON_NULL:
             case BSON_REGEX:
             case BSON_CODE:
             case BSON_CODEWSCOPE:

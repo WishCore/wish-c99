@@ -30,6 +30,10 @@ int main(int argc, char** argv) {
 
     bson bi;
     bson_init_size(&bi, 512);
+    bson_append_start_object(&bi, "bones");
+    bson_append_finish_object(&bi);
+    bson_append_start_object(&bi, "fees");
+    bson_append_finish_object(&bi);
     bson_append_start_object(&bi, "acl");
     bson_append_start_object(&bi, "roles");
     bson_append_start_array(&bi, "root");
@@ -58,61 +62,33 @@ int main(int argc, char** argv) {
     bson_append_finish_object(&bi);
     
     bson_append_finish_object(&bi);
+    
+    bson_append_start_object(&bi, "last");
+    bson_append_finish_object(&bi);
     bson_finish(&bi);
 
     bson_visit("Initial state:", bson_data(&bi));
     
-    bson_insert_string(&bi, "acl.roles.user", "uid3");
-    bson_insert_string(&bi, "acl.roles.user", "uid6");
+    bson update;
+    bson_init(&update);
+    bson_append_null(&update, "acl");
+    bson_append_start_object(&update, "fees");
+    bson_append_string(&update, "text", "low");
+    bson_append_double(&update, "number", 0.3);
+    bson_append_finish_object(&update);
+    bson_finish(&update);
     
-    bson b;
-    bson_init(&b);
-    bson_append_start_object(&b, "data");
-    bson_append_start_object(&b, "connectPolicy");
-    bson_append_string(&b, "abdefbda", "always");
-    bson_append_string(&b, "deadbeef", "sometimes");
-    bson_append_finish_object(&b);
-    bson_append_finish_object(&b);
-    bson_finish(&b);
+    bson_visit("update:", bson_data(&update));
     
-    bson_iterator i;
-    bson_iterator_init(&i, &b);
-    bson_find_fieldpath_value("data.connectPolicy", &i); // "connectPolicy");
-    
-    printf("iterator: %i", bson_iterator_type(&i));
+    bson_update(&bi, &update); //, &result);
 
-    bson_insert_element(&bi, "acl.permissions.root", i);
-    bson_insert_element(&bi, "acl.roles.user", i);
+    bson_visit("result:", bson_data(&bi));
     
-    bson_destroy(&b);
-    
-    bson_visit("After insert:", bson_data(&bi));
-    
-    bson_remove_string(&bi, "acl.roles.user", "uid3");
-
-    bson_visit("After remove:", bson_data(&bi));
-    
-    bson_remove_path(&bi, "acl.permissions.root");
-
-    bson_visit("After remove:", bson_data(&bi));
-    
-    bson_remove_path(&bi, "acl.roles.user");
-
-    bson_visit("After remove:", bson_data(&bi));
-    
-    bson_remove_path(&bi, "acl.permissions");
-    bson_remove_string(&bi, "acl.roles.root", "uid1");
-
-    bson_visit("After remove:", bson_data(&bi));
-    
-    bson_remove_path(&bi, "acl.roles");
-
-    bson_visit("After remove:", bson_data(&bi));
+    bson_destroy(&update);
     
     if (bi.err) {
         WISHDEBUG(LOG_CRITICAL, "We got an error while in bson_insert_string. %s", bson_first_errormsg(&bi));
     }
-    
     
     return 0;
 }
