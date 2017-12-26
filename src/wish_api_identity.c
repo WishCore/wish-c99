@@ -637,11 +637,13 @@ void wish_api_identity_permissions(rpc_server_req* req, const uint8_t* args) {
     }
     
     bson permissions;
+    bool permissions_created = false;
     if (id.permissions) {
         bson_init_with_data(&permissions, id.permissions);
     } else {
         bson_init(&permissions);
         bson_finish(&permissions);
+        permissions_created = true;
     }
 
     // create the update query object from iterator pointing at update parameter object
@@ -652,13 +654,17 @@ void wish_api_identity_permissions(rpc_server_req* req, const uint8_t* args) {
     
     // run update on orig
     bson_update(&permissions, &update);
+    bson_destroy(&update);
 
     id.permissions = bson_data(&permissions);
 
     int ret = wish_identity_update(core, &id);
 
-    // set permissions to NULL or the identity_destroy will try to free it
-    id.permissions = NULL;
+    if (permissions_created) {
+        bson_destroy(&permissions);
+        // set permissions to NULL or the identity_destroy will try to free it
+        id.permissions = NULL;
+    }
     
     
     int buf_len = 128;
