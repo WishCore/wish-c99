@@ -478,11 +478,13 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     }
     
     bson meta;
+    bool meta_created = false;
     if (id.meta) {
         bson_init_with_data(&meta, id.meta);
     } else {
         bson_init(&meta);
         bson_finish(&meta);
+        meta_created = true;
     }
 
     // create the update query object from iterator pointing at update parameter object
@@ -493,13 +495,17 @@ void wish_api_identity_update(rpc_server_req* req, const uint8_t* args) {
     
     // run update on orig
     bson_update(&meta, &update);
+    bson_destroy(&update);
 
     id.meta = bson_data(&meta);
-
+    
     int ret = wish_identity_update(core, &id);
 
-    // set meta to NULL or the identity_destroy will try to free it
-    id.meta = NULL;
+    if (meta_created) {
+        bson_destroy(&meta);
+        // set meta to NULL or the identity_destroy will try to free it
+        id.meta = NULL;
+    }
     
     int buf_len = 128;
     uint8_t buf[buf_len];
