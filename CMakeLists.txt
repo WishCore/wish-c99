@@ -2,10 +2,20 @@ project(wish)
 cmake_minimum_required(VERSION 2.8.8)
 
 #set(CMAKE_C_FLAGS "-Wall -std=c99 -Wno-pointer-sign")
-set(CMAKE_C_FLAGS "-Wall -m32 -Wno-pointer-sign -Wno-unused-variable")
-#set(CMAKE_C_FLAGS "-Wall -Wno-pointer-sign -Wno-unused-variable")
-#set(CMAKE_C_FLAGS_RELEASE "-Os -O3")
-#set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
+#set(CMAKE_C_FLAGS "-Wall -m32 -Wno-pointer-sign -Wno-unused-variable")
+set(CMAKE_C_FLAGS "-Wall -Wno-pointer-sign -Wno-unused-variable")
+set(CMAKE_C_FLAGS_RELEASE "-Os -O3")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
+
+set(ARCH "x64")
+
+option(BUILD_IA32 "Build IA32" OFF)
+
+if(BUILD_IA32)
+    message("Should be building for ia32")
+    set(CMAKE_C_FLAGS "-m32 -Wall -Wno-pointer-sign -Wno-unused-variable")
+    set(ARCH "ia32")
+endif(BUILD_IA32)
 
 set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
@@ -18,7 +28,7 @@ execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=4 --dirty --always -
 string(REGEX REPLACE "\n$" "" EXECUTABLE_VERSION_STRING "${EXECUTABLE_VERSION_STRING}")
 string(REGEX REPLACE "\n$" "" WISH_CORE_VERSION_STRING "${WISH_CORE_VERSION_STRING}")
 
-set(EXECUTABLE "wish-core-${EXECUTABLE_VERSION_STRING}-x64-linux")
+set(EXECUTABLE "wish-core") #-${EXECUTABLE_VERSION_STRING}-${ARCH}-linux")
 set(TEST_EXECUTABLE1 "test_bson")
 set(TEST_EXECUTABLE2 "test_bson_update")
 
