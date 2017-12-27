@@ -175,7 +175,7 @@ void wish_close_parallel_connections(wish_core_t *core, void *_connection) {
             if (memcmp(c->ruid, connection->ruid, WISH_ID_LEN) == 0) {
                 if (memcmp(c->rhid, connection->rhid, WISH_WHID_LEN) == 0) {
                     if (c->context_state == WISH_CONTEXT_CONNECTED) {
-                        wish_close_connection(core, connection);
+                        wish_close_connection(core, c);
                     }
                }
            }
