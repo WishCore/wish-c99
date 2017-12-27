@@ -2,7 +2,8 @@ project(wish)
 cmake_minimum_required(VERSION 2.8.8)
 
 #set(CMAKE_C_FLAGS "-Wall -std=c99 -Wno-pointer-sign")
-set(CMAKE_C_FLAGS "-Wall -Wno-pointer-sign -Wno-unused-variable")
+set(CMAKE_C_FLAGS "-Wall -m32 -Wno-pointer-sign -Wno-unused-variable")
+#set(CMAKE_C_FLAGS "-Wall -Wno-pointer-sign -Wno-unused-variable")
 #set(CMAKE_C_FLAGS_RELEASE "-Os -O3")
 #set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
 
