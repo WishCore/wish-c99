@@ -111,15 +111,21 @@ void wish_core_create_handshake_msg(wish_core_t* core, wish_connection_t* conn, 
     bson_append_start_array(&bs, "transports");
     
     
-    // FIXME wish_get_host_ip_str cannot report failure, so we cannot test
-    wish_get_host_ip_str(core, host_part, WISH_MAX_TRANSPORT_LEN);
-    wish_platform_sprintf(transport_url, "wish://%s:%d", host_part, wish_get_host_port(core));
+    int i = 0;
     
-    bson_append_string(&bs, "0", transport_url);
-
+#if 0 //Putting local IP addr in handshake is disabled.
+    if (wish_get_host_ip_str(core, host_part, WISH_MAX_TRANSPORT_LEN)) {
+        WISHDEBUG(LOG_CRITICAL, "Could not get local IP addr."); 
+    }
+    else {
+        /* IP addr of the local interface */
+        wish_platform_sprintf(transport_url, "wish://%s:%d", host_part, wish_get_host_port(core));
+        bson_append_string(&bs, "0", transport_url);
+        i++;
+    }
+#endif
+    
     wish_relay_client_t* relay = NULL;
-    
-    int i = 1;
     
     LL_FOREACH(core->relay_db, relay) {
         char index[21];
