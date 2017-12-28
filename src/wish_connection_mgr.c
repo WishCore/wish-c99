@@ -30,51 +30,54 @@ void wish_connections_check(wish_core_t* core) {
     for (j = 0; j < num_uids; j++) {
         if (i == j) { continue; }
         if( wish_core_is_connected_luid_ruid(core, uid_list[0].uid, uid_list[j].uid) ) { continue; }
-
-        size_t id_bson_doc_max_len = sizeof (wish_identity_t) + 100;
-        uint8_t id_bson_doc[id_bson_doc_max_len];
-        int ret = wish_load_identity_bson(uid_list[j].uid, id_bson_doc, id_bson_doc_max_len);
-        if (ret != 1) {
+        
+        wish_identity_t id;
+        if (wish_identity_load(uid_list[j].uid, &id) != RET_SUCCESS) {
             WISHDEBUG(LOG_CRITICAL, "Failed loading identity");
+            wish_identity_destroy(&id);
             return;
         }
         
-        //bson_visit("wish_connections_check -- id_bson_doc", id_bson_doc);
-
-        bson_iterator it;
-        bson_type bt;
-
-        bson_iterator_from_buffer(&it, id_bson_doc);
-        bt = bson_find_fieldpath_value("transports.0", &it);        
+        /* Check if we should connect, meta: { connect: false } */
         
-        //WISHDEBUG(LOG_CRITICAL, "transports type: %d", bson_iterator_type(&it));
-        
-        if (bson_iterator_type(&it) != BSON_STRING) {
+        if (wish_identity_get_meta_connect(&id) == false) {
+            WISHDEBUG(LOG_CRITICAL, "check connections: will not connect, %s flagged as 'do not connect'", id.alias);
+            wish_identity_destroy(&id);
             continue;
-        }        
-
-        do {
-            int url_len = bson_iterator_string_len(&it);
-            char* url = (char *) bson_iterator_string(&it);
-            //WISHDEBUG(LOG_CRITICAL, "  Should connect %02x %02x > %02x %02x to %s", uid_list[0].uid[0], uid_list[0].uid[1], uid_list[j].uid[0], uid_list[j].uid[1], url);
+        }
+        
+        /* Check if we should connect, permissions: { banned: true } */
+        if (wish_identity_is_banned(&id) == true) {
+            WISHDEBUG(LOG_CRITICAL, "check connections, will not connect, %s is flagged as 'banned'", id.alias);
+            wish_identity_destroy(&id);
+            continue;
+        }
+         
+        for (int cnt = 0; cnt < WISH_MAX_TRANSPORTS; cnt++) {
+            int url_len = strnlen(id.transports[cnt], WISH_MAX_TRANSPORT_LEN);
+            if (url_len > 0) {
+                char* url = id.transports[cnt];
+                //WISHDEBUG(LOG_CRITICAL, "  Should connect %02x %02x > %02x %02x to %s", uid_list[0].uid[0], uid_list[0].uid[1], uid_list[j].uid[0], uid_list[j].uid[1], url);
             
-            wish_ip_addr_t ip;
-            uint16_t port;
-            ret = wish_parse_transport_port(url, url_len, &port);
-            if (ret) {
-                WISHDEBUG(LOG_CRITICAL, "Could not parse transport port");
-            }
-            else {
-                ret = wish_parse_transport_ip(url, url_len, &ip);
+                wish_ip_addr_t ip;
+                uint16_t port;
+                int ret = wish_parse_transport_port(url, url_len, &port);
                 if (ret) {
-                    WISHDEBUG(LOG_CRITICAL, "Could not parse transport ip");
+                    WISHDEBUG(LOG_CRITICAL, "Could not parse transport port");
                 }
                 else {
-                    /* Parsing of IP and port OK: go ahead with connecting */
-                    wish_connections_connect_tcp(core, uid_list[0].uid, uid_list[j].uid, &ip, port);
+                    ret = wish_parse_transport_ip(url, url_len, &ip);
+                    if (ret) {
+                        WISHDEBUG(LOG_CRITICAL, "Could not parse transport ip");
+                    }
+                    else {
+                        /* Parsing of IP and port OK: go ahead with connecting */
+                        wish_connections_connect_tcp(core, uid_list[0].uid, uid_list[j].uid, &ip, port);
+                    }
                 }
             }
-        } while ((bt = bson_iterator_next(&it)) != BSON_EOO);
+        }
+        wish_identity_destroy(&id);
     }
 }
 

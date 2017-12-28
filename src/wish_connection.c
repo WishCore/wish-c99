@@ -945,9 +945,21 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 connection->context_state = WISH_CONTEXT_CONNECTED;
             }
             else {
+                /* if we discover that we are banned, don't announce the connection, but instead just close it. */
+                bson_iterator it;
+                if (bson_find_from_buffer(&it, plaintxt, "banned") == BSON_BOOL) {
+                    if (bson_iterator_bool(&it)) {
+                        WISHDEBUG(LOG_CRITICAL, "Note: We are banned from the remote host (outgoing connection)");
+                        wish_identity_add_meta_connect(core, connection->ruid, false);
+                        wish_close_connection(core, connection);
+                        break;
+                    }
+                }
+                
                 struct wish_event evt = { .event_type =
                     WISH_EVENT_NEW_CORE_CONNECTION, .context = connection };
                 wish_message_processor_notify(&evt);
+                
             }
 
        }
@@ -1112,7 +1124,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             const int max_handshake_len = 500;
             uint8_t handshake_msg[max_handshake_len];
 
-            wish_core_create_handshake_msg(core, handshake_msg, max_handshake_len);
+            wish_core_create_handshake_msg(core, connection, handshake_msg, max_handshake_len);
 
             bson bs;
             bson_init_with_data(&bs, handshake_msg);
@@ -1216,18 +1228,26 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
                 wish_identity_destroy(&id);
             }
             
-            /* Finished processing the handshake */
-            wish_platform_free(plaintxt);
-
-            /* Start pinging process */
-
-            connection->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
-            if (connection->friend_req_connection == false) {
-                struct wish_event evt = { 
-                    .event_type = WISH_EVENT_NEW_CORE_CONNECTION,
-                    .context = connection };
-                wish_message_processor_notify(&evt);
+            if (bson_find_from_buffer(&it, plaintxt, "banned") == BSON_BOOL) {
+                WISHDEBUG(LOG_CRITICAL, "Note: We are banned from the remote host (incoming connection)");
+                /* update the contact meta with { connect: false } and close the connection. 
+                 * Note that this should not normally happen, because the remote host that has us banned should not contact us in the first place! */
+                wish_identity_add_meta_connect(core, connection->ruid, false);        
+                wish_close_connection(core, connection);
             }
+            else {
+                connection->curr_protocol_state = PROTO_STATE_WISH_RUNNING;
+                if (connection->friend_req_connection == false) {
+                    struct wish_event evt = { 
+                        .event_type = WISH_EVENT_NEW_CORE_CONNECTION,
+                        .context = connection };
+                    wish_message_processor_notify(&evt);
+                    /* Remove "connect: false" from meta if it exists, we have now been again contacted by the remote! */
+                    wish_identity_remove_meta_connect(core, connection->ruid); 
+                }
+            }
+            /* Finished processing the handshake */
+            wish_platform_free(plaintxt);         
         }
         break;
     case PROTO_STATE_INITIAL:

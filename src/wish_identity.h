@@ -219,3 +219,32 @@ bson_iterator wish_identity_meta(wish_identity_t* identity, const char* permissi
  */
 bson_iterator wish_identity_permissions(wish_identity_t* identity, const char* permission);
 
+/**
+ * Returns true, if the identity is banned from connecting, ie. it has permissions: { banned: true }
+ * If property does not exist, then return false ("not banned").
+ * 
+ * @param identity
+ * @return true, if explicitly banned, else false
+ */
+bool wish_identity_is_banned(wish_identity_t *identity);
+
+/**
+ * Returns false, if the identity should not be contacted, ie. it has meta: { connect: false }
+ * If property does not exist, then return true ("can be connected to").
+ * @param identity
+ * @return false if we have flagged the identity as "do not connect".
+ */
+bool wish_identity_get_meta_connect(wish_identity_t *identity);
+
+/**
+ * Add property connect: <status> to identity.meta
+ * @param id
+ * @param status
+ */
+void wish_identity_add_meta_connect(wish_core_t *core, uint8_t *uid, bool status);
+
+/**
+ * Remote property connect: <bool>
+ * @param id
+ */
+void wish_identity_remove_meta_connect(wish_core_t *core, uint8_t *uid);

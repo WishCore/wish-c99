@@ -62,7 +62,7 @@ void wish_ldiscover_feed(wish_core_t* core, wish_ip_addr_t *ip, uint16_t port, u
 size_t buffer_len) {
     /* First, try to detect the magic bytes 'W' and '.' in the beginning
      * of the message */
-
+   
     if (buffer_len < 3) {
         WISHDEBUG(LOG_DEBUG, "Malformed ldiscover message (too short)");
         return;
@@ -258,7 +258,7 @@ size_t buffer_len) {
         // we do not have any identities, and cannot therefore connect
         return;
     }
-
+    
     wish_connection_t *existing_conn_ctx = wish_core_lookup_ctx_by_luid_ruid_rhid(core, uid_list[0].uid, ruid, rhid);
     if (existing_conn_ctx != NULL) {
         if (existing_conn_ctx->context_state == WISH_CONTEXT_CONNECTED) {
@@ -288,8 +288,32 @@ size_t buffer_len) {
         WISHDEBUG(LOG_CRITICAL, "wld: error obtaining local host id");
     }
     
-    /* Create new wish context with the ids */
-
+    
+    /* Check if we should connect or not. (meta: { connect: false }), or permissions: { banned:true } */
+   
+    wish_identity_t id;
+    if (wish_identity_load(ruid, &id) != RET_SUCCESS) {
+        WISHDEBUG(LOG_CRITICAL, "While checking meta.connect: Could not load identity");    
+        wish_identity_destroy(&id);
+        return;
+    }
+    else {
+        if (wish_identity_get_meta_connect(&id) == false) {
+            WISHDEBUG(LOG_CRITICAL, "Will not connect over wld, because %s is flagged as 'do not connect'", id.alias);
+            return;
+        }
+        
+        
+        if (wish_identity_is_banned(&id) == true) {
+            WISHDEBUG(LOG_CRITICAL, "Will not connect over wld, the %s is flagged as 'banned'", id.alias);
+            return;
+        }
+        WISHDEBUG(LOG_DEBUG, "Will  connect over wld  %s", id.alias);
+        wish_identity_destroy(&id);
+    }
+    
+    
+    /* Start connecting: Create new wish context with the ids */
     /* FIXME currently always using first uid of list */
     uint8_t *my_uid = uid_list[0].uid;
     wish_connection_t *connection = wish_connection_init(core, my_uid, ruid);

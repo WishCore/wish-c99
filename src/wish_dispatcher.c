@@ -97,7 +97,7 @@ size_t wish_core_create_hostid(wish_core_t* core, char* hostid, char* sys_id_str
     return WISH_WHID_LEN;
 }
 
-void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t buffer_len) {
+void wish_core_create_handshake_msg(wish_core_t* core, wish_connection_t* conn, uint8_t *buffer, size_t buffer_len) {
     
     uint8_t host_id[WISH_WHID_LEN] = { 0 };
     char host_part[WISH_MAX_TRANSPORT_LEN];
@@ -132,8 +132,28 @@ void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t b
         
         bson_append_string(&bs, index, host);
     }
-    
+      
     bson_append_finish_array(&bs);
+    
+    if (conn->friend_req_connection == false) {
+        /* Check if conn->ruid has permissions: { banned:true } */
+        wish_identity_t id;
+
+        if (wish_identity_load(conn->ruid, &id) != RET_SUCCESS) {
+            WISHDEBUG(LOG_CRITICAL, "While checking permissions: Could not load ruid identity");       
+        }
+        else {
+           
+            bool banned = wish_identity_is_banned(&id);
+            //WISHDEBUG(LOG_CRITICAL, "Adding: banned %i", banned);
+            
+            if (banned) {
+                bson_append_bool(&bs, "banned", banned);
+            }
+        }
+        wish_identity_destroy(&id);
+    }
+    
     bson_finish(&bs);
 }
 
@@ -166,12 +186,12 @@ void wish_core_process_handshake(wish_core_t* core, wish_connection_t* ctx, uint
     }
     
     memcpy(ctx->rhid, host_id, WISH_WHID_LEN);
-
+        
     /* Now create our own "wish handshake message" */
     const int max_handshake_len = 500;
     uint8_t handshake_msg[max_handshake_len];
     
-    wish_core_create_handshake_msg(core, handshake_msg, max_handshake_len);
+    wish_core_create_handshake_msg(core, ctx, handshake_msg, max_handshake_len);
     
     bson bs;
     bson_init_with_data(&bs, handshake_msg);

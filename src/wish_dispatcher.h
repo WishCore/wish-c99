@@ -8,7 +8,7 @@
 /* Submit a handshake message (extracted from the wire) to the Wish core */
 void wish_core_process_handshake(wish_core_t* core, wish_connection_t* ctx, uint8_t* bson_doc);
 
-void wish_core_create_handshake_msg(wish_core_t* core, uint8_t *buffer, size_t buffer_len);
+void wish_core_create_handshake_msg(wish_core_t* core, wish_connection_t* conn, uint8_t *buffer, size_t buffer_len);
 
 /* Submit an actual Wish service message */
 void wish_core_process_message(wish_core_t* core, wish_connection_t* ctx, uint8_t* bson_doc);
@@ -34,3 +34,4 @@ size_t wish_core_create_hostid(wish_core_t* core, char* hostid, char* sys_id_str
 
 size_t wish_core_get_host_id(wish_core_t* core, uint8_t *hostid_ptr);
 
+void check_meta_connect(wish_core_t *core, void *c);
