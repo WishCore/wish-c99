@@ -157,7 +157,7 @@ wish_core_lookup_connected_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_
     wish_connection_t *connection = NULL;
     int i = 0;
 
-    wish_time_t latest_input = WISH_TIME_T_MAX;
+    wish_time_t latest_input = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
         if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) {
             /* If the wish context is not in use, we can safely skip it */
@@ -170,7 +170,7 @@ wish_core_lookup_connected_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_
                     == 0) {
                 if (memcmp(core->connection_pool[i].rhid, rhid, 
                         WISH_WHID_LEN) == 0) {
-                    if (core->connection_pool[i].context_state == WISH_CONTEXT_CONNECTED && core->connection_pool[i].latest_input_timestamp < latest_input) {
+                    if (core->connection_pool[i].context_state == WISH_CONTEXT_CONNECTED && core->connection_pool[i].latest_input_timestamp >= latest_input) {
                         connection = &(core->connection_pool[i]);
                         latest_input = core->connection_pool[i].latest_input_timestamp;
                     }
