@@ -89,6 +89,7 @@ int wish_save_identity_entry(wish_identity_t* identity) {
     if (bs.data == NULL) { bson_destroy(&bs); return -3; }
     
     int ret = wish_save_identity_entry_bson(bson_data(&bs));
+    bson_destroy(&bs);
     
     if (ret == 0) {
         return -2;

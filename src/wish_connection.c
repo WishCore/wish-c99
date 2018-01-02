@@ -594,6 +594,12 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
             }
         }
         
+        if (connection->friend_req_connection) {
+            if (connection->friend_req_meta) {
+                wish_platform_free(connection->friend_req_meta);
+            }
+        }
+        
         /* Delete any outstanding RPC request contexts */
         wish_cleanup_core_rpc_server(core, connection);
 

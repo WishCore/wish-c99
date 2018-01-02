@@ -177,6 +177,10 @@ size_t buffer_len) {
         if (core->ldiscovery_db[i].occupied && core->ldiscovery_db[i].type == DISCOVER_TYPE_LOCAL && current_time - core->ldiscovery_db[i].timestamp > 30) {
             core->ldiscovery_db[i].occupied = false;
             //WISHDEBUG(LOG_CRITICAL, "LocalDiscovery dropped timed out entry.");
+            if (core->ldiscovery_db[i].class) { wish_platform_free(core->ldiscovery_db[i].class); }
+            core->ldiscovery_db[i].class = NULL;
+            if (core->ldiscovery_db[i].meta) { wish_platform_free(core->ldiscovery_db[i].meta); }
+            core->ldiscovery_db[i].meta = NULL;
             
             wish_core_signals_emit_string(core, "localDiscovery");
             continue;
@@ -300,12 +304,14 @@ size_t buffer_len) {
     else {
         if (wish_identity_get_meta_connect(&id) == false) {
             WISHDEBUG(LOG_CRITICAL, "Will not connect over wld, because %s is flagged as 'do not connect'", id.alias);
+            wish_identity_destroy(&id);
             return;
         }
         
         
         if (wish_identity_is_banned(&id) == true) {
             WISHDEBUG(LOG_CRITICAL, "Will not connect over wld, the %s is flagged as 'banned'", id.alias);
+            wish_identity_destroy(&id);
             return;
         }
         WISHDEBUG(LOG_DEBUG, "Will  connect over wld  %s", id.alias);
@@ -396,7 +402,10 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t* uid) {
     }
 
     // Local discovery will not advertise if we don't have a private key
-    if (!id.has_privkey) { return; }
+    if (!id.has_privkey) { 
+        wish_identity_destroy(&id);
+        return; 
+    }
 
     const size_t msg_len = 2 + 2*(20 + WISH_ID_LEN) + 20 + WISH_PUBKEY_LEN + 10 + WISH_MAX_TRANSPORT_LEN + WISH_ALIAS_LEN;
     uint8_t msg[msg_len];
@@ -423,6 +432,7 @@ void wish_ldiscover_advertize(wish_core_t* core, uint8_t* uid) {
 
     if (wish_load_pubkey(uid, pubkey)) {
         bson_visit("failed to load pubkey for uid", bson_data(&bs));
+        wish_identity_destroy(&id);
         return;
     }
 
@@ -467,7 +477,14 @@ void wish_ldiscover_add(wish_core_t* core, wish_ldiscover_t* entry) {
 void wish_ldiscover_clear(wish_core_t* core) {
     int i;
     for(i=0; i<WISH_LOCAL_DISCOVERY_MAX; i++) {
-        if (core->ldiscovery_db[i].meta) { wish_platform_free(core->ldiscovery_db[i].meta); }
+        if (core->ldiscovery_db[i].meta) { 
+            wish_platform_free(core->ldiscovery_db[i].meta); 
+            core->ldiscovery_db[i].meta = NULL;
+        }
+        if (core->ldiscovery_db[i].class) {
+            wish_platform_free(core->ldiscovery_db[i].class);
+            core->ldiscovery_db[i].class = NULL;
+        }
         
         core->ldiscovery_db[i].occupied = false;
     }

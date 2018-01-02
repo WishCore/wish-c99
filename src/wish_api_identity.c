@@ -251,11 +251,13 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
     
     if (bson_find_fieldpath_value("0", &it) != BSON_BINDATA) {
         rpc_server_error_msg(req, 308, "Argument 1 must be Buffer");
+        bson_destroy(&bs);
         return;
     }
     
     if (bson_iterator_bin_len(&it) != WISH_UID_LEN) {
         rpc_server_error_msg(req, 308, "Argument 1 must be Buffer(32)");
+        bson_destroy(&bs);
         return;
     }
     
@@ -267,6 +269,7 @@ void wish_api_identity_get(rpc_server_req* req, const uint8_t* args) {
         WISHDEBUG(LOG_CRITICAL, "Could not load identity");
         rpc_server_error_msg(req, 997, "Could not load identity");
         wish_identity_destroy(&identity);
+        bson_destroy(&bs);
         return;
     }
 
