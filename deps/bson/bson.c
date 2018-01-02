@@ -3231,7 +3231,7 @@ static bson_visitor_cmd_t _bson_append_into_visitor(
         bson_append_field_from_iterator(it, ctx->bsout);
         ctx->lastkey = BSON_ITERATOR_KEY(it);
         char* endptr;
-#ifdef COMPILING_FOR_ESP8266
+#ifdef WITHOUT_STRTOIMAX
         ctx->lastindex = strtol(ctx->lastkey, &endptr,10);
 #else
         ctx->lastindex = strtoimax(ctx->lastkey, &endptr,10);
