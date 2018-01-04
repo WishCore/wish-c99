@@ -1289,7 +1289,7 @@ static return_t wish_ldiscover_entry_from_bson(const char* signed_meta, wish_ldi
     if (bson_iterator_bin_len(&it) != WISH_PUBKEY_LEN) { return RET_E_INVALID_INPUT; }
     memcpy(out->pubkey, bson_iterator_bin_data(&it), WISH_PUBKEY_LEN);
     
-    bson_iterator_init(&it, &data);
+    bson_iterator_init(&it, &meta);
     bson_find_fieldpath_value("transports.0", &it);
     if (bson_iterator_type(&it) != BSON_STRING) { return RET_E_INVALID_INPUT; }
     wish_parse_transport_ip_port(bson_iterator_string(&it), bson_iterator_string_len(&it), &out->transport_ip, &out->transport_port);
