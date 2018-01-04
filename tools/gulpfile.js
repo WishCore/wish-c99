@@ -59,7 +59,7 @@ gulp.task('tar-gz', function () {
             .pipe(gulp.dest('../build'));
 });
 
-gulp.task('default', sequence(['clean'], ['wish-all'], ['wish-src'], ['wish-deps'], ['wish-rpc-src'], ['tar-gz']));
+gulp.task('default', sequence(['clean'], ['wish-all'], ['wish-src'], ['wish-port'], ['wish-deps'], ['wish-rpc-src'], ['tar-gz']));
     
 gulp.task('clean', function () {
     return gulp.src('../build/source')
