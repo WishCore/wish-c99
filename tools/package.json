@@ -1,0 +1,21 @@
+{
+  "name": "wish-release-source",
+  "version": "1.0.0",
+  "description": "Gulp based build tool for releasing Wish sources",
+  "main": "gulpfile.js",
+  "dependencies": {
+    "git-describe": "^4.0.2",
+    "gulp": "^3.9.1",
+    "gulp-clean": "^0.3.2",
+    "gulp-gzip": "^1.4.1",
+    "gulp-header": "^1.8.9",
+    "gulp-sequence": "^1.0.0",
+    "gulp-tar": "^2.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "André Kaustell <andre.kaustell@controlthings.fi>",
+  "license": "ISC"
+}
