@@ -318,6 +318,9 @@ size_t buffer_len) {
         wish_identity_destroy(&id);
     }
     
+    if (memcmp(rhid, local_hostid, WISH_ID_LEN) > 0) { /* If we have the bigger rhid, then we we should not connect. */
+        return;
+    }
     
     /* Start connecting: Create new wish context with the ids */
     /* FIXME currently always using first uid of list */
