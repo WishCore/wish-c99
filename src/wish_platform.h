@@ -52,3 +52,16 @@ void wish_platform_set_vprintf(int (*fn)(const char* format, va_list args));
 
 int wish_platform_printf(const char* format, ...);
 
+/**
+ * Duplicate string. 
+ *
+ * Allocates memory from the heap for the duplicate, and copies the
+ * string there. The copy must be de-allocated with wish_platform_free
+ * after you are done with it.
+ * 
+ * This is needed to wrap the C library function strdup, which is unavailable on some platforms.
+ *
+ * @param str pointer to the string to be duplicated
+ * @return the duplicate string, or NULL if fail
+ */
+char* wish_platform_strdup(const char* str);

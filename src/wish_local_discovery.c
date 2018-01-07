@@ -224,7 +224,7 @@ size_t buffer_len) {
         memcpy(&core->ldiscovery_db[free].rhid, rhid, WISH_ID_LEN);
         memcpy(&core->ldiscovery_db[free].pubkey, pubkey_ptr, WISH_PUBKEY_LEN);
         strncpy((char*) &core->ldiscovery_db[free].alias, alias, WISH_ALIAS_LEN);
-        core->ldiscovery_db[free].class = (meta_product != NULL ? strdup(meta_product) : NULL);
+        core->ldiscovery_db[free].class = (meta_product != NULL ? wish_platform_strdup(meta_product) : NULL);
         core->ldiscovery_db[free].claim = claim;
         /* FIXME ip address length here is hardcoded and assumed to be
          * IPv4 */

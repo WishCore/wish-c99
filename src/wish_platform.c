@@ -94,4 +94,18 @@ int wish_platform_printf(const char* format, ...) {
     return retval;
 }
 
-
+char* wish_platform_strdup(const char* str) {
+#ifdef WITHOUT_STRDUP
+    /* Length of the string, plus null byte */
+    int len = strlen(str) + 1;
+    char* copy = (char*) wish_platform_malloc(len);
+    if (copy) {
+        // FIXME This does not ensure null termination! Write null efter string copied.
+        memset(copy, 0, len);
+        memcpy(copy, str, len);
+    }
+    return copy;
+#else
+    return strdup(str);
+#endif
+}
