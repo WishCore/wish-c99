@@ -248,8 +248,15 @@ void wish_core_process_message(wish_core_t* core, wish_connection_t* ctx, uint8_
 
 /* Route an incoming message (from app) */
 void wish_core_handle_app_to_core(wish_core_t* core, const uint8_t src_wsid[WISH_ID_LEN], const uint8_t* data, size_t len) {
-    //WISHDEBUG(LOG_CRITICAL, "Incoming message from app to core len %d", len);
-    //bson_visit("Incoming message from app to core", data);
+#if 0
+    // This is used for debugging
+    wish_app_entry_t* app = wish_service_get_entry(core, src_wsid);
+    if (app) { WISHDEBUG(LOG_CRITICAL, "Incoming message from app %s to core len %d", app->name, len); }
+    
+    WISHDEBUG(LOG_CRITICAL, "Incoming message from app to core len %d", len);
+    bson_visit("Incoming message from app to core", data);
+#endif    
+    
 
     /* Determine if it is login or what */
     const uint8_t *recovered_wsid = NULL;

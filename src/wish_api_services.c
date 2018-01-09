@@ -192,7 +192,14 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
             rpc_server_send(req, NULL, 0);
         }
     } else {
-        WISHDEBUG(LOG_CRITICAL, "Could not find a suitable wish connection to send data.");
+        //WISHDEBUG(LOG_CRITICAL, "Could not find a suitable wish connection to send data.");
+        //WISHDEBUG(LOG_CRITICAL, "    luid: %02x %02x %02x %02x ...", luid[0], luid[1], luid[2], luid[3]);
+        //WISHDEBUG(LOG_CRITICAL, "    ruid: %02x %02x %02x %02x ...", ruid[0], ruid[1], ruid[2], ruid[3]);
+        //WISHDEBUG(LOG_CRITICAL, "    rhid: %02x %02x %02x %02x ...", rhid[0], rhid[1], rhid[2], rhid[3]);
+        //WISHDEBUG(LOG_CRITICAL, "    rsid: %02x %02x %02x %02x ...", rsid[0], rsid[1], rsid[2], rsid[3]);
+        //WISHDEBUG(LOG_CRITICAL, "    protocol: %s", protocol);
+        //bson_visit("Sending this failed in wish-core (may fail if payload not bson):", payload);
+        rpc_server_error_msg(req, 311, "No connection.");
     }
 }
 

@@ -245,6 +245,9 @@ void wish_core_app_rpc_handle_req(wish_core_t* core, const uint8_t src_wsid[WISH
     bson bs;
     bson_init_with_data(&bs, data);
     
+    //WISHDEBUG(LOG_CRITICAL, "wish_core_from_app: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12], data[13], data[14]);
+    //bson_visit("wish_core_from_app:", data);
+    
     rpc_server_receive(core->app_api, NULL, app, &bs);
 }
 

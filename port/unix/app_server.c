@@ -199,6 +199,10 @@ again:
             ring_buffer_read(&app_rx_ring_bufs[i], len_bytes, 2);
             uint16_t expect_len = len_bytes[0] << 8 | len_bytes[1];
             app_transport_expect_bytes[i] = expect_len;
+            
+            // skip frame payload if len is 0
+            if (expect_len == 0) { goto again; }
+            
             app_transport_states[i] = APP_TRANSPORT_WAIT_PAYLOAD;
             
             if (expect_len>APP_RX_RB_SZ) {
@@ -233,6 +237,15 @@ again:
                 } else {
                     bson_visit("Bad login message!", payload);
                 }
+            }
+            
+            bson bs;
+            bson_init_with_data(&bs, payload);
+            
+            if ( bson_size(&bs) != expect_len ) {
+                WISHDEBUG(LOG_CRITICAL, "Payload size mismatch, %i while expecting %i", bson_size(&bs), expect_len);
+                app_transport_states[i] = APP_TRANSPORT_CLOSING;
+                break;
             }
 
             receive_app_to_core(core, apps[i].wsid, payload, expect_len);
