@@ -170,7 +170,7 @@ wish_core_lookup_connected_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_
                     == 0) {
                 if (memcmp(core->connection_pool[i].rhid, rhid, 
                         WISH_WHID_LEN) == 0) {
-                    if (core->connection_pool[i].context_state == WISH_CONTEXT_CONNECTED && core->connection_pool[i].latest_input_timestamp >= latest_input) {
+                    if (core->connection_pool[i].context_state == WISH_CONTEXT_CONNECTED && core->connection_pool[i].latest_input_timestamp >= latest_input && !core->connection_pool[i].friend_req_connection) {
                         connection = &(core->connection_pool[i]);
                         latest_input = core->connection_pool[i].latest_input_timestamp;
                     }
@@ -188,6 +188,11 @@ bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t 
         if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) {
             /* If the wish context is not in use, we can safely skip it */
             //WISHDEBUG(LOG_CRITICAL, "Skipping free wish context");
+            continue;
+        }
+        
+        if (core->connection_pool[i].friend_req_connection) {
+            /* A friend request connection does not count as being a connection actually */
             continue;
         }
 
