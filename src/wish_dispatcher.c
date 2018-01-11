@@ -97,6 +97,42 @@ size_t wish_core_create_hostid(wish_core_t* core, char* hostid, char* sys_id_str
     return WISH_WHID_LEN;
 }
 
+void wish_core_update_transports_from_handshake(wish_core_t *core, wish_connection_t *connection, uint8_t *handshake_msg) {
+    /* Update transports if we have a normal connection */
+    
+    wish_identity_t id;
+    bson_iterator it;
+    
+    if ( wish_identity_load(connection->ruid, &id) == RET_SUCCESS ) {
+        bool found_transports = false;
+        /* Clear existing transports, and replace them with transports provided by remote party */
+        /* FIXME append to transport list - instead of overwriting - the old transports should be deprecated later when we discover that they are no longer valid */
+        memset(id.transports, 0, WISH_MAX_TRANSPORTS*WISH_MAX_TRANSPORT_LEN);
+        for (int i = 0; i < WISH_MAX_TRANSPORTS; i++) {
+            const size_t path_max_len = 16;
+            char path[path_max_len];
+            wish_platform_snprintf(path, path_max_len, "transports.%d", i);
+            bson_iterator_from_buffer(&it, handshake_msg);
+            if (bson_find_fieldpath_value(path, &it) == BSON_STRING) {
+                strncpy(&id.transports[i][0], bson_iterator_string(&it), WISH_MAX_TRANSPORT_LEN);
+                found_transports = true;
+            }
+        }
+
+        if (!found_transports) {
+            WISHDEBUG(LOG_CRITICAL, "No transports were reported by remote!");
+        }
+        else {
+            /* Save the remote identity updated with transports */
+            wish_identity_update(core, &id);
+        }
+    }
+    else {
+        WISHDEBUG(LOG_CRITICAL, "Error loading identity when about to update transports!");
+    }
+    wish_identity_destroy(&id);
+}
+
 void wish_core_create_handshake_msg(wish_core_t* core, wish_connection_t* conn, uint8_t *buffer, size_t buffer_len) {
     
     uint8_t host_id[WISH_WHID_LEN] = { 0 };
@@ -192,6 +228,10 @@ void wish_core_process_handshake(wish_core_t* core, wish_connection_t* ctx, uint
     }
     
     memcpy(ctx->rhid, host_id, WISH_WHID_LEN);
+    
+    if (ctx->friend_req_connection == false) {
+        wish_core_update_transports_from_handshake(core, ctx, handshake);
+    }
         
     /* Now create our own "wish handshake message" */
     const int max_handshake_len = 500;
