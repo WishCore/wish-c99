@@ -41,7 +41,7 @@ void wish_api_connections_list(rpc_server_req* req, const uint8_t* args) {
             bson_append_binary(&bs, "rhid", db[i].rhid, WISH_ID_LEN);
             //bson_append_bool(&bs, "online", true);
             bson_append_bool(&bs, "outgoing", db[i].outgoing);
-            //bson_append_bool(&bs, "relay", db[i].via_relay);
+            bson_append_bool(&bs, "relay", db[i].via_relay);
             //bson_append_bool(&bs, "authenticated", true);
             /*
             bson_append_start_object(&bs, "transport");
