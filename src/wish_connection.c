@@ -108,6 +108,8 @@ wish_connection_t* wish_connection_is_from_pool(wish_core_t *core, wish_connecti
  * Please note: The context returned here could a countext which is not
  * yet ready for use, because it is e.g. just being created.
  * 
+ * @note This function ignores friend request connections.
+ * 
  */
 wish_connection_t* 
 wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid) {
@@ -126,9 +128,10 @@ wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, c
                     == 0) {
                 if (memcmp(core->connection_pool[i].rhid, rhid, 
                         WISH_WHID_LEN) == 0) {
-
-                    connection = &(core->connection_pool[i]);
-                    break;
+                    if (!core->connection_pool[i].friend_req_connection) {
+                        connection = &(core->connection_pool[i]);
+                        break;
+                    }
                 }
                 else {
                     WISHDEBUG(LOG_DEBUG, "rhid mismatch");
