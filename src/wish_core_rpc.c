@@ -687,7 +687,7 @@ static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
     
     wish_core_t* core = req->server->context;
     
-    connection = wish_connection_exists(core, req->ctx);
+    connection = wish_connection_is_from_pool(core, req->ctx); //Verify that the connection pointer is actually valid, ie. is a connection from the core's pool
     
     if (connection == NULL) {
         WISHDEBUG(LOG_CRITICAL, "wish_core_connection_send: The connection is null, bailing.");

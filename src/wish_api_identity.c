@@ -590,8 +590,15 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
         }
         
         if (wish_service_exists(core, req->context) == NULL) {
-            if (wish_connection_exists(core, req->ctx) == NULL) {
-                WISHDEBUG(LOG_CRITICAL, "Will not send, connection gone");
+            if (wish_connection_is_from_pool(core, req->ctx) != NULL) {
+                wish_connection_t *conn = req->ctx;
+                if (!wish_core_is_connected_luid_ruid(core, conn->luid, conn->ruid)) {
+                    WISHDEBUG(LOG_CRITICAL, "Will not send, connection gone");
+                    return;
+                }
+            }
+            else {
+                WISHDEBUG(LOG_CRITICAL, "Will not send, req->ctx is not a connection from the core's pool");
                 return;
             }
         }
@@ -599,6 +606,8 @@ void wish_api_identity_remove(rpc_server_req* req, const uint8_t* args) {
         rpc_server_send(req, bson_data(&bs), bson_size(&bs));
         
         wish_core_signals_emit_string(core, "identity");
+        
+        
     } else {
         rpc_server_error_msg(req, 343, "Invalid argument. Expecting 32 byte bin data.");
         return;

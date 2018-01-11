@@ -92,7 +92,7 @@ wish_connection_t* wish_core_lookup_ctx_by_connection_id(wish_core_t* core, wish
     return connection;
 }
 
-wish_connection_t* wish_connection_exists(wish_core_t *core, wish_connection_t *connection) {
+wish_connection_t* wish_connection_is_from_pool(wish_core_t *core, wish_connection_t *connection) {
     for (int i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
         if (&core->connection_pool[i] == connection) {
             
@@ -1283,6 +1283,16 @@ uint16_t uint16_native2be(uint16_t in) {
  * @return 0, if sending succeeds, else non-zero for an error
  */
 int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, const uint8_t* payload_clrtxt, int payload_len) {
+    if (connection->context_state == WISH_CONTEXT_FREE) {
+        WISHDEBUG(LOG_CRITICAL, "Attempt to send data on a connection which is not connected");
+        return 1;
+    }
+    
+    if (connection->context_state == WISH_CONTEXT_CLOSING) {
+        WISHDEBUG(LOG_CRITICAL, "Attempt to send data on a connection which is already closing down");
+        return 1;
+    }
+    
     mbedtls_gcm_context aes_gcm_ctx;
     mbedtls_gcm_init(&aes_gcm_ctx);
     WISHDEBUG(LOG_DEBUG, "send payload len %d", payload_len);
@@ -1319,6 +1329,12 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, con
     memcpy(frame, &frame_len_be, 2);
     /* Send the frame length and the key in one go */
     WISHDEBUG(LOG_DEBUG, "About to send %d", frame_len);
+    
+    if (connection->send == NULL) {
+        WISHDEBUG(LOG_CRITICAL, "Can't send, the connection's send function is NULL");
+        return 1;
+    }
+    
     ret = connection->send(connection->send_arg, frame, frame_len);
     if (ret == 0) {
         /* Sending not failed */
