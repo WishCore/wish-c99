@@ -737,6 +737,8 @@ void wish_core_init_rpc(wish_core_t* core) {
     rpc_server_register(core->core_api, &core_signals_h);
     rpc_server_register(core->core_api, &core_send_h);
     rpc_server_register(core->core_api, &core_directory_h);
+
+#ifdef WISH_REMOTE_MANAGEMENT
     rpc_server_register(core->core_api, &core_identity_get_h);
     rpc_server_register(core->core_api, &core_identity_list_h);
     rpc_server_register(core->core_api, &core_identity_update_h);
@@ -747,6 +749,7 @@ void wish_core_init_rpc(wish_core_t* core) {
     rpc_server_register(core->core_api, &core_identity_friend_request_list_h);
     rpc_server_register(core->core_api, &core_identity_friend_request_accept_h);
     rpc_server_register(core->core_api, &core_identity_friend_request_decline_h);
+#endif
     
     /* Initialize core "friend request API" RPC server */
     core->friend_req_api = rpc_server_init(core, wish_core_connection_send);
