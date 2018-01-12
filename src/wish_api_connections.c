@@ -284,6 +284,7 @@ void wish_api_connections_disconnect_all(rpc_server_req* req, const uint8_t* arg
     
     bson bs;
     bson_init_buffer(&bs, buf, buf_len);
+    bson_append_bool(&bs, "data", true);
     bson_finish(&bs);
     
     rpc_server_send(req, bson_data(&bs), bson_size(&bs));
