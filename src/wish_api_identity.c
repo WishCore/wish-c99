@@ -1055,8 +1055,8 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     bson_iterator_from_buffer(&data, bson_iterator_bin_data(&it));
     
     const char* ruid = NULL;
-    const char* pubkey = NULL;
-    const char* alias = NULL;
+    //const char* pubkey = NULL;
+    //const char* alias = NULL;
     
     bson_find_fieldpath_value("uid", &data);
     
@@ -1075,7 +1075,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         return;
     }
 
-    pubkey = bson_iterator_bin_data(&data);
+    //pubkey = bson_iterator_bin_data(&data);
     
     bson_iterator_from_buffer(&data, bson_iterator_bin_data(&it));
     bson_find_fieldpath_value("alias", &data);
@@ -1085,7 +1085,7 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
         return;
     }
 
-    alias = bson_iterator_string(&data);
+    //alias = bson_iterator_string(&data);
 
     const char* transport = NULL;
     bson_iterator_from_buffer(&it, args);
