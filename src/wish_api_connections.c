@@ -269,6 +269,27 @@ void wish_api_connections_disconnect(rpc_server_req* req, const uint8_t* args) {
 }
 
 /**
+ * connections.disconnectAll
+ * 
+ * @param req
+ * @param args
+ */
+void wish_api_connections_disconnect_all(rpc_server_req* req, const uint8_t* args) {
+    wish_core_t* core = req->server->context;
+    
+    wish_connections_close_all(core);
+    
+    int buf_len = 128;
+    char buf[buf_len];
+    
+    bson bs;
+    bson_init_buffer(&bs, buf, buf_len);
+    bson_finish(&bs);
+    
+    rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+}
+
+/**
  *  connections.checkConnections
  */
 void wish_api_connections_check_connections(rpc_server_req* req, const uint8_t* args) {

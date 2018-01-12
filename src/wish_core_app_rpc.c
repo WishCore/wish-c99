@@ -139,6 +139,7 @@ handler connections_list_h =                          { .op = "connections.list"
 handler connections_apps_h =                          { .op = "connections.apps",                  .handler = wish_api_connections_apps, .args = "(host: Host): Apps[]" };
 handler connections_request_h =                       { .op = "connections.request",               .handler = wish_api_connections_request, .args = "(host: Host, op: string, args: array): Response" };
 handler connections_disconnect_h =                    { .op = "connections.disconnect",            .handler = wish_api_connections_disconnect, .args = "(id: number): bool" };
+handler connections_disconnect_all_h =                { .op = "connections.disconnectAll",         .handler = wish_api_connections_disconnect_all, .args = "(): bool" };
 handler connections_check_connections_h =             { .op = "connections.checkConnections",      .handler = wish_api_connections_check_connections, .args = "(id: number): bool" };
 
 handler directory_find_h =                            { .op = "directory.find",                    .handler = wish_api_directory_find, .args = "(filter?: string): DirectoryEntry" };
@@ -210,6 +211,7 @@ void wish_core_app_rpc_init(wish_core_t* core) {
     rpc_server_register(core->app_api, &connections_apps_h);
     rpc_server_register(core->app_api, &connections_request_h);
     rpc_server_register(core->app_api, &connections_disconnect_h);
+    rpc_server_register(core->app_api, &connections_disconnect_all_h);
     rpc_server_register(core->app_api, &connections_check_connections_h);
 
     rpc_server_register(core->app_api, &api_acl_check_h);

@@ -1470,7 +1470,7 @@ int wish_core_get_rx_buffer_free(wish_core_t* core, wish_connection_t* connectio
 }
 
 
-void wish_close_all_connections(wish_core_t* core) {
+void wish_connections_close_all(wish_core_t* core) {
     int i = 0;
     for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
         switch (core->connection_pool[i].context_state) {

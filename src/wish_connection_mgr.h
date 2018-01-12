@@ -27,7 +27,7 @@ int wish_send_advertizement(wish_core_t* core, uint8_t *ad, size_t ad_len);
 /* Gracefully initiate a TCP socket close */
 void wish_close_connection(wish_core_t* core, wish_connection_t* connection);
 
-void wish_close_all_connections(wish_core_t* core);
+void wish_connections_close_all(wish_core_t* core);
 
 void wish_connections_check(wish_core_t* core);
 
