@@ -680,7 +680,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
 static uint32_t uint32_convert_be(uint32_t net_number) {
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     /* Big endian architecture - pass through */
-    return value_in;
+    return net_number;
 #else 
     /* Little endian architecture detected */
     /* See https://sourceforge.net/p/predef/wiki/Endianness/ */
