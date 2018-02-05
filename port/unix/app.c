@@ -657,7 +657,8 @@ int main(int argc, char** argv) {
 
                 LL_FOREACH(core->relay_db, relay) {
                 
-                    if (FD_ISSET(relay->sockfd, &wfds)) {
+                    /* Note: Before select() we added fd to be checked for writability, if the relay fd was in this state. Now we need to check writability under the same condition */
+                    if (FD_ISSET(relay->sockfd, &wfds) && relay->curr_state ==  WISH_RELAY_CLIENT_CONNECTING) {
                         int connect_error = 0;
                         socklen_t connect_error_len = sizeof(connect_error);
                         if (getsockopt(relay->sockfd, SOL_SOCKET, SO_ERROR, 
@@ -667,7 +668,7 @@ int main(int argc, char** argv) {
                         }
                         if (connect_error == 0) {
                             /* connect() succeeded, the connection is open */
-                            //printf("Relay client connected\n");
+                            printf("Relay client connected\n");
                             relay_ctrl_connected_cb(core, relay);
                             wish_relay_client_periodic(core, relay);
                         }
@@ -676,12 +677,11 @@ int main(int argc, char** argv) {
                              * global errno is not valid now */
                             printf("relay control connect() failed: %s\n", strerror(connect_error));
 
-                            // FIXME only one relay context assumed!
+                            close(relay->sockfd);
                             relay_ctrl_connect_fail_cb(core, relay);
                         }
                     }
-
-                    if (FD_ISSET(relay->sockfd, &rfds)) {
+                    else if (FD_ISSET(relay->sockfd, &rfds) && relay->curr_state != WISH_RELAY_CLIENT_INITIAL) { /* Note: Before select() we added fd to be checked for readability, if the relay fd was in some other state than its initial state. Now we need to check writability under the same condition */
                         uint8_t byte;   /* That's right, we read just one
                             byte at a time! */
                         int read_len = read(relay->sockfd, &byte, 1);
@@ -690,11 +690,14 @@ int main(int argc, char** argv) {
                             wish_relay_client_periodic(core, relay);
                         }
                         else if (read_len == 0) {
-                            //printf("Relay control connection disconnected\n");
+                            printf("Relay control connection disconnected\n");
+                            close(relay->sockfd);
                             relay_ctrl_disconnect_cb(core, relay);
                         }
                         else {
-                            perror("relay control read()");
+                            perror("relay control read() error (closing connection): ");
+                            close(relay->sockfd);
+                            relay_ctrl_disconnect_cb(core, relay);
                         }
                     }
                 }
