@@ -303,18 +303,18 @@ size_t buffer_len) {
     }
     else {
         if (wish_identity_get_meta_connect(&id) == false) {
-            WISHDEBUG(LOG_CRITICAL, "Will not connect over wld, because %s is flagged as 'do not connect'", id.alias);
+            // Will not connect over wld, because %s is flagged as 'do not connect'
             wish_identity_destroy(&id);
             return;
         }
         
         
         if (wish_identity_is_banned(&id) == true) {
-            WISHDEBUG(LOG_CRITICAL, "Will not connect over wld, the %s is flagged as 'banned'", id.alias);
+            // Will not connect over wld, the %s is flagged as 'banned'
             wish_identity_destroy(&id);
             return;
         }
-        WISHDEBUG(LOG_DEBUG, "Will  connect over wld  %s", id.alias);
+        // Will  connect over wld
         wish_identity_destroy(&id);
     }
     
