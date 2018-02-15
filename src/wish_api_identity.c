@@ -1415,6 +1415,7 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
 
     if(!found) {
         wish_save_identity_entry(&elt->id);
+        wish_core_signals_emit_string(core, "identity");
     }
 
     
@@ -1480,14 +1481,8 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
 
             wish_ldiscover_add(core, &entry);
         } else {
-            WISHDEBUG(LOG_CRITICAL, "wish_ldiscover_entry_from_bson returned error");
-            rpc_server_error_msg(req, 344, "Failed creating wld entry from signed_meta");
-            wish_platform_free(elt);
-#ifdef COMPILING_FOR_ESP8266
-            wish_platform_free(signed_cert_buffer);
-            wish_platform_free(buf_base);
-#endif
-            return;
+            // the meta was not an invite
+            WISHDEBUG(LOG_CRITICAL, "Apparently not an invite: wish_ldiscover_entry_from_bson returned error.");
         }
     }
 
