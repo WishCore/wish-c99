@@ -920,7 +920,6 @@ void wish_api_identity_verify(rpc_server_req* req, const uint8_t* args) {
     bson_iterator_from_buffer(&it, args);
 
     if ( bson_find_fieldpath_value("0.meta", &it) != BSON_EOO ) {
-        WISHDEBUG(LOG_CRITICAL, "0.meta");
         bson_append_field_from_iterator(&it, &b);
     }
 
@@ -1482,7 +1481,6 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
             wish_ldiscover_add(core, &entry);
         } else {
             // the meta was not an invite
-            WISHDEBUG(LOG_CRITICAL, "Apparently not an invite: wish_ldiscover_entry_from_bson returned error.");
         }
     }
 
