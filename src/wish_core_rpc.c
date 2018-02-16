@@ -21,6 +21,7 @@
 #include "wish_core_signals.h"
 
 #include "utlist.h"
+#include "wish_connection_mgr.h"
 
 void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service_entry, bool online) {
     int buffer_len = 300;
@@ -605,6 +606,8 @@ static void friend_req_callback(rpc_client_req* req, void* context, const uint8_
     
     /* emit friendRequesteeAccepted even if it was an identity which already existed */
     wish_core_signals_emit_string(core, "friendRequesteeAccepted");
+    wish_connection_t* connection = context;
+    wish_close_connection(core, connection);
 }
 
 
