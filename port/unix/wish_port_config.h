@@ -7,7 +7,7 @@
 
 /** This specifies the maximum number of simultaneous Wish connections
  * */
-#define WISH_PORT_CONTEXT_POOL_SZ   10
+#define WISH_PORT_CONTEXT_POOL_SZ   100
 
 /** This specifies the maximum number of simultaneous app requests to core */
 #define WISH_PORT_APP_RPC_POOL_SZ ( 60 )
