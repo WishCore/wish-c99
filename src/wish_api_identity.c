@@ -1086,6 +1086,10 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
 
     //alias = bson_iterator_string(&data);
 
+    if(luid[0] == 0 && luid[1] == 0 && ruid[0] == 0 && ruid[1] == 0)  {
+        WISHDEBUG(LOG_CRITICAL, "Blaaah! --------------------------------------------------------!!");
+    }
+    
     const char* transport = NULL;
     bson_iterator_from_buffer(&it, args);
 
@@ -1147,6 +1151,9 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     }
     
     wish_connection_t* connection = wish_connection_init(core, luid, ruid);
+    
+    #warning NULL check connection here!
+    
     connection->friend_req_connection = true;
     connection->friend_req_meta = freq_meta; // NULL or pointer to data
     //memcpy(friend_req_ctx->rhid, rhid, WISH_ID_LEN);
