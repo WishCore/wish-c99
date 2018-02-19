@@ -94,7 +94,9 @@ enum wish_context_state {
 
 #include "wish_identity.h"
 
-typedef struct wish_context {
+typedef struct wish_context wish_connection_t;
+
+struct wish_context {
     /* An unique connection id which is unique to a wish core
      * connection, can be used to associate the context with the underlying 
      * network transport connection, for example */
@@ -103,7 +105,7 @@ typedef struct wish_context {
     /** Connection state */
     enum wish_context_state context_state;
     /* Function used by wish core to send TCP data */
-    int (*send)(void *, unsigned char*, int);
+    int (*send)(wish_connection_t* connection, unsigned char*, int);
     /* Data to be supplied as first argument to wish_context.send */
     void* send_arg;
     enum transport_state curr_transport_state;
@@ -156,7 +158,11 @@ typedef struct wish_context {
     bool friend_req_connection;
     const char* friend_req_meta;
     wish_remote_app* apps;
-} wish_connection_t;
+#ifdef WISH_CORE_DEBUG
+    int bytes_in;
+    int bytes_out;
+#endif
+};
 
 struct wish_peer {
     uint8_t *luid;  /* Local wuid */
@@ -184,7 +190,7 @@ void wish_core_process_data(wish_core_t* core, wish_connection_t* h);
  * to be sent.
  *
  * The send function is called with the argument given as arg */
-void wish_core_register_send(wish_core_t* core, wish_connection_t* h, int (*send)(void *,
+void wish_core_register_send(wish_core_t* core, wish_connection_t* h, int (*send)(wish_connection_t*,
 unsigned char*, int), void* arg);
 
 void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* h, enum tcp_event);

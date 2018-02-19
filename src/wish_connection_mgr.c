@@ -118,8 +118,16 @@ void check_connection_liveliness(wish_core_t* core, void* ctx) {
             break;
         case WISH_CONTEXT_IN_MAKING: {
             if (core->core_time > (connection->latest_input_timestamp + CONNECTION_SETUP_TIMEOUT)) {
+#ifndef WISH_CORE_DEBUG
                 WISHDEBUG(LOG_CRITICAL, "Ping timeout. Closing connection. (luid: %02x %02x, ruid: %02x %02x)", 
                         connection->luid[0], connection->luid[1], connection->ruid[0], connection->ruid[1]);
+#else
+                WISHDEBUG(LOG_CRITICAL, "Ping timeout. Closing connection. (luid: %02x %02x, ruid: %02x %02x), tp: %d, ps: %d, b_in: %i, b_out: %i, rb: %d, expect: %d, time: %d, core-time: %d (%s, %s)", 
+                        connection->luid[0], connection->luid[1], connection->ruid[0], connection->ruid[1], 
+                        connection->curr_transport_state, connection->curr_protocol_state, connection->bytes_in, connection->bytes_out, ring_buffer_length(&connection->rx_ringbuf), connection->expect_bytes, 
+                        connection->latest_input_timestamp, wish_time_get_relative(core), connection->via_relay ? "relayed" : "direct",
+                        connection->friend_req_connection ? "friendReq" : "normal");
+#endif
                 wish_close_connection(core, connection);
             }
             break;

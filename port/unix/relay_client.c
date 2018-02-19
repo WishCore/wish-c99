@@ -16,6 +16,7 @@
 
 #include "wish_relay_client.h"
 #include "wish_connection.h"
+#include "wish_debug.h"
 
 void socket_set_nonblocking(int sockfd);
 
@@ -69,6 +70,8 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_t* relay, uint8
             perror("relay server connect()");
             relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
         }
+    } else {
+        WISHDEBUG(LOG_CRITICAL, "Relay client connection succeeded but we expected error.");
     }
 }
 

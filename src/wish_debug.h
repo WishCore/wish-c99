@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include "stdbool.h"
 #include "stdint.h"
+#include "stdlib.h"
 
 #include "wish_port_config.h"
 
@@ -77,8 +78,11 @@ void wish_debug_printf(int stream, const char* format, ...);
   #define WISHDEBUG(lvl, format, ...) do {} while (0);
 #else
   #ifndef COMPILING_FOR_ESP8266
-  #define WISHDEBUG(lvl, format, ...) \
-    if (lvl >= LOG_THRESHOLD) wish_platform_printf(format "\n\r", ## __VA_ARGS__)
+  #define WISHDEBUG(lvl, format, ...)                             \
+    if (lvl >= LOG_THRESHOLD) {                                   \
+        wish_platform_printf("%s: ", getenv("CORE_NAME"));        \
+        wish_platform_printf(format "\n\r", ## __VA_ARGS__);      \
+    }                                                             
     //wish_debug_printf(lvl, format "\n", ## __VA_ARGS__);
   #else
   /* Special version needed for ESP8266 for now - this is just silly */

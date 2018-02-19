@@ -126,6 +126,7 @@ void wish_relay_client_add(wish_core_t* core, const char* host) {
 /* This function should be invoked regularly to process data received
  * from relay server and take actions accordingly */
 void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
+again:
     switch (relay->curr_state) {
     case WISH_RELAY_CLIENT_CONNECTING:
         
@@ -206,6 +207,7 @@ void wish_relay_client_periodic(wish_core_t* core, wish_relay_client_t *relay) {
                 /* FIXME Implement some kind of abstraction for IP
                  * addresses */
                 wish_open_connection(core, connection, &(relay->ip), relay->port, true);
+                goto again;
                 break;
             }
             default:

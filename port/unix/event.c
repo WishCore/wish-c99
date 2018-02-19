@@ -10,7 +10,7 @@
 int event_read = 0;
 int event_write = 0;
 int num_curr_events = 0;
-#define EVENT_QUEUE_LEN 40
+#define EVENT_QUEUE_LEN 400
 struct wish_event events[EVENT_QUEUE_LEN];
 
 void wish_message_processor_notify(struct wish_event *ev) {

@@ -478,11 +478,11 @@ again:
                     memcpy(out_buffer+2, output, 384);
                     /* Send the frame length and the key in one go */
                     WISHDEBUG(LOG_DEBUG, "Attempting to send data");
-                    connection->send(connection->send_arg, out_buffer, 2+384);
+                    connection->send(connection, out_buffer, 2+384);
 
                     connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
                     connection->curr_protocol_state = PROTO_SERVER_STATE_DH;
-                    WISHDEBUG(LOG_DEBUG, "movint to TRANSPORT_STATE_WAIT_FRAME_LEN");
+                    WISHDEBUG(LOG_DEBUG, "moving to TRANSPORT_STATE_WAIT_FRAME_LEN");
                 }
             }
             break;
@@ -503,8 +503,9 @@ again:
                 /* Copy the relay session id */
                 memcpy(msg + 3, connection->relay->session_id, RELAY_SESSION_ID_LEN);
 
-                connection->send(connection->send_arg, msg, msg_len);
                 connection->curr_transport_state = TRANSPORT_STATE_SERVER_WAIT_INITIAL;
+                connection->send(connection, msg, msg_len);
+                goto again;
             }
 
             break;
@@ -521,7 +522,7 @@ again:
  * to be sent.
  *
  * The send function is called with the argument given as arg */
-void wish_core_register_send(wish_core_t* core, wish_connection_t* connection, int (*send)(void *, unsigned char*, int), void* arg) {
+void wish_core_register_send(wish_core_t* core, wish_connection_t* connection, int (*send)(wish_connection_t*, unsigned char*, int), void* arg) {
     connection->send = send;
     connection->send_arg = arg;
 }
@@ -553,7 +554,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
         connection->curr_protocol_state = PROTO_STATE_DH;
 
         /* Maestro, take it away please */
-        connection->send(connection->send_arg, buffer, buffer_len);
+        connection->send(connection, buffer, buffer_len);
         break;
     }
     case TCP_CLIENT_DISCONNECTED:
@@ -817,7 +818,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             memcpy(out_buffer, frame_len_data, 2);
             memcpy(out_buffer+2, dhm_public, 384);
             /* Send the frame length and the key in one go */
-            connection->send(connection->send_arg, out_buffer, 2+384);
+            connection->send(connection, out_buffer, 2+384);
 
             /* Calculate shared secret */
             ret = mbedtls_dhm_calc_secret(&dhm_ctx, 
@@ -1315,7 +1316,7 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, con
         return 1;
     }
     
-    ret = connection->send(connection->send_arg, frame, frame_len);
+    ret = connection->send(connection, frame, frame_len);
     if (ret == 0) {
         /* Sending not failed */
         WISHDEBUG(LOG_DEBUG, "Sent %d", frame_len);

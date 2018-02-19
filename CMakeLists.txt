@@ -10,12 +10,22 @@ set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
 set(ARCH "x64")
 
 option(BUILD_IA32 "Build IA32" OFF)
+option(CORE_REMOTE_MANAGEMENT "Unsecure remote management features enabled" OFF)
+option(CORE_DEBUG "Debug features enabled" OFF)
 
 if(BUILD_IA32)
     message("Should be building for ia32")
     set(CMAKE_C_FLAGS "-m32 -Wall -Wno-pointer-sign -Wno-unused-variable")
     set(ARCH "ia32")
 endif(BUILD_IA32)
+
+if(CORE_REMOTE_MANAGEMENT)
+    add_definitions("-DWISH_REMOTE_MANAGEMENT") 
+endif(CORE_REMOTE_MANAGEMENT)
+
+if(CORE_DEBUG)
+    add_definitions("-DWISH_CORE_DEBUG") 
+endif(CORE_DEBUG)
 
 set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})

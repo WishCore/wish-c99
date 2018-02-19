@@ -52,9 +52,9 @@ void error(const char *msg)
     exit(0);
 }
 
-int write_to_socket(void *sockfd_ptr, unsigned char* buffer, int len) {
+int write_to_socket(wish_connection_t* connection, unsigned char* buffer, int len) {
     int retval = 0;
-    int sockfd = *((int *) sockfd_ptr);
+    int sockfd = *((int *) connection->send_arg);
     int n = write(sockfd,buffer,len);
     
     if (n < 0) {
@@ -62,6 +62,10 @@ int write_to_socket(void *sockfd_ptr, unsigned char* buffer, int len) {
          retval = 1;
     }
 
+#ifdef WISH_CORE_DEBUG
+    connection->bytes_out += len;
+#endif
+    
     return retval;
 }
 
@@ -788,11 +792,11 @@ int main(int argc, char** argv) {
                     int read_len = read(sockfd, buffer, read_buf_len);
                     if (read_len > 0) {
                         //printf("Read some data\n");
+#ifdef WISH_CORE_DEBUG
+                        ctx->bytes_in += read_len;
+#endif
                         wish_core_feed(core, ctx, buffer, read_len);
-                        struct wish_event ev = { 
-                            .event_type = WISH_EVENT_NEW_DATA,
-                            .context = ctx };
-                        wish_message_processor_notify(&ev);
+                        wish_core_process_data(core, ctx);
                     }
                     else if (read_len == 0) {
                         //printf("Connection closed?\n");
@@ -867,6 +871,7 @@ int main(int argc, char** argv) {
                         *fd_ptr = newsockfd;
                         /* New wish connection can be accepted */
                         wish_core_register_send(core, connection, write_to_socket, fd_ptr);
+                        WISHDEBUG(LOG_CRITICAL, "Accepted TCP connection %d", newsockfd);
                         wish_core_signal_tcp_event(core, connection, TCP_CLIENT_CONNECTED);
                     }
                 }
