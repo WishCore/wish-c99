@@ -109,7 +109,6 @@ int wish_open_connection(wish_core_t* core, wish_connection_t* connection, wish_
         exit(1);
     }
     *(sockfd_ptr) = socket(AF_INET, SOCK_STREAM, 0);
-    
 
     int sockfd = *(sockfd_ptr);
     socket_set_nonblocking(sockfd);
@@ -871,7 +870,7 @@ int main(int argc, char** argv) {
                         *fd_ptr = newsockfd;
                         /* New wish connection can be accepted */
                         wish_core_register_send(core, connection, write_to_socket, fd_ptr);
-                        WISHDEBUG(LOG_CRITICAL, "Accepted TCP connection %d", newsockfd);
+                        //WISHDEBUG(LOG_CRITICAL, "Accepted TCP connection %d", newsockfd);
                         wish_core_signal_tcp_event(core, connection, TCP_CLIENT_CONNECTED);
                     }
                 }
