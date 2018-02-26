@@ -117,7 +117,8 @@ int wish_open_connection(wish_core_t* core, wish_connection_t* connection, wish_
 
     //printf("Opening connection sockfd %i\n", sockfd);
     if (sockfd < 0) {
-        perror("ERROR opening socket");
+        perror("socket() returns error:");
+        exit(1);
     }
 
     // set ip and port to wish connection
@@ -588,14 +589,18 @@ int main(int argc, char** argv) {
             
             LL_FOREACH(core->relay_db, relay) {
                 if (relay->curr_state == WISH_RELAY_CLIENT_CONNECTING) {
-                    FD_SET(relay->sockfd, &wfds);
+                    if (relay->sockfd != -1) {
+                        FD_SET(relay->sockfd, &wfds);
+                    }
                     update_max_fd(relay->sockfd, &max_fd);
                 }
                 else if (relay->curr_state == WISH_RELAY_CLIENT_WAIT_RECONNECT) {
                     /* connect to relay server has failed or disconnected and we wait some time before retrying */
                 }
                 else if (relay->curr_state != WISH_RELAY_CLIENT_INITIAL) {
-                    FD_SET(relay->sockfd, &rfds);
+                    if (relay->sockfd != -1) {
+                        FD_SET(relay->sockfd, &rfds);
+                    }
                     update_max_fd(relay->sockfd, &max_fd);
                 }
             }
@@ -637,7 +642,7 @@ int main(int argc, char** argv) {
         struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 100000;
-
+#if 0
         for (i = 0; i < max_fd; i++) {
             if (FD_ISSET(i, &rfds)) {
                 FD_SET(i, &exceptfds);
@@ -646,6 +651,7 @@ int main(int argc, char** argv) {
                 FD_SET(i, &exceptfds);
             }
         }
+#endif
 
         int select_ret = select(max_fd, &rfds, &wfds, &exceptfds, &tv);
 
@@ -682,6 +688,7 @@ int main(int argc, char** argv) {
 
                             close(relay->sockfd);
                             relay_ctrl_connect_fail_cb(core, relay);
+                            relay->sockfd = -1;
                         }
                     }
                     else if (FD_ISSET(relay->sockfd, &rfds) && relay->curr_state != WISH_RELAY_CLIENT_INITIAL) { /* Note: Before select() we added fd to be checked for readability, if the relay fd was in some other state than its initial state. Now we need to check writability under the same condition */
@@ -696,11 +703,13 @@ int main(int argc, char** argv) {
                             printf("Relay control connection disconnected\n");
                             close(relay->sockfd);
                             relay_ctrl_disconnect_cb(core, relay);
+                            relay->sockfd = -1;
                         }
                         else {
                             perror("relay control read() error (closing connection): ");
                             close(relay->sockfd);
                             relay_ctrl_disconnect_cb(core, relay);
+                            relay->sockfd = -1;
                         }
                     }
                 }
@@ -759,7 +768,7 @@ int main(int argc, char** argv) {
                             //perror("app connection read()");
                             app_connection_cleanup(core, i);
                             close(app_fds[i]);
-                        }
+                        }             
                     }
                 }
             }
@@ -804,6 +813,12 @@ int main(int argc, char** argv) {
                         wish_core_signal_tcp_event(core, ctx, TCP_DISCONNECTED);
                         continue;
                     }
+                    else {
+                        //read returns -1
+                        close(sockfd);
+                        free(ctx->send_arg);
+                        wish_core_signal_tcp_event(core, ctx, TCP_DISCONNECTED);
+                    }
                 }
                 if (FD_ISSET(sockfd, &wfds)) {
                     /* The Wish connection socket is now writable. This
@@ -839,6 +854,8 @@ int main(int argc, char** argv) {
                          * global errno is not valid now */
                         printf("wish connection connect() failed: %s\n", 
                             strerror(connect_error));
+                        close(*((int*) ctx->send_arg));
+                        free(ctx->send_arg);
                         connect_fail_cb(ctx);
                     }
                 }
@@ -885,7 +902,6 @@ int main(int argc, char** argv) {
         else {
             /* Select error return */
             perror("Select error: ");
-            
             exit(0);
         }
         

@@ -45,6 +45,10 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_t* relay, uint8
 
     //printf("Open relay connection");
     relay->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    
+    if (relay->sockfd == -1) {
+        relay->curr_state = WISH_RELAY_CLIENT_WAIT_RECONNECT;
+    }
 
     socket_set_nonblocking(relay->sockfd);
 
