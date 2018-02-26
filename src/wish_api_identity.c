@@ -1152,7 +1152,11 @@ void wish_api_identity_friend_request(rpc_server_req* req, const uint8_t* args) 
     
     wish_connection_t* connection = wish_connection_init(core, luid, ruid);
     
-    #warning NULL check connection here!
+    if (connection == NULL) {
+        WISHDEBUG(LOG_CRITICAL, "Cannot open a friend request connection because no vacant wish connection available.");
+        rpc_server_error_msg(req, 341, "Cannot open a friend request connection because no vacant wish connection available.");
+        return;
+    }
     
     connection->friend_req_connection = true;
     connection->friend_req_meta = freq_meta; // NULL or pointer to data
