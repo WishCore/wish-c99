@@ -724,12 +724,60 @@ static void wish_core_connection_send(rpc_server_req* req, const bson* bs) {
     wish_core_send_message(core, connection, bson_data(&res), bson_size(&res));
 }
 
+/**
+ * ACL check function for core-to-core requests.
+ * For requests that require that the remote core has elevated privileges, the remote contact's permissions is checked for { core: { owner: true } }.
+ * 
+ * @param req
+ * @param resource
+ * @param permission
+ * @param ctx
+ * @param decision
+ */
 static void acl_check(rpc_server_req* req, const uint8_t* resource, const uint8_t* permission, void* ctx, rpc_acl_check_decision_cb decision) {
-    // This acl implementation is a dummy
+    wish_connection_t* connection = req->ctx;
+    const char* op = resource;
 
-    //wish_connection_t* connection = req->ctx;
+    if (strncmp(permission, "call", 5) != 0) {
+        WISHDEBUG(LOG_CRITICAL, "core2core ACL check for op %s, test for illegal permission %s", op, permission);
+        decision(req, false);
+        return;
+    }
 
-    decision(req, true);    
+    bool allowed = false;
+
+    /* First, verify the op, as some RPCs are always allowed between cores */
+    if (strncmp(op, core_send_h.op, MAX_RPC_OP_LEN) == 0) {
+        allowed = true;
+    }
+    else if (strncmp(op, core_directory_h.op, MAX_RPC_OP_LEN) == 0) {
+        allowed = true;
+    }
+    else if (strncmp(op, core_peers_h.op, MAX_RPC_OP_LEN) == 0) {
+        allowed = true;
+    }
+    else if (strncmp(op, core_send_h.op, MAX_RPC_OP_LEN) == 0) {
+        allowed = true;
+    }
+    else {
+        /* The request requires special authority, identity.permissions must have: { core: { ower: true } } */
+
+        wish_identity_t id;
+        wish_identity_load(connection->ruid, &id);
+
+        if (id.permissions != NULL) {
+            bson_iterator it;
+            bson_iterator_from_buffer(&it, id.permissions);
+
+            if (bson_find_fieldpath_value("core.owner", &it) == BSON_BOOL) {
+                allowed = bson_iterator_bool(&it);
+            }
+        }
+        wish_identity_destroy(&id);
+    }
+
+    //WISHDEBUG(LOG_CRITICAL, "core2core ACL check for op %s, allowed %i", op, allowed);
+    decision(req, allowed);
 }
 
 void wish_core_init_rpc(wish_core_t* core) {
@@ -741,7 +789,6 @@ void wish_core_init_rpc(wish_core_t* core) {
     rpc_server_register(core->core_api, &core_send_h);
     rpc_server_register(core->core_api, &core_directory_h);
 
-#ifdef WISH_REMOTE_MANAGEMENT
     rpc_server_register(core->core_api, &core_identity_get_h);
     rpc_server_register(core->core_api, &core_identity_list_h);
     rpc_server_register(core->core_api, &core_identity_update_h);
@@ -752,7 +799,6 @@ void wish_core_init_rpc(wish_core_t* core) {
     rpc_server_register(core->core_api, &core_identity_friend_request_list_h);
     rpc_server_register(core->core_api, &core_identity_friend_request_accept_h);
     rpc_server_register(core->core_api, &core_identity_friend_request_decline_h);
-#endif
     
     /* Initialize core "friend request API" RPC server */
     core->friend_req_api = rpc_server_init(core, wish_core_connection_send);
