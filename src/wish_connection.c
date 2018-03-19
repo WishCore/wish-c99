@@ -616,7 +616,7 @@ void wish_core_signal_tcp_event(wish_core_t* core, wish_connection_t* connection
          * PROTO_SERVER_STATE_DH, then we must free the server_dhm_context
          * here. Normally it is done when handling input from peer,
          * in wish_core_handle_payload() */
-        if (connection->curr_protocol_state == PROTO_SERVER_STATE_DH) {
+        if (connection->curr_protocol_state == PROTO_SERVER_STATE_DH && connection->server_dhm_ctx != NULL) {
             mbedtls_dhm_free(connection->server_dhm_ctx);
             wish_platform_free(connection->server_dhm_ctx);
         }
@@ -1059,6 +1059,7 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* connection, 
             memcpy(connection->aes_gcm_iv_in, output+16, 12);
 
             wish_platform_free(server_dhm_ctx);
+            connection->server_dhm_ctx = NULL; /* Set to null, as the memory area is now free'ed */
 
             /* Save the client and server hashes, because we have the
              * secret at hand */
