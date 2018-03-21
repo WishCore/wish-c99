@@ -90,13 +90,6 @@ int wish_relay_get_preferred_server_url(char *url_str, int url_str_len);
 
 int wish_relay_encode_as_url(char *url_str, wish_ip_addr_t *ip, int port);
 
-/**
- * Get relay contexts. 
- *
- * @return pointer to an array containing the relay contexts
- */
-wish_relay_client_t *wish_relay_get_contexts(wish_core_t* core);
-
 /** 
  * Check timeout status on the relay contexts 
  */

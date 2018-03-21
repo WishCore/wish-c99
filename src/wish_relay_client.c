@@ -36,7 +36,7 @@ void relay_ctrl_disconnect_cb(wish_core_t* core, wish_relay_client_t *relay) {
     relay->last_input_timestamp = wish_time_get_relative(core);
 }
 
-static void wish_relay_client_check_connections(wish_core_t* core) {
+static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
     wish_relay_client_t* relay;
 
     LL_FOREACH(core->relay_db, relay) {
@@ -49,6 +49,7 @@ static void wish_relay_client_check_connections(wish_core_t* core) {
             case WISH_RELAY_CLIENT_INITIAL:
                 if (core->loaded_num_ids > 0) {
                     // Assume first identity in db is the one we want
+                    // FIXME This does not work with multiple identities!
                     wish_relay_client_open(core, relay, core->uid_list[0].uid);
                 }
                 break;
@@ -57,27 +58,19 @@ static void wish_relay_client_check_connections(wish_core_t* core) {
                     relay->curr_state = WISH_RELAY_CLIENT_INITIAL;
                 }
                 break;
+            case WISH_RELAY_CLIENT_WAIT:
+                if (wish_time_get_relative(core) > (relay->last_input_timestamp + RELAY_SERVER_TIMEOUT)) {
+                    WISHDEBUG(LOG_CRITICAL, "Relay control connection time-out");
+                    wish_relay_client_close(core, relay);
+                } else {
+                    // Normal operation, waiting for input (keep alive or new connection event etc.)
+                    wish_relay_client_periodic(core, relay);
+                }
+                break;
             default:
                 break;
         }
     }                
-}
-
-static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
-    //WISHDEBUG(LOG_CRITICAL, "wish_core_relay_periodic");
-    
-    
-    wish_relay_client_t *rctx;
-    LL_FOREACH(wish_relay_get_contexts(core), rctx) {
-
-        if (rctx->curr_state == WISH_RELAY_CLIENT_WAIT) {
-            /* Just check timeouts if the relay client waits for
-             * notifications from relay server */
-            wish_relay_client_periodic(core, rctx);
-        }
-    }
-
-    wish_relay_client_check_connections(core);
 }
 
 static int wish_core_get_num_relays(wish_core_t *core) {
@@ -214,13 +207,6 @@ again:
                 WISHDEBUG(LOG_CRITICAL, "Relay error: Unexepected data");
                 break;
             }
-        } else {
-            /* There was no data to read right now. Check that we are
-             * not in "timeout" */
-            if (wish_time_get_relative(core) > (relay->last_input_timestamp + RELAY_SERVER_TIMEOUT)) {
-                WISHDEBUG(LOG_CRITICAL, "Relay control connection time-out");
-                wish_relay_client_close(core, relay);
-            }
         }
 
         break;
@@ -252,13 +238,3 @@ int wish_relay_encode_as_url(char *url_str, wish_ip_addr_t *ip, int port) {
     wish_platform_sprintf(url_str, "wish://%d.%d.%d.%d:%d", ip->addr[0], ip->addr[1], ip->addr[2], ip->addr[3], port);
     return 0;
 }
-
-/**
- * Get relay contexts. 
- *
- * @return pointer to an array containing the relay contexts
- */
-wish_relay_client_t *wish_relay_get_contexts(wish_core_t* core) {
-    return core->relay_db;
-}
-
