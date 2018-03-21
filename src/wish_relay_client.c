@@ -87,8 +87,6 @@ void wish_core_relay_client_init(wish_core_t* core) {
     }
     
     wish_core_time_set_interval(core, wish_core_relay_periodic, NULL, 1);
-    
-    wish_relay_client_check_connections(core);
 }
 
 void wish_relay_client_add(wish_core_t* core, const char* host) {
