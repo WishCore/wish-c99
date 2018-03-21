@@ -17,6 +17,7 @@
 void relay_ctrl_connected_cb(wish_core_t* core, wish_relay_client_t *relay) {
     WISHDEBUG(LOG_CRITICAL, "Relay control connection established");
     relay->curr_state = WISH_RELAY_CLIENT_OPEN;
+    relay->last_input_timestamp = wish_time_get_relative(core);
 }
 
 void relay_ctrl_connect_fail_cb(wish_core_t* core, wish_relay_client_t *relay) {
@@ -65,16 +66,15 @@ static void wish_relay_client_check_connections(wish_core_t* core) {
 static void wish_core_relay_periodic(wish_core_t* core, void* ctx) {
     //WISHDEBUG(LOG_CRITICAL, "wish_core_relay_periodic");
     
-    /* FIXME implementation for several relay connections */
-    wish_relay_client_t *rctx = wish_relay_get_contexts(core);
     
-    // return if no relay client found
-    if (rctx == NULL) { return; }
-    
-    if (rctx->curr_state == WISH_RELAY_CLIENT_WAIT) {
-        /* Just check timeouts if the relay client waits for
-         * notifications from relay server */
-        wish_relay_client_periodic(core, rctx);
+    wish_relay_client_t *rctx;
+    LL_FOREACH(wish_relay_get_contexts(core), rctx) {
+
+        if (rctx->curr_state == WISH_RELAY_CLIENT_WAIT) {
+            /* Just check timeouts if the relay client waits for
+             * notifications from relay server */
+            wish_relay_client_periodic(core, rctx);
+        }
     }
 
     wish_relay_client_check_connections(core);

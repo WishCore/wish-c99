@@ -81,7 +81,7 @@ void wish_relay_client_open(wish_core_t* core, wish_relay_client_t* relay, uint8
 
 void wish_relay_client_close(wish_core_t* core, wish_relay_client_t *relay) {
     close(relay->sockfd);
-    relay_ctrl_disconnect_cb(core, core->relay_db);
+    relay_ctrl_disconnect_cb(core, relay);
 }
 
 
