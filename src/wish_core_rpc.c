@@ -774,7 +774,12 @@ static void acl_check(rpc_server_req* req, const uint8_t* resource, const uint8_
     }
 
     //WISHDEBUG(LOG_CRITICAL, "core2core ACL check for op %s, allowed %i", op, allowed);
+#ifdef WISH_REMOTE_MANAGEMENT
+    decision(req, true);
+#else
     decision(req, allowed);
+#endif
+    
 }
 
 void wish_core_init_rpc(wish_core_t* core) {
