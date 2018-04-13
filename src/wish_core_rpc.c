@@ -756,6 +756,9 @@ static void acl_check(rpc_server_req* req, const uint8_t* resource, const uint8_
     else if (strncmp(op, core_peers_h.op, MAX_RPC_OP_LEN) == 0) {
         allowed = true;
     }
+    else if (strncmp(op, core_signals_h.op, MAX_RPC_OP_LEN) == 0) {
+        allowed = true;
+    }
     else {
         /* The request requires special authority, identity.permissions must have: { core: { ower: true } } */
 
