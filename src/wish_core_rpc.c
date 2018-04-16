@@ -467,7 +467,7 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
         rpc_server_error_msg(req, 503, "friend req args does not have { signatures: [...] }.");
         return;
     }
-    
+
     /* TODO: verify signatures */
    
     /* Start setting up a relationship request. */
@@ -494,6 +494,34 @@ static void core_friend_req(rpc_server_req* req, const uint8_t* args) {
     
     // store signed meta data
     rel.signed_meta = signed_meta_copy;
+
+    // Check that no old friend requests exist with the same identities
+    // TODO: Connections might not close
+    wish_relationship_req_t* elt = NULL;
+    wish_relationship_req_t* tmp = NULL;
+    
+    DL_FOREACH_SAFE(core->relationship_req_db, elt, tmp) {
+        if ( memcmp(elt->luid, recepient_uid, WISH_UID_LEN) == 0 
+                && memcmp(elt->id.uid, new_id->uid, WISH_UID_LEN) == 0 ) {
+            DL_DELETE(core->relationship_req_db, elt);
+            break;
+        }
+    }
+    
+    int i;
+
+    for (i = 0; i < WISH_CONTEXT_POOL_SZ; i++) {
+        if (core->connection_pool[i].context_state == WISH_CONTEXT_FREE) { continue; }
+        if (&core->connection_pool[i] == connection) { continue; }
+
+        if (memcmp(core->connection_pool[i].luid, recepient_uid, WISH_ID_LEN) == 0) {
+            if (memcmp(core->connection_pool[i].ruid, new_id->uid, WISH_ID_LEN) == 0) {
+                //WISHDEBUG(LOG_CRITICAL, "Disconnecting old friend request connection: %i", core->connection_pool[i].connection_id);
+                wish_close_connection(core, &core->connection_pool[i]);
+                break;
+            }
+        }
+    }    
 
     wish_relationship_req_add(core, &rel);
 
