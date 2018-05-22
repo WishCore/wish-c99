@@ -9,7 +9,9 @@
 #include "wish_utils.h"
 
 /* Define Relay server IP and port: */
+#ifndef RELAY_SERVER_HOST
 #define RELAY_SERVER_HOST "193.65.54.131:40000"
+#endif
 
 #define RELAY_SERVER_TIMEOUT 45 /* Seconds */
 
