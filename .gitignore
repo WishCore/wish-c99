@@ -16,3 +16,4 @@
 /doc/latex
 
 /tools/node_modules
+.DS_Store
