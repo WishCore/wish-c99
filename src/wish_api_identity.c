@@ -1367,6 +1367,8 @@ void wish_api_identity_friend_request_accept(rpc_server_req* req, const uint8_t*
         return;
     }
     
+    wish_core_signals_emit_string(core, "friendRequest");
+    
     // Find the connection which was used for receiving the friend request   
     
     int i = 0;
@@ -1577,6 +1579,8 @@ void wish_api_identity_friend_request_decline(rpc_server_req* req, const uint8_t
         rpc_server_error_msg(req, 356, "No such friend request found.");
         return;
     }
+
+    wish_core_signals_emit_string(core, "friendRequest");
     
     // Find the connection which was used for receiving the friend request   
     
