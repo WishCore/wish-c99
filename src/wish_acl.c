@@ -109,6 +109,7 @@ void wish_api_acl_user_roles(rpc_server_req* req, const uint8_t* args) {
     bson_finish(&bs);
     
     rpc_server_send(req, bson_data(&bs), bson_size(&bs));
+    bson_destroy(&bs);
 }
 
 /* args: 'String(Hex) luid, String role' */
