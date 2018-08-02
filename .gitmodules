@@ -2,3 +2,6 @@
 	path = deps/wish-rpc-c99
 	url = foremost.cto.fi:/git/wish-rpc-c99
 
+[submodule "deps/ed25519"]
+	path = deps/ed25519
+	url = https://github.com/rdeker/ed25519.git
