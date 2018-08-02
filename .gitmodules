@@ -8,3 +8,6 @@
 [submodule "deps/mbedtls"]
 	path = deps/mbedtls
 	url = https://github.com/ARMmbed/mbedtls.git
+[submodule "deps/uthash"]
+	path = deps/uthash
+	url = https://github.com/troydhanson/uthash.git
