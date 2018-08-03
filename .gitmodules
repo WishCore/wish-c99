@@ -1,6 +1,6 @@
 [submodule "deps/wish-rpc-c99"]
 	path = deps/wish-rpc-c99
-	url = foremost.cto.fi:/git/wish-rpc-c99
+	url = https://github.com/WishCore/wish-rpc-c99
 
 [submodule "deps/ed25519"]
 	path = deps/ed25519
