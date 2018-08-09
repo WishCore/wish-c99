@@ -1,4 +1,5 @@
 matrix:
+  language: c
   include:
     # works on Precise and Trusty
     - os: linux
