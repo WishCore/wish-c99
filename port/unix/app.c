@@ -331,6 +331,9 @@ void setup_wish_local_discovery(void) {
      * local discovery port 9090 */
     int option = 1;
     setsockopt(wld_fd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+#ifdef __APPLE__
+    setsockopt(wld_fd, SOL_SOCKET, SO_REUSEPORT, &option, sizeof(option));
+#endif
 #endif
 
     socket_set_nonblocking(wld_fd);
@@ -679,6 +682,9 @@ int main(int argc, char** argv) {
                 wish_relay_client_t* relay;
 
                 LL_FOREACH(core->relay_db, relay) {
+                    if (relay->sockfd == -1) {
+                        continue;
+                    }
                 
                     /* Note: Before select() we added fd to be checked for writability, if the relay fd was in this state. Now we need to check writability under the same condition */
                     if (FD_ISSET(relay->sockfd, &wfds) && relay->curr_state ==  WISH_RELAY_CLIENT_CONNECTING) {
