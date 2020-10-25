@@ -56,13 +56,14 @@ set(TEST_EXECUTABLE2 "test_bson_update")
 #MESSAGE( STATUS "output: " ${EXECUTABLE} )
 
 add_definitions( "-DWISH_CORE_VERSION_STRING=\"${WISH_CORE_VERSION_STRING}\"") 
+add_definitions( "-DMBEDTLS_CONFIG_FILE=\"mbedtls-wish-config.h\"" )
 #add_definitions( "-DWLD_META_PRODUCT=\"${WLD_META_PRODUCT}\"") 
 
 include_directories(src port/unix deps/bson deps/ed25519/src deps/mbedtls/include deps/uthash/include deps/wish-rpc-c99/src)
 
 file(GLOB wish_SRC "src/*.c")
 file(GLOB wish_port_SRC "port/unix/*.c")
-file(GLOB_RECURSE wish_deps_SRC "deps/bson/*.c" "deps/ed25519/src/*.c" "deps/mbedtls/library/*.c" "deps/uthash/src/*.c" "deps/wish-rpc-c99/src/*.c")
+file(GLOB_RECURSE wish_deps_SRC "deps/bson/*.c" "deps/ed25519/src/*.c" "deps/mbedtls/library/gcm.c" "deps/mbedtls/library/bignum.c" "deps/mbedtls/library/aes.c" "deps/mbedtls/library/dhm.c" "deps/mbedtls/library/aesni.c" "deps/mbedtls/library/cipher.c" "deps/mbedtls/library/cipher_wrap.c" "deps/mbedtls/library/ccm.c" "deps/mbedtls/library/asn1parse.c" "deps/mbedtls/library/sha256.c" "deps/uthash/src/*.c" "deps/wish-rpc-c99/src/*.c")
 
 list(REMOVE_ITEM wish_port_SRC "${CMAKE_SOURCE_DIR}/port/unix/test_bson.c")
 list(REMOVE_ITEM wish_port_SRC "${CMAKE_SOURCE_DIR}/port/unix/test_bson_update.c")
