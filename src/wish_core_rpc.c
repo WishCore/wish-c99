@@ -50,6 +50,7 @@ void wish_send_peer_update(wish_core_t* core, struct wish_service_entry *service
             //bson_append_bool(&bs, "N", true);
             //bson_append_string(&bs, "type", "N");
             //bson_append_start_object(&bs, "data");
+            bson_append_string_maxlen(&bs, "name", service_entry->name, WISH_APP_NAME_MAX_LEN);
             bson_append_binary(&bs, "rsid", service_entry->wsid, WISH_WSID_LEN);
 
             /* FIXME protocols[0][0]??? It will only include first of
@@ -239,6 +240,7 @@ void peers_callback(rpc_client_req* req, void* context, const uint8_t* payload, 
     bson_init_buffer(&b, buf, l);
     bson_append_string(&b, "type", "peer");
     bson_append_start_object(&b, "peer");
+    bson_append_string_maxlen(&b, "name", name, WISH_APP_NAME_MAX_LEN);
     bson_append_binary(&b, "luid", connection->luid, WISH_UID_LEN);
     bson_append_binary(&b, "ruid", connection->ruid, WISH_UID_LEN);
     bson_append_binary(&b, "rhid", connection->rhid, WISH_UID_LEN);

@@ -364,6 +364,7 @@ void wish_send_peer_update_locals(wish_core_t* core, const uint8_t* sid, struct 
             
             bson_append_string(&bs, "type", "peer");
             bson_append_start_object(&bs, "peer");
+            bson_append_string_maxlen(&bs, "name", service_entry->name, WISH_APP_NAME_MAX_LEN);
             bson_append_binary(&bs, "luid", (uint8_t*) local_id_list[i].uid, WISH_ID_LEN);
             bson_append_binary(&bs, "ruid", (uint8_t*) local_id_list[j].uid, WISH_ID_LEN);
             bson_append_binary(&bs, "rsid", (uint8_t*) service_entry->wsid, WISH_WSID_LEN);
