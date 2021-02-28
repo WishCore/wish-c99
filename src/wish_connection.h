@@ -122,6 +122,11 @@ struct wish_context {
     int (*send)(wish_connection_t* connection, unsigned char*, int);
     /* Data to be supplied as first argument to wish_context.send */
     void* send_arg;
+    bool eagain;
+    unsigned char* out_buffer;
+    uint16_t out_buffer_length;
+    uint16_t out_buffer_consumed;
+    rpc_server_req* req;
     enum transport_state curr_transport_state;
     enum protocol_state curr_protocol_state;
     int expect_bytes;
@@ -213,9 +218,16 @@ void wish_core_handle_payload(wish_core_t* core, wish_connection_t* ctx, uint8_t
 
 /* Decrypt a "Wish frame" - 
  */
-int wish_core_decrypt(wish_core_t* core, wish_connection_t* ctx, uint8_t* ciphertxt, size_t 
-ciphertxt_len, uint8_t* auth_tag, size_t auth_tag_len, uint8_t* plaintxt,
-size_t plaintxt_len );
+int wish_core_decrypt(
+    wish_core_t* core,
+    wish_connection_t* ctx,
+    uint8_t* ciphertxt,
+    size_t ciphertxt_len,
+    uint8_t* auth_tag,
+    size_t auth_tag_len,
+    uint8_t* plaintxt,
+    size_t plaintxt_len
+);
 
 /**
  * Send a payload using the Wish connection.
@@ -239,8 +251,9 @@ wish_connection_t* wish_core_get_connection_pool(wish_core_t* core);
 /* This function returns the wish context associated with the provided
  * remote IP, remote port, local IP, local port. If no matching wish
  * context is found, return NULL. */
-wish_connection_t* wish_identify_context(wish_core_t* core, uint8_t rmt_ip[4], 
-    uint16_t rmt_port, uint8_t local_ip[4], uint16_t local_port);
+wish_connection_t* wish_identify_context(
+    wish_core_t* core, uint8_t rmt_ip[4], uint16_t rmt_port, uint8_t local_ip[4], uint16_t local_port
+);
 
 /* This function returns the pointer to the wish context corresponding
  * to the id number given as argument */
@@ -260,10 +273,13 @@ wish_connection_t* wish_connection_is_from_pool(wish_core_t *core, wish_connecti
  * Please note: The context returned here could a countext which is not
  * yet ready for use, because it is e.g. just being created.
  */
-wish_connection_t* wish_core_lookup_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid);
+wish_connection_t* wish_core_lookup_ctx_by_luid_ruid_rhid(
+    wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid
+);
 
-wish_connection_t* 
-wish_core_lookup_connected_ctx_by_luid_ruid_rhid(wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid);
+wish_connection_t* wish_core_lookup_connected_ctx_by_luid_ruid_rhid(
+    wish_core_t* core, const uint8_t *luid, const uint8_t *ruid, const uint8_t *rhid
+);
 
 /* returns true if there is any connection form luid to ruid */
 bool wish_core_is_connected_luid_ruid(wish_core_t* core, uint8_t *luid, uint8_t *ruid);

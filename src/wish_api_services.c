@@ -169,6 +169,12 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
 
     if (connection != NULL && connection->context_state == WISH_CONTEXT_CONNECTED) {
         
+        if (connection->eagain) {
+            // Buffer full and one frame is only partially sent, will drop data
+            rpc_server_error_msg(req, 507, "Out buffer full, try again later...");
+            return;
+        }
+
         /* Build the actual on-wire message:
          *
          * req: {
@@ -196,13 +202,21 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
             WISHDEBUG(LOG_CRITICAL, "BSON write error, args_buffer");
             return;
         }
-        
+
         int send_ret = wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
         
-        if (send_ret != 0) {
-            /* Sending failed. Propagate RPC error */
-            WISHDEBUG(LOG_CRITICAL, "Core app RPC: Sending not possible at this time");
-            rpc_server_error_msg(req, 506, "Failed sending message to remote core.");
+        if (send_ret == -4) {
+            rpc_server_error_msg(req, 507, "Out buffer full, try again later...");
+        }
+        else if (send_ret != 0) {
+            if (connection->req) {
+                WISHDEBUG(LOG_CRITICAL, "Another request was still here waiting... FAIL!", send_ret);
+            } else {
+                /* Sending failed. Propagate RPC error */
+                // WISHDEBUG(LOG_CRITICAL, "Core app RPC: out buffer full %i", send_ret);
+                // rpc_server_error_msg(req, 506, "Send, but buffer full, but this message is accepted");
+                connection->req = req;
+            }
         } else {
             /* Sending successful */
             rpc_server_send(req, NULL, 0);

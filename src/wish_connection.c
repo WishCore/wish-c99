@@ -526,7 +526,7 @@ again:
         case TRANSPORT_STATE_INITIAL:
         /* impossible */
         default:
-            WISHDEBUG(LOG_CRITICAL, "Impossible transport state reached");
+            WISHDEBUG(LOG_CRITICAL, "Impossible transport state reached %i", connection->curr_transport_state);
         break;
     }
 
@@ -1288,6 +1288,12 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, con
         WISHDEBUG(LOG_CRITICAL, "Attempt to send data on a connection which is already closing down");
         return 1;
     }
+
+    if (connection->eagain || connection->out_buffer) {
+        WISHDEBUG(LOG_CRITICAL, "Attempt to send data on a connection which has still data in output buffer");
+        return -2;
+    }
+
     
     mbedtls_gcm_context aes_gcm_ctx;
     mbedtls_gcm_init(&aes_gcm_ctx);
@@ -1325,30 +1331,47 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, con
     memcpy(frame, &frame_len_be, 2);
     /* Send the frame length and the key in one go */
     WISHDEBUG(LOG_DEBUG, "About to send %d", frame_len);
-    
+
     if (connection->send == NULL) {
         WISHDEBUG(LOG_CRITICAL, "Can't send, the connection's send function is NULL");
         return 1;
     }
     
     ret = connection->send(connection, frame, frame_len);
-    if (ret == 0) {
-        /* Sending not failed */
-        WISHDEBUG(LOG_DEBUG, "Sent %d", frame_len);
+
+    if (ret == -1) {
+        // tried to send, but nothing was accepted, tell sender that frame was dropped.
+        wish_platform_free(frame);
+        return -4;
+    } else if (ret < frame_len) {
+        if (connection->out_buffer) {
+            printf("Error there was stuff in output buffer when trying to set it..!\n");
+        }
+        connection->eagain = true;
+        connection->out_buffer = frame;
+        connection->out_buffer_length = frame_len;
+        connection->out_buffer_consumed = ret;
+        update_nonce(connection->aes_gcm_iv_out+4);
+    } else if (ret == frame_len) {
+        wish_platform_free(frame);
         update_nonce(connection->aes_gcm_iv_out+4);
     }
-    else {
-        WISHDEBUG(LOG_CRITICAL, "Porting layer send function reported failure");
-    }
-    wish_platform_free(frame);
-    WISHDEBUG(LOG_DEBUG, "Exiting");
-    return ret;
+
+    // WISHDEBUG(LOG_CRITICAL, "Exiting %i of %i", ret, frame_len);
+    return ret < frame_len ? -3 : 0;
 }
 
 
-int wish_core_decrypt(wish_core_t* core, wish_connection_t* ctx, uint8_t* ciphertxt, size_t 
-ciphertxt_len, uint8_t* auth_tag, size_t auth_tag_len, uint8_t* plaintxt,
-size_t plaintxt_len) {
+int wish_core_decrypt(
+    wish_core_t* core,
+    wish_connection_t* ctx,
+    uint8_t* ciphertxt,
+    size_t ciphertxt_len,
+    uint8_t* auth_tag,
+    size_t auth_tag_len,
+    uint8_t* plaintxt,
+    size_t plaintxt_len
+) {
     mbedtls_gcm_context aes_gcm_ctx;
     mbedtls_gcm_init(&aes_gcm_ctx);
     int ret = mbedtls_gcm_setkey(&aes_gcm_ctx, MBEDTLS_CIPHER_ID_AES, 
@@ -1360,7 +1383,7 @@ size_t plaintxt_len) {
     }
 
     if (ciphertxt_len > plaintxt_len) {
-        WISHDEBUG(LOG_CRITICAL, "Would overwrite buffer bounds. Stop");
+        WISHDEBUG(LOG_CRITICAL, "Would overwrite buffer bounds. Stop. cipherlen %i plainlen %i", ciphertxt_len, plaintxt_len);
         mbedtls_gcm_free(&aes_gcm_ctx);
         return WISH_CORE_DECRYPT_FAIL;
     }

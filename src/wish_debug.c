@@ -21,7 +21,7 @@
 
 /* 15 octets can be printed per line, assuming canonical 80 charter wide
  * terminal */
-const int octets_per_line = 16;
+const int octets_per_line = 32;
 
 #ifndef COMPILING_FOR_ESP8266
 
@@ -69,7 +69,7 @@ void wish_debug_print_array(int log_lvl, char* title, uint8_t* array, uint8_t le
     WISHDEBUG(log_lvl, "%s: print_array len: %d:", title, len);
     WISHDEBUG2(log_lvl, "  ");
     for (i = 0; i < len; i++) {
-        WISHDEBUG2(log_lvl, "0x%02x ", array[i]);
+        WISHDEBUG2(log_lvl, "%02x ", array[i]);
         if (i % (octets_per_line-1) == 0 && i > 0) {
             WISHDEBUG(log_lvl, "");
             WISHDEBUG2(log_lvl, "  ");

@@ -66,21 +66,27 @@ void error(const char *msg)
     exit(0);
 }
 
+/**
+ * Write bytes to socket
+ *
+ * Returns number of bytes written
+ */
 int write_to_socket(wish_connection_t* connection, unsigned char* buffer, int len) {
+    if (connection->eagain) {
+        printf("Oh no, someone tried to write while eagaint set.\n");
+        return 0;
+    }
     int retval = 0;
     int sockfd = *((int *) connection->send_arg);
-    int n = write(sockfd,buffer,len);
+    int n = write(sockfd, buffer, len);
     
-    if (n < 0) {
-         printf("ERROR writing to socket: %s", strerror(errno));
-         retval = 1;
-    }
-
 #ifdef WISH_CORE_DEBUG
-    connection->bytes_out += len;
+    if (n > 0) {
+        connection->bytes_out += len;
+    }
 #endif
     
-    return retval;
+    return n;
 }
 
 #define LOCAL_DISCOVERY_UDP_PORT 9090
@@ -113,7 +119,13 @@ void connect_fail_cb(wish_connection_t* connection) {
     wish_core_signal_tcp_event(connection->core, connection, TCP_DISCONNECTED);
 }
 
-int wish_open_connection(wish_core_t* core, wish_connection_t* connection, wish_ip_addr_t *ip, uint16_t port, bool relaying) {
+int wish_open_connection(
+    wish_core_t* core,
+    wish_connection_t* connection,
+    wish_ip_addr_t *ip,
+    uint16_t port,
+    bool relaying
+) {
     connection->core = core;
     
     //printf("should start connect\n");
@@ -650,6 +662,10 @@ int main(int argc, char** argv) {
                  * detect when connect() is ready */
                 FD_SET(sockfd, &wfds);
             }
+            else if (ctx->eagain) {
+                FD_SET(sockfd, &wfds);
+                FD_SET(sockfd, &rfds);
+            }
             else {
                 FD_SET(sockfd, &rfds);
             }
@@ -855,17 +871,41 @@ int main(int argc, char** argv) {
                     if (connect_error == 0) {
                         /* connect() succeeded, the connection is open
                          * */
-                        if (ctx->curr_transport_state 
-                                == TRANSPORT_STATE_CONNECTING) {
-                            if (ctx->via_relay) {
-                                connected_cb_relay(ctx);
-                            }
-                            else {
-                                connected_cb(ctx);
+                        if (ctx->curr_transport_state == TRANSPORT_STATE_CONNECTING) {
+                            ctx->via_relay ? connected_cb_relay(ctx) : connected_cb(ctx);
+                        }
+                        else if (ctx->eagain) {
+                            ctx->eagain = false;
+
+                            if (ctx->out_buffer) {
+
+                                uint8_t* frame = ctx->out_buffer + ctx->out_buffer_consumed;
+                                int frame_len = ctx->out_buffer_length - ctx->out_buffer_consumed;
+
+                                int ret = ctx->send(
+                                    ctx,
+                                    frame,
+                                    frame_len
+                                );
+
+                                if (ret < frame_len) {
+                                    // Wrote more, but did could not empty the buffer
+                                    ctx->out_buffer_consumed += ret;
+                                    ctx->eagain = true;
+                                } else {
+                                    // Frame sent, we can now send more
+                                    wish_platform_free(ctx->out_buffer);
+                                    ctx->out_buffer = NULL;
+                                    ctx->eagain = false;
+
+                                    // respond to the original service.send request
+                                    rpc_server_send(ctx->req, NULL, 0);
+                                    ctx->req = NULL;
+                                }
                             }
                         }
                         else {
-                            printf("There is somekind of state inconsistency\n");
+                            printf("There is somekind of state inconsistency %i\n", ctx->curr_transport_state);
                             exit(1);
                         }
                     }
