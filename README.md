@@ -19,9 +19,9 @@ This is a C-language implementation based on the Wish (wish-core) reference impl
 
 ## Applications
 
-`wish-cli`: A node.js command line interface for accessing and managing a Wish Core. See: https://www.npmjs.com/package/wish-cli
+`wish-cli`: A node.js command line interface for accessing and managing a Wish Core. See: https://www.npmjs.com/package/@wishcore/wish-cli
 
-`wish-core-api`: A native node.js addon to quickly build node.js applications using Wish. See https://www.npmjs.com/package/wish-core-api.
+`wish-core-api`: A native node.js addon to quickly build node.js applications using Wish. See https://www.npmjs.com/package/@wishcore/wish-sdk.
 
 ## Build
 

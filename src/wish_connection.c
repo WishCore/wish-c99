@@ -355,6 +355,8 @@ again:
                     wish_core_handle_payload(core, connection, buf, connection->expect_bytes);
                     wish_platform_free(buf);
                     connection->curr_transport_state = TRANSPORT_STATE_WAIT_FRAME_LEN;
+                    connection->latest_input_timestamp = wish_time_get_relative(core);
+
                     if (ring_buffer_length(&(connection->rx_ringbuf)) >= 2) {
                         /* There is more data to be read */
                         goto again;
@@ -1352,9 +1354,11 @@ int wish_core_send_message(wish_core_t* core, wish_connection_t* connection, con
         connection->out_buffer_length = frame_len;
         connection->out_buffer_consumed = ret;
         update_nonce(connection->aes_gcm_iv_out+4);
+        connection->latest_input_timestamp = wish_time_get_relative(core);
     } else if (ret == frame_len) {
         wish_platform_free(frame);
         update_nonce(connection->aes_gcm_iv_out+4);
+        connection->latest_input_timestamp = wish_time_get_relative(core);
     }
 
     // WISHDEBUG(LOG_CRITICAL, "Exiting %i of %i", ret, frame_len);

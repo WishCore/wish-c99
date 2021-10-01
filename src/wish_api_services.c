@@ -205,7 +205,7 @@ void wish_api_services_send(rpc_server_req* req, const uint8_t* args) {
 
         int send_ret = wish_core_send_message(core, connection, bson_data(&bs), bson_size(&bs));
         
-        if (send_ret == -4) {
+        if (send_ret == -4 || send_ret == -2) {
             rpc_server_error_msg(req, 507, "Out buffer full, try again later...");
         }
         else if (send_ret != 0) {
