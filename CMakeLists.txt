@@ -1,5 +1,5 @@
 project(wish)
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 3.19)
 
 #set(CMAKE_C_FLAGS "-Wall -std=c99 -Wno-pointer-sign")
 #set(CMAKE_C_FLAGS "-Wall -m32 -Wno-pointer-sign -Wno-unused-variable")
@@ -15,6 +15,10 @@ option(CORE_DEBUG "Debug features enabled" OFF)
 #option(CORE_CLASS "Define class for localdiscovery" OFF)
 
 set(CORE_CLASS "" CACHE STRING "Define class for local discovery")
+
+if(BUILD_ARM64)
+    set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Build arm64 for Mac OS X" FORCE)
+endif(BUILD_ARM64)
 
 if(BUILD_IA32)
     message("Should be building for ia32")
